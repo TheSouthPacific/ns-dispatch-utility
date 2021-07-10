@@ -1,0 +1,32 @@
+[general]
+user_agent = 'United States of Vietnam'
+
+[bbcode]
+simple_formatter_path = '~/ns_dispatches/design/simple_tags.toml'
+complex_formatter_path = '~/ns_dispatches/design/complex_tags.toml'
+complex_formatter_config_path = '~/ns_dispatches/design/complex_tags_config.toml'
+
+[template_renderer]
+filter_path = '~/ns_dispatches/design/filters.toml'
+
+[plugins]
+# Choose loader to load dispatch config and content.
+dispatch_loader = 'file_dispatchloader'
+# Choose loader to load variables.
+var_loader = 'file_varloader'
+# Choose loader to load nation login credentials.
+cred_loader = 'json_credloader'
+
+[loader_config]
+[loader_config.file_dispatchloader]
+dispatch_config_paths = ['~/ns_dispatches/dispatches.toml']
+dispatch_template_path = '~/ns_dispatches'
+
+# Dispatch file extension
+# file_ext = '.txt'
+
+[loader_config.file_varloader]
+var_paths = '~/ns_dispatches/vars.toml'
+
+[loader_config.json_credloader]
+# cred_path = '~/ns_dispatches/nations.json'

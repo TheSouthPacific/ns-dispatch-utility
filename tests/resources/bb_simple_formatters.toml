@@ -1,0 +1,8 @@
+[simple1]
+template = '[simple1r]%(value)s[/simple1r]'
+
+[simple2]
+template = '[simple2r]%(value)s[/simple2r]'
+
+[simple3]
+render_embedded = false
