@@ -1,6 +1,7 @@
 """Load dispatches from plain text files with TOML dispatch configuration.
 """
 
+import copy
 import pathlib
 import collections
 import json
@@ -50,7 +51,7 @@ class DispatchConfigManager():
                 if owner_nation not in canonical_dispatch_config:
                     canonical_dispatch_config[owner_nation] = {}
                 for name, config in owner_dispatches.items():
-                    canonical_config = config
+                    canonical_config = copy.deepcopy(config)
                     if 'ns_id' not in config and 'action' not in config:
                         canonical_config['action'] = 'create'
                     elif 'action' not in config:

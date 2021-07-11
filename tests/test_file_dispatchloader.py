@@ -12,11 +12,11 @@ from nsdu.loaders import file_dispatchloader
 
 class TestDispatchConfigManager():
     def test_load_from_file_with_multiple_files(self, toml_files):
-        dispatch_config_1 = {'nation1': {'test1': {'ns_id': 12345,
+        dispatch_config_1 = {'nation1': {'test1': {'ns_id': '12345',
                                                    'title': 'Test title 1',
                                                    'category': '1',
                                                    'subcategory': '100'},
-                                         'test2': {'ns_id': 67890,
+                                         'test2': {'ns_id': '67890',
                                                    'title': 'Test title 2',
                                                    'category': '1',
                                                    'subcategory': '100'},
@@ -26,11 +26,11 @@ class TestDispatchConfigManager():
                              'nation2': {'test4': {'title': 'Test title 4',
                                                    'category': '1',
                                                    'subcategory': '100'}}}
-        dispatch_config_2 = {'nation1': {'test5': {'ns_id': 98765,
+        dispatch_config_2 = {'nation1': {'test5': {'ns_id': '98765',
                                                    'title': 'Test title 1',
                                                    'category': '1',
                                                    'subcategory': '100'}},
-                             'nation2': {'test6': {'ns_id': 54321,
+                             'nation2': {'test6': {'ns_id': '54321',
                                                    'title': 'Test title 4',
                                                    'category': '1',
                                                    'subcategory': '100'}}}
@@ -58,7 +58,7 @@ class TestDispatchConfigManager():
             ins.load_from_files([str(file_path), 'abcd.toml'])
 
     def test_get_canonical_dispatch_config(self):
-        dispatch_config_1 = {'nation1': {'test1': {'ns_id': 12345,
+        dispatch_config_1 = {'nation1': {'test1': {'ns_id': '12345',
                                                    'title': 'Test title 1',
                                                    'category': '1',
                                                    'subcategory': '100'},
@@ -69,12 +69,12 @@ class TestDispatchConfigManager():
                              'nation2': {'test4': {'title': 'Test title 4',
                                                    'category': '1',
                                                    'subcategory': '100'}}}
-        dispatch_config_2 = {'nation1': {'test3': {'ns_id': 98765,
+        dispatch_config_2 = {'nation1': {'test3': {'ns_id': '98765',
                                                    'title': 'Test title 3',
                                                    'category': '1',
                                                    'subcategory': '100'}},
                              'nation2': {'test5': {'action': 'remove',
-                                                   'ns_id': 54321,
+                                                   'ns_id': '54321',
                                                    'title': 'Test title 5',
                                                    'category': '1',
                                                    'subcategory': '100'},
@@ -82,7 +82,7 @@ class TestDispatchConfigManager():
                                                    'category': '1',
                                                    'subcategory': '100'},
                                          'test7': {'action': 'remove',
-                                                   'ns_id': 76543,
+                                                   'ns_id': '76543',
                                                    'title': 'Test title 7',
                                                    'category': '1',
                                                    'subcategory': '100'}}}
@@ -93,7 +93,7 @@ class TestDispatchConfigManager():
         r = ins.get_canonical_dispatch_config()
 
         expected = {'nation1': {'test1': {'action': 'edit',
-                                          'ns_id': 12345,
+                                          'ns_id': '12345',
                                           'title': 'Test title 1',
                                           'category': '1',
                                           'subcategory': '100'},
@@ -102,7 +102,7 @@ class TestDispatchConfigManager():
                                           'category': '1',
                                           'subcategory': '100'},
                                 'test3': {'action': 'edit',
-                                          'ns_id': 98765,
+                                          'ns_id': '98765',
                                           'title': 'Test title 3',
                                           'category': '1',
                                           'subcategory': '100'}},
@@ -111,7 +111,7 @@ class TestDispatchConfigManager():
                                           'category': '1',
                                           'subcategory': '100'},
                                 'test5': {'action': 'remove',
-                                          'ns_id': 54321,
+                                          'ns_id': '54321',
                                           'title': 'Test title 5',
                                           'category': '1',
                                           'subcategory': '100'},
@@ -120,7 +120,7 @@ class TestDispatchConfigManager():
                                           'category': '1',
                                           'subcategory': '100'},
                                 'test7': {'action': 'remove',
-                                          'ns_id': 76543,
+                                          'ns_id': '76543',
                                           'title': 'Test title 7',
                                           'category': '1',
                                           'subcategory': '100'}}}
@@ -128,18 +128,18 @@ class TestDispatchConfigManager():
 
 
     def test_save_after_add_new_dispatch_id(self, toml_files):
-        dispatch_config_1 = {'nation1': {'test1': {'ns_id': 12345,
+        dispatch_config_1 = {'nation1': {'test1': {'ns_id': '12345',
                                                    'title': 'Test title 1',
                                                    'category': '1',
                                                    'subcategory': '100'},
                                          'test2': {'title': 'Test title 3',
                                                    'category': '1',
                                                    'subcategory': '100'}},
-                             'nation2': {'test3': {'ns_id': 12345,
+                             'nation2': {'test3': {'ns_id': '12345',
                                                    'title': 'Test title 4',
                                                    'category': '1',
                                                    'subcategory': '100'}}}
-        dispatch_config_2 = {'nation1': {'test4': {'ns_id': 98765,
+        dispatch_config_2 = {'nation1': {'test4': {'ns_id': '98765',
                                                    'title': 'Test title 1',
                                                    'category': '1',
                                                    'subcategory': '100'}},
@@ -153,12 +153,33 @@ class TestDispatchConfigManager():
         dispatch_config_file_2_path = dispatch_config_dir / 'dispatch_config_2.toml'
         ins.load_from_files([str(dispatch_config_file_1_path), str(dispatch_config_file_2_path)])
 
-        ins.add_new_dispatch_id('test2', 23456)
-        ins.add_new_dispatch_id('test5', 54321)
+        ins.add_new_dispatch_id('test2', '23456')
+        ins.add_new_dispatch_id('test5', '54321')
         ins.save()
 
-        assert toml.load(dispatch_config_file_1_path)['nation1']['test2']['ns_id'] == 23456
-        assert toml.load(dispatch_config_file_2_path)['nation2']['test5']['ns_id'] == 54321
+        expected_1 = {'nation1': {'test1': {'ns_id': '12345',
+                                            'title': 'Test title 1',
+                                            'category': '1',
+                                            'subcategory': '100'},
+                                  'test2': {'ns_id': '23456',
+                                            'title': 'Test title 3',
+                                            'category': '1',
+                                            'subcategory': '100'}},
+                      'nation2': {'test3': {'ns_id': '12345',
+                                            'title': 'Test title 4',
+                                            'category': '1',
+                                            'subcategory': '100'}}}
+        expected_2 = {'nation1': {'test4': {'ns_id': '98765',
+                                            'title': 'Test title 1',
+                                            'category': '1',
+                                            'subcategory': '100'}},
+                      'nation2': {'test5': {'ns_id': '54321',
+                                            'title': 'Test title 4',
+                                            'category': '1',
+                                            'subcategory': '100'}}}
+
+        assert toml.load(dispatch_config_file_1_path) == expected_1
+        assert toml.load(dispatch_config_file_2_path) == expected_2
 
 class TestFileDispatchLoaderObj():
     def test_get_dispatch_text(self, text_files):
@@ -182,19 +203,19 @@ class TestFileDispatchLoaderIntegration():
                            'test3.txt': 'Test text 3', 'test4.txt': 'Test text 4'})
 
     def test_with_no_dispatch_creation_or_removal(self, dispatch_files, toml_files):
-        dispatch_config_1 = {'nation1': {'test1': {'ns_id': 12345,
+        dispatch_config_1 = {'nation1': {'test1': {'ns_id': '12345',
                                                    'title': 'Test title 1',
                                                    'category': '1',
                                                    'subcategory': '100'},
-                                         'test2': {'ns_id': 67890,
+                                         'test2': {'ns_id': '67890',
                                                    'title': 'Test title 2',
                                                    'category': '1',
                                                    'subcategory': '100'}},
-                             'nation2': {'test3': {'ns_id': 78654,
+                             'nation2': {'test3': {'ns_id': '78654',
                                                    'title': 'Test title 3',
                                                    'category': '1',
                                                    'subcategory': '100'}}}
-        dispatch_config_2 = {'nation1': {'test4': {'ns_id': 98765,
+        dispatch_config_2 = {'nation1': {'test4': {'ns_id': '98765',
                                                    'title': 'Test title 4',
                                                    'category': '1',
                                                    'subcategory': '100'}}}
@@ -209,23 +230,23 @@ class TestFileDispatchLoaderIntegration():
         r_dispatch_text = file_dispatchloader.get_dispatch_text(loader, 'test1')
         file_dispatchloader.cleanup_dispatch_loader(loader)
 
-        assert r_dispatch_config['nation1']['test4']['ns_id'] == 98765
+        assert r_dispatch_config['nation1']['test4']['ns_id'] == '98765'
         assert r_dispatch_text == 'Test text 1'
 
     def test_with_one_dispatch_creation_and_one_removal(self, dispatch_files, toml_files):
-        dispatch_config_1 = {'nation1': {'test1': {'ns_id': 12345,
+        dispatch_config_1 = {'nation1': {'test1': {'ns_id': '12345',
                                                    'title': 'Test title 1',
                                                    'category': '1',
                                                    'subcategory': '100'},
                                          'test2': {'title': 'Test title 2',
                                                    'category': '1',
                                                    'subcategory': '100'}},
-                             'nation2': {'test3': {'ns_id': 78654,
+                             'nation2': {'test3': {'ns_id': '78654',
                                                    'title': 'Test title 3',
                                                    'category': '1',
                                                    'subcategory': '100'}}}
         dispatch_config_2 = {'nation1': {'test4': {'action': 'remove',
-                                                   'ns_id': 98765,
+                                                   'ns_id': '98765',
                                                    'title': 'Test title 4',
                                                    'category': '1',
                                                    'subcategory': '100'}}}
@@ -240,9 +261,9 @@ class TestFileDispatchLoaderIntegration():
         loader = file_dispatchloader.init_dispatch_loader({'file_dispatchloader': loader_config})
         r_dispatch_config = file_dispatchloader.get_dispatch_config(loader)
         r_dispatch_text = file_dispatchloader.get_dispatch_text(loader, 'test1')
-        file_dispatchloader.add_dispatch_id(loader, 'test2', 54321)
+        file_dispatchloader.add_dispatch_id(loader, 'test2', '54321')
         file_dispatchloader.cleanup_dispatch_loader(loader)
 
         assert r_dispatch_config['nation1']['test4']['action'] == 'remove'
         assert r_dispatch_text == 'Test text 1'
-        assert toml.load(dispatch_config_dir / 'dispatch_config_1.toml')['nation1']['test2']['ns_id'] == 54321
+        assert toml.load(dispatch_config_dir / 'dispatch_config_1.toml')['nation1']['test2']['ns_id'] == '54321'
