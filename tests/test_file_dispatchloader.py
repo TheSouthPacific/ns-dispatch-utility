@@ -127,7 +127,7 @@ class TestDispatchConfigManager():
         assert r == expected
 
 
-    def test_save_after_add_new_dispatch_id(self, toml_files):
+    def test_save_after_add_new_dispatch_id_for_all_new_dispatches(self, toml_files):
         dispatch_config_1 = {'nation1': {'test1': {'ns_id': '12345',
                                                    'title': 'Test title 1',
                                                    'category': '1',
@@ -175,6 +175,58 @@ class TestDispatchConfigManager():
                                             'subcategory': '100'}},
                       'nation2': {'test5': {'ns_id': '54321',
                                             'title': 'Test title 4',
+                                            'category': '1',
+                                            'subcategory': '100'}}}
+
+        assert toml.load(dispatch_config_file_1_path) == expected_1
+        assert toml.load(dispatch_config_file_2_path) == expected_2
+
+    def test_save_after_add_new_dispatch_id_for_only_one_new_dispatch(self, toml_files):
+        dispatch_config_1 = {'nation1': {'test1': {'ns_id': '12345',
+                                                   'title': 'Test title 1',
+                                                   'category': '1',
+                                                   'subcategory': '100'},
+                                         'test2': {'title': 'Test title 3',
+                                                   'category': '1',
+                                                   'subcategory': '100'}},
+                             'nation2': {'test3': {'ns_id': '12345',
+                                                   'title': 'Test title 4',
+                                                   'category': '1',
+                                                   'subcategory': '100'}}}
+        dispatch_config_2 = {'nation1': {'test4': {'ns_id': '98765',
+                                                   'title': 'Test title 1',
+                                                   'category': '1',
+                                                   'subcategory': '100'}},
+                             'nation2': {'test5': {'title': 'Test title 4',
+                                                   'category': '1',
+                                                   'subcategory': '100'}}}
+        dispatch_config_dir = toml_files({'dispatch_config_1.toml': dispatch_config_1,
+                                          'dispatch_config_2.toml':dispatch_config_2})
+        ins = file_dispatchloader.DispatchConfigManager()
+        dispatch_config_file_1_path = dispatch_config_dir / 'dispatch_config_1.toml'
+        dispatch_config_file_2_path = dispatch_config_dir / 'dispatch_config_2.toml'
+        ins.load_from_files([str(dispatch_config_file_1_path), str(dispatch_config_file_2_path)])
+
+        ins.add_new_dispatch_id('test2', '23456')
+        ins.save()
+
+        expected_1 = {'nation1': {'test1': {'ns_id': '12345',
+                                            'title': 'Test title 1',
+                                            'category': '1',
+                                            'subcategory': '100'},
+                                  'test2': {'ns_id': '23456',
+                                            'title': 'Test title 3',
+                                            'category': '1',
+                                            'subcategory': '100'}},
+                      'nation2': {'test3': {'ns_id': '12345',
+                                            'title': 'Test title 4',
+                                            'category': '1',
+                                            'subcategory': '100'}}}
+        expected_2 = {'nation1': {'test4': {'ns_id': '98765',
+                                            'title': 'Test title 1',
+                                            'category': '1',
+                                            'subcategory': '100'}},
+                      'nation2': {'test5': {'title': 'Test title 4',
                                             'category': '1',
                                             'subcategory': '100'}}}
 

@@ -84,8 +84,8 @@ class DispatchConfigManager():
 
         for dispatch_config_path, dispatch_config in self.all_dispatch_config.items():
             for owner_nation, owner_dispatches in dispatch_config.items():
-                for name in owner_dispatches.keys():
-                    if 'ns_id' not in self.all_dispatch_config[dispatch_config_path][owner_nation][name]:
+                for name, config in owner_dispatches.items():
+                    if 'ns_id' not in config and name in self.new_dispatch_id:
                         self.all_dispatch_config[dispatch_config_path][owner_nation][name]['ns_id'] = self.new_dispatch_id.pop(name)
 
         for dispatch_config_path, dispatch_config in self.all_dispatch_config.items():
