@@ -207,7 +207,7 @@ test = ["pytest (<5.4)", "pytest-cov"]
 
 [[package]]
 name = "nationstates"
-version = "3.0.2.8"
+version = "3.0.3.9"
 description = "Nationstates API wrapper for python"
 category = "main"
 optional = false
@@ -594,8 +594,7 @@ mock = [
     {file = "mock-4.0.3.tar.gz", hash = "sha256:7d3fbbde18228f4ff2f1f119a45cdffa458b4c0dee32eb4d2bb2f82554bac7bc"},
 ]
 nationstates = [
-    {file = "nationstates-3.0.2.8-py2-none-any.whl", hash = "sha256:5bd31f03305b5d5b49ff398b27a59034c7896dc2b2fab0964ffb752b9919ee22"},
-    {file = "nationstates-3.0.2.8.tar.gz", hash = "sha256:6728a567bf59186a984dbd0eeba871fb2f81b9180260ebdfef39bf1f5d625ca5"},
+    {file = "nationstates-3.0.3.9.tar.gz", hash = "sha256:6474b20ea6379056c3a73c60dcc0710c51898f6e039a500ec899a0f704f48db6"},
 ]
 packaging = [
     {file = "packaging-21.0-py3-none-any.whl", hash = "sha256:c86254f9220d55e31cc94d69bade760f0847da8000def4dfe1c6b872fd14ff14"},
