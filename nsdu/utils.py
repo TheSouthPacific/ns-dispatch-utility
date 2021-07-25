@@ -134,8 +134,7 @@ def get_general_config():
 
 
 def get_dispatch_info(dispatch_config):
-    """Compose and return dispatch information
-    for use as context in the template renderer.
+    """Return dispatch information for use as context in the template renderer.
 
     Args:
         dispatch_config (dict): Dispatch configuration.
@@ -173,23 +172,10 @@ def load_module(path, name='module'):
         name (str): Name of module for reference needs. Defaults to 'module'
     """
 
-    spec = importlib.util.spec_from_file_location(name, path)
+    spec = importlib.util.spec_from_file_location(name, path.expanduser())
     if spec is not None:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
         return module
 
     raise FileNotFoundError
-
-
-def add_extension(name):
-    """Get file name with .py extension.
-
-    Args:
-        name (str): Name
-
-    Returns:
-        str
-    """
-
-    return '{}.py'.format(name)
