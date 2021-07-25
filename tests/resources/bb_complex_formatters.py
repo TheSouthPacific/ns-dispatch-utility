@@ -4,7 +4,7 @@ from nsdu import BBCode
 @BBCode.register('complex')
 class Complex():
     def format(self, tag_name, value, options, parent, context):
-        return "[complexr]{}[/complexr]".format(value)
+        return "[simple1]{}[/simple1]".format(value)
 
 
 @BBCode.register('complexctx', render_embedded=False)
