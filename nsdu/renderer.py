@@ -35,27 +35,28 @@ class DispatchJinjaLoader(jinja2.BaseLoader):
 class TemplateRenderer():
     """Render a dispatch template.
 
-        Args:
-            dispatch_loader (str): Dispatch loader plugin.
-            filter_path (str): Path to filters file.
+    Args:
+        dispatch_loader (str): Dispatch loader plugin.
     """
 
-    def __init__(self, dispatch_loader, filter_path):
-        self.filter_path = pathlib.Path(filter_path).expanduser()
+    def __init__(self, dispatch_loader):
         template_loader = DispatchJinjaLoader(dispatch_loader)
         # Make access to undefined context variables generate logs.
         undef = jinja2.make_logging_undefined(logger=logger)
         self.env = jinja2.Environment(loader=template_loader, trim_blocks=True, undefined=undef)
 
-    def load_filters(self):
+    def load_filters(self, filter_path):
         """Load all filters if filter path is set.
+
+        Args:
+            filter_path (str): Path to filters file.
         """
 
-        if self.filter_path is not None:
+        if filter_path is not None:
             try:
-                filters = utils.get_funcs(self.filter_path)
+                filters = utils.get_funcs(pathlib.Path(filter_path))
             except FileNotFoundError:
-                raise exceptions.ConfigError('Filter file not found at "{}"'.format(self.filter_path))
+                raise exceptions.ConfigError('Filter file not found at "{}"'.format(filter_path))
             else:
                 loaded_filters = {}
                 for jinja_filter in filters:
@@ -83,34 +84,31 @@ class DispatchRenderer():
 
     Args:
         dispatch_loader: Dispatch loader
-        var_loader: Var loader
-        bb_config (dict): BBCode parser configuration
-        template_config (dict): Template renderer configuration
     """
 
-    def __init__(self, dispatch_loader, var_loader, bb_config, template_config):
-        self.template_renderer = TemplateRenderer(dispatch_loader,
-                                                  template_config.get('filter_path', None))
-
-        self.bb_parser = bb_parser.BBParser(bb_config.get('simple_formatter_path', None),
-                                            bb_config.get('complex_formatter_path', None),
-                                            bb_config.get('complex_formatter_config_path', None))
-
-        self.var_loader = var_loader
+    def __init__(self, dispatch_loader):
+        self.template_renderer = TemplateRenderer(dispatch_loader)
+        self.bb_parser = bb_parser.BBParser()
 
         # Context all dispatches will have
         self.global_context = {}
 
-    def load(self, dispatch_config):
+    def load(self, simple_bb_config, complex_bb_config, template_config, vars, dispatch_config):
         """Load template renderer filters, BBCode formatters, and setup context.
         Args:
+            simple_bb_config (dict): Simple BBCode formatter config
+            complex_bb_config (dict): Complex BBCode formatter config
+            template_config (dict): Template renderer config
+            vars (dict): Variables for placeholders
             dispatch_config (dict): Dispatch config
         """
 
-        self.template_renderer.load_filters()
-        self.bb_parser.load_formatters()
+        self.template_renderer.load_filters(template_config.get('filter_path', None))
+        self.bb_parser.load_formatters(simple_bb_config,
+                                       complex_bb_config.get('complex_formatter_source_path', None),
+                                       complex_bb_config.get('complex_formatter_config_path', None))
 
-        self.global_context = self.var_loader.get_all_vars()
+        self.global_context = vars
         self.global_context['dispatch_info'] = utils.get_dispatch_info(dispatch_config)
 
     def render(self, name):
