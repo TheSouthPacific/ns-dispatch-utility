@@ -27,23 +27,23 @@ class NSDU():
     """
 
     def __init__(self, config):
+        self.config = config
+
         ns_api = nationstates.Nationstates(user_agent=config['general']['user_agent'])
         dispatch_api = api_adapter.DispatchAPI(ns_api)
 
-        plugin_options = config['plugins']
-        loader_config = config['loader_config']
+        plugin_opt = self.config['plugins']
+        loader_config = self.config['loader_config']
 
-        self.dispatch_loader = loader.DispatchLoader(plugin_options['dispatch_loader'], loader_config)
-        self.var_loader = loader.VarLoader(plugin_options['var_loader'], loader_config)
+        self.dispatch_loader = loader.DispatchLoader(plugin_opt['dispatch_loader'], loader_config)
+        self.var_loader = loader.VarLoader(plugin_opt['var_loader'], loader_config)
+        self.simple_bb_loader = loader.SimpleBBLoader(plugin_opt['simple_bb_loader'], loader_config)
 
         self.dispatch_config = None
 
-        bb_config = config['bbcode']
-        template_config= config['template_renderer']
-        self.renderer = renderer.DispatchRenderer(self.dispatch_loader, self.var_loader,
-                                                  bb_config, template_config)
+        self.renderer = renderer.DispatchRenderer(self.dispatch_loader)
 
-        self.cred_loader = loader.CredLoader(plugin_options['cred_loader'], loader_config)
+        self.cred_loader = loader.CredLoader(plugin_opt['cred_loader'], loader_config)
         self.creds = utils.CredManager(self.cred_loader, dispatch_api)
 
         self.updater = updater.DispatchUpdater(dispatch_api, self.creds,
@@ -59,14 +59,19 @@ class NSDU():
         self.cred_loader.load_loader()
         if only_cred:
             return
+        self.creds.load_creds()
 
         self.dispatch_loader.load_loader()
         self.dispatch_config = self.dispatch_loader.get_dispatch_config()
 
-        self.creds.load_creds()
+        self.simple_bb_loader.load_loader()
+        simple_bb_config = self.simple_bb_loader.get_simple_bb_config()
 
         self.var_loader.load_loader()
-        self.renderer.load(self.dispatch_config)
+        vars = self.var_loader.get_all_vars()
+
+        self.renderer.load(simple_bb_config, self.config['complex_bb_parser'],
+                           self.config['template_renderer'],vars, self.dispatch_config)
 
     def update_dispatches(self, dispatches):
         """Update dispatches. Empty list means update all.
