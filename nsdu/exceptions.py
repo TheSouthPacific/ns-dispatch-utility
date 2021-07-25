@@ -1,6 +1,7 @@
 """Exceptions for NSDU-specific errors.
 """
 
+
 class NSDUError(Exception):
     """NSDU general error.
     """
@@ -12,7 +13,7 @@ class ConfigError(NSDUError):
 
 
 class LoaderError(NSDUError):
-    """Loader plugin error.
+    """Error of loader plugins.
     """
 
     def __init__(self, suppress_nsdu_error=True):
@@ -20,8 +21,13 @@ class LoaderError(NSDUError):
         super().__init__()
 
 
+class LoaderConfigError(LoaderError):
+    """Loader's config error.
+    """
+
+
 class DispatchTextNotFound(LoaderError):
-    """Dispatch text not found error.
+    """Dispatch text not found.
     """
 
 
