@@ -1,8 +1,10 @@
+import pathlib
+
 from nsdu import loader
 from nsdu import info
 
 
-info.LOADER_DIR_PATH = 'tests/resources'
+info.LOADER_DIR_PATH = pathlib.Path('tests/resources')
 
 
 DISPATCH_LOADER_NAME = 'dispatchloader-test1'
@@ -14,7 +16,9 @@ class TestDispatchLoader():
         obj = loader.DispatchLoader(DISPATCH_LOADER_NAME,
                                     DISPATCH_LOADER_CONFIG)
         obj.load_loader()
+
         r = obj.get_dispatch_config()
+
         obj.cleanup_loader()
 
         assert r == {'foo1': 'bar1', 'foo2': 'bar2'}
@@ -23,7 +27,9 @@ class TestDispatchLoader():
         obj = loader.DispatchLoader(DISPATCH_LOADER_NAME,
                                     DISPATCH_LOADER_CONFIG)
         obj.load_loader()
+
         r = obj.get_dispatch_text('test')
+
         obj.cleanup_loader()
 
         assert r == 'Dispatch content of test'
@@ -32,7 +38,9 @@ class TestDispatchLoader():
         obj = loader.DispatchLoader(DISPATCH_LOADER_NAME,
                                     DISPATCH_LOADER_CONFIG)
         obj.load_loader()
+
         r = obj.add_dispatch_id('test', '123456')
+
         obj.cleanup_loader()
 
         assert r
@@ -47,9 +55,24 @@ class TestVarLoader():
     def test_get_all_vars(self):
         obj = loader.VarLoader(VAR_LOADER_NAMES, VAR_LOADER_CONFIG)
         obj.load_loader()
+
         r = obj.get_all_vars()
 
         assert r == {'key1': {'key1': 'val1'}, 'key2': {'key2': 'val2'}}
+
+
+SIMPLE_BB_LOADER_NAME = 'simplebbloader-test1'
+SIMPLE_BB_LOADER_CONFIG = {'simplebbloader-test1': {'key1': 'val1'}}
+
+
+class TestSimpleBBLoader():
+    def test_get_simple_bb_config(self):
+        obj = loader.SimpleBBLoader(SIMPLE_BB_LOADER_NAME, SIMPLE_BB_LOADER_CONFIG)
+        obj.load_loader()
+
+        r = obj.get_simple_bb_config()
+
+        assert r == {'key1': {'key1': 'val1'}}
 
 
 CRED_LOADER_NAME = 'credloader-test1'
@@ -60,7 +83,9 @@ class TestCredLoader():
     def test_get_all_creds(self):
         obj = loader.CredLoader(CRED_LOADER_NAME, CRED_LOADER_CONFIG)
         obj.load_loader()
+
         r = obj.get_creds()
+
         obj.cleanup_loader()
 
         assert r == {'nation1': '123456'}
@@ -68,7 +93,9 @@ class TestCredLoader():
     def test_add_cred(self):
         obj = loader.CredLoader(CRED_LOADER_NAME, CRED_LOADER_CONFIG)
         obj.load_loader()
+
         r = obj.add_cred('nation1', '123456')
+
         obj.cleanup_loader()
 
         assert r
@@ -76,7 +103,9 @@ class TestCredLoader():
     def test_remove_cred(self):
         obj = loader.CredLoader(CRED_LOADER_NAME, CRED_LOADER_CONFIG)
         obj.load_loader()
+
         r = obj.remove_cred('nation1')
+
         obj.cleanup_loader()
 
         assert r

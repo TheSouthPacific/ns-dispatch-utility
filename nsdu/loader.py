@@ -3,6 +3,7 @@
 
 import collections
 import os
+import pathlib
 
 import pluggy
 
@@ -16,7 +17,7 @@ class Loader():
 
     Args:
         proj_name (str): Pluggy project name for this plugin type
-        name (str|list): Name(s) of loader file(s)
+        name (str|list): Name(s) of loader's source file(s)
         loader_config (dict): Loaders' configuration
     """
 
@@ -30,10 +31,10 @@ class Loader():
         """Load a loader's module and register it.
 
         Args:
-            name (str): Name of loader file
+            name (str): Name of loader's source file
         """
 
-        path = os.path.join(info.LOADER_DIR_PATH, utils.add_extension(name))
+        path = (info.LOADER_DIR_PATH / name).with_suffix('.py')
         module = utils.load_module(path, name)
         self.manager.register(module)
 
@@ -49,7 +50,7 @@ class Loader():
 
 
 class PersistentLoader(Loader):
-    """Handling plugins that need to exist for the entire duration of the app.
+    """Handling plugins that maintain state for the entire duration of the app.
 
     Args:
         Same as Loader class
@@ -81,7 +82,7 @@ class VarLoader(Loader):
     """Load variables from multiple loaders.
 
     Args:
-        names (list): Names of loader files
+        names (list): Names of loaders' source file
     """
 
     def __init__(self, names, loader_config):
@@ -97,7 +98,7 @@ class DispatchLoader(PersistentLoader):
     """Load dispatch information and content.
 
     Args:
-        name (str): Name of loader file
+        name (str): Name of loader's source file
     """
 
     def __init__(self, name, loader_config):
@@ -121,11 +122,25 @@ class DispatchLoader(PersistentLoader):
                                                  dispatch_id=dispatch_id)
 
 
+class SimpleBBLoader(Loader):
+    """Load simple BBCode formatter config.
+
+    Args:
+        name (str): Name of loader's source file
+    """
+
+    def __init__(self, name, loader_config):
+        super().__init__(info.SIMPLE_BB_LOADER_PROJ, name, loader_config)
+
+    def get_simple_bb_config(self):
+        return self.manager.hook.get_simple_bb_config(config=self.loader_config)
+
+
 class CredLoader(PersistentLoader):
     """Load nation login credentials.
 
     Args:
-        name (str): Name of loader file
+        name (str): Name of loader's source file
     """
 
     def __init__(self, name, loader_config):

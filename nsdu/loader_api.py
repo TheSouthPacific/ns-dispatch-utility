@@ -12,6 +12,9 @@ dispatch_loader = pluggy.HookimplMarker(info.DISPATCH_LOADER_PROJ)
 var_loader_specs = pluggy.HookspecMarker(info.VAR_LOADER_PROJ)
 var_loader = pluggy.HookimplMarker(info.VAR_LOADER_PROJ)
 
+simple_bb_loader_specs = pluggy.HookspecMarker(info.SIMPLE_BB_LOADER_PROJ)
+simple_bb_loader = pluggy.HookimplMarker(info.SIMPLE_BB_LOADER_PROJ)
+
 cred_loader_specs = pluggy.HookspecMarker(info.CRED_LOADER_PROJ)
 cred_loader = pluggy.HookimplMarker(info.CRED_LOADER_PROJ)
 
@@ -21,7 +24,7 @@ def init_dispatch_loader(config):
     """Initiate a loader.
 
     Args:
-        config (dict): Loaders' configuration
+        config (dict): Loader's configuration
 
     Return:
         Loader object
@@ -74,13 +77,24 @@ def cleanup_dispatch_loader(loader):
 
 @var_loader_specs
 def get_vars(config):
-    """Get all variables as a dict.
+    """Get variables for placeholders.
 
     Args:
-        config (dict): Loaders' configuration
+        config (dict): Loader's configuration
 
     Return:
-        dict: Variables
+        dict: Placeholder variables
+    """
+
+
+@simple_bb_loader_specs(firstresult=True)
+def get_simple_bb_config(config):
+    """Get simple BBCode formatter config.
+
+    Args:
+        config (dict): Loader's configuration
+    Return:
+        dict: Config for simple BBCode formatters
     """
 
 
@@ -89,7 +103,7 @@ def init_cred_loader(config):
     """Initiate a loader.
 
     Args:
-        config (dict): Loaders' configuration
+        config (dict): Loader's configuration
 
     Return:
         Loader object
@@ -101,7 +115,7 @@ def get_creds(loader):
     """Get all nations' credential.
 
     Args:
-        config (dict): Loaders' configuration
+        config (dict): Loader's configuration
 
     Return:
         dict: Nations' credential
@@ -113,7 +127,7 @@ def add_cred(loader, name, x_autologin):
     """Add a nation's credential.
 
     Args:
-        config (dict): Loaders' configuration
+        config (dict): Loader's configuration
         name (str): Nation name
         x_autologin (str): Nation's X-Autologin.
     """
@@ -124,7 +138,7 @@ def remove_cred(loader, name):
     """Delete a nation's credential.
 
     Args:
-        config (dict): Loaders' configuration
+        config (dict): Loader's configuration
         name (str): Nation name
     """
 
