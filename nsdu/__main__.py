@@ -101,7 +101,7 @@ class NSDU():
 
 
     def add_nation_cred(self, nation_name, password):
-        """Add a new credential.
+        """Add new credentials.
 
         Args:
             nation_name (str): Nation name
@@ -111,7 +111,7 @@ class NSDU():
         self.creds[nation_name] = password
 
     def remove_nation_cred(self, nation_name):
-        """Remove a credential.
+        """Remove credentials.
 
         Args:
             nation_name (str): Nation name
@@ -124,7 +124,9 @@ class NSDU():
         """
 
         self.dispatch_loader.cleanup_loader()
+        self.creds.save()
         self.cred_loader.cleanup_loader()
+
 
 def cli():
     """Process command line arguments."""
@@ -133,9 +135,9 @@ def cli():
     subparsers = parser.add_subparsers(help='Sub-command help')
 
     cred_command = subparsers.add_parser('cred', help='Nation login credential management')
-    cred_command.add_argument('--add', nargs=2, metavar=('NAME', 'PASSWORD'),
+    cred_command.add_argument('--add', nargs='*', metavar=('NAME', 'PASSWORD'),
                               help='Add new login credential')
-    cred_command.add_argument('--remove', nargs=1, metavar='NAME',
+    cred_command.add_argument('--remove', nargs='*', metavar='NAME',
                               help='Remove login credential')
 
     update_command = subparsers.add_parser('update', help='Update dispatches')
@@ -153,12 +155,17 @@ def run(app, inputs):
         inputs: CLI arguments
     """
 
-    if hasattr(inputs, 'add'):
+    if hasattr(inputs, 'add') and inputs.add is not None:
         app.load(only_cred=True)
-        app.add_nation_cred(inputs.add[0], inputs.add[1])
-    elif hasattr(inputs, 'remove'):
+        if len(inputs.add) % 2 != 0:
+            print('There is no password for the last name.')
+            return
+        for i in range(0, len(inputs.add), 2):
+            app.add_nation_cred(inputs.add[i], inputs.add[i+1])
+    elif hasattr(inputs, 'remove') and inputs.remove is not None:
         app.load(only_cred=True)
-        app.remove_nation_cred(inputs.remove[0])
+        for nation_name in inputs.remove:
+            app.remove_nation_cred(nation_name)
     else:
         app.load()
         app.update_dispatches(inputs.dispatches)
