@@ -29,7 +29,11 @@ dispatch_template_path = '~/ns_dispatches'
 file_path = '~/ns_dispatches/simple_bb_config.toml'
 
 [loader_config.file_varloader]
-var_paths = '~/ns_dispatches/vars.toml'
+var_paths = ['~/ns_dispatches/vars.toml']
+# Variable groups that contain personnel names (e.g. government official names)
+personnel_groups = ['personnel']
+# Variable groups that define information associated with a personnel name (e.g. nation name, Discord ID)
+personnel_info_groups = ['reference']
 
 [loader_config.json_credloader]
 # cred_path = '~/ns_dispatches/nations.json'

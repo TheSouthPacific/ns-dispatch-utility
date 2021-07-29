@@ -3,6 +3,7 @@ import os
 import pytest
 import toml
 
+from nsdu import exceptions
 from nsdu.loaders import file_varloader
 
 
@@ -20,6 +21,67 @@ def setup_vars_files():
 
     os.remove('test1.toml')
     os.remove('test2.toml')
+
+
+class TestAddPersonnelInfo():
+    def test_with_existing_groups(self):
+        personnel = {'personnel1': {'position1': 'Frodo', 'position2': 'Gandalf'},
+                     'personnel2': {'position1': 'Sauron', 'position2': 'Theoden'}}
+        personnel_info = {'info1': {'Frodo': {'nation': 'Frodonia', 'discord_handle': 'Frodo#1234'},
+                                    'Gandalf': {'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'},
+                                    'Sauron': {'nation': 'Sauron', 'discord_handle': 'Sauron#5050'}},
+                          'info2': {'Theoden': {'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}}}
+        vars = {'foo1': 'bar1'}
+        vars.update(personnel)
+        vars.update(personnel_info)
+    
+        file_varloader.add_personnel_info(vars, ['personnel1', 'personnel2'], ['info1', 'info2'])
+    
+        expected_personnel = {'personnel1': {'position1': {'name': 'Frodo', 'nation': 'Frodonia', 'discord_handle': 'Frodo#1234'},
+                                             'position2': {'name': 'Gandalf', 'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'}},
+                              'personnel2': {'position1': {'name': 'Sauron', 'nation': 'Sauron', 'discord_handle': 'Sauron#5050'},
+                                             'position2': {'name': 'Theoden', 'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}}}
+        expected = {'foo1': 'bar1'}
+        expected.update(expected_personnel)
+        expected.update(personnel_info)
+        assert vars == expected
+    
+    def test_with_non_existent_personnel_group(self):
+        personnel = {'personnel1': {'position1': 'Frodo', 'position2': 'Gandalf'}}
+        personnel_info = {'info1': {'Frodo': {'nation': 'Frodonia', 'discord_handle': 'Frodo#1234'},
+                                    'Gandalf': {'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'},
+                                    'Sauron': {'nation': 'Sauron', 'discord_handle': 'Sauron#5050'}},
+                          'info2': {'Theoden': {'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}}}
+        vars = {'foo1': 'bar1'}
+        vars.update(personnel)
+        vars.update(personnel_info)
+
+        with pytest.raises(exceptions.LoaderConfigError):
+            file_varloader.add_personnel_info(vars, ['personnel1', 'personnel2'], ['info1', 'info2'])
+    
+    def test_with_non_existent_personnel_info_group(self):
+        personnel = {'personnel1': {'position1': 'Frodo', 'position2': 'Gandalf'},
+                     'personnel2': {'position1': 'Sauron', 'position2': 'Theoden'}}
+        personnel_info = {'info2': {'Theoden': {'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}}}
+        vars = {'foo1': 'bar1'}
+        vars.update(personnel)
+        vars.update(personnel_info)
+
+        with pytest.raises(exceptions.LoaderConfigError):
+            file_varloader.add_personnel_info(vars, ['personnel1', 'personnel2'], ['info1', 'info2'])
+    
+    def test_with_non_existent_personnel_name(self):
+        personnel = {'personnel1': {'position1': 'Frodo', 'position2': 'Gandalf'},
+                     'personnel2': {'position1': 'Sauron', 'position2': 'Theoden'}}
+        personnel_info = {'info1': {'Gandalf': {'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'},
+                                    'Sauron': {'nation': 'Sauron', 'discord_handle': 'Sauron#5050'}},
+                          'info2': {'Theoden': {'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}}}
+        vars = {'foo1': 'bar1'}
+        vars.update(personnel)
+        vars.update(personnel_info)
+
+        with pytest.raises(exceptions.LoaderConfigError):
+            file_varloader.add_personnel_info(vars, ['personnel1', 'personnel2'], ['info1', 'info2'])
 
 
 class TestFileVarLoader():

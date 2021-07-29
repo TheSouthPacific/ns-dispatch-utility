@@ -7,6 +7,7 @@ import logging
 import toml
 
 from nsdu import loader_api
+from nsdu import exceptions
 
 
 logger = logging.getLogger(__name__)
@@ -58,7 +59,32 @@ def get_all_vars(paths):
     return loaded_vars
 
 
+def add_personnel_info(vars, personnel_groups, personnel_info_groups):
+    personnel_info = {}
+    for group in personnel_info_groups:
+        try:
+            group_info = vars[group]
+            for name in group_info.keys():
+                group_info[name]['name'] = name
+            personnel_info.update(group_info)
+        except KeyError:
+            raise exceptions.LoaderConfigError('Personnel info var group "{}" not found'.format(group))
+
+    for group in personnel_groups:
+        try:
+            personnel = vars[group]
+            for position in personnel.keys():
+                try:
+                    personnel_name = personnel[position]
+                    vars[group][position] = personnel_info[personnel_name]
+                except KeyError:
+                    raise exceptions.LoaderConfigError('Info for personnel "{}" not found'.format(personnel_name))
+        except KeyError:
+            raise exceptions.LoaderConfigError('Personnel var group "{}" not found'.format(group))
+
+
 @loader_api.var_loader
 def get_vars(config):
-    var_paths = config['file_varloader']['var_paths']
-    return get_all_vars(var_paths)
+    loader_config = config['file_varloader']
+    vars = get_all_vars(loader_config['var_paths'])
+    return add_personnel_info(vars, loader_config['personnel_groups'], loader_config['personnel_info_groups'])
