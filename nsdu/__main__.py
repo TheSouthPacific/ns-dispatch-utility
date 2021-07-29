@@ -77,7 +77,7 @@ class NSDU():
         """Update dispatches. Empty list means update all.
 
         Args:
-            dispatches (list): Dispatch names.
+            dispatches (list): Dispatch names
         """
 
         for owner_nation, dispatch_config in self.dispatch_config.items():
@@ -87,10 +87,18 @@ class NSDU():
             except exceptions.NationLoginError:
                 logger.error('Could not log into nation "%s".', owner_nation)
                 continue
+            
+            if not dispatches:
+                [self.updater.update_dispatch(name) for name in dispatch_config.keys()]
+            else:
+                remaining_dispatches = set(dispatches)
+                for name in dispatch_config.keys():
+                    if name in remaining_dispatches:
+                        self.updater.update_dispatch(name)
+                        remaining_dispatches.discard(name)
+                if remaining_dispatches:
+                    [logger.error('Could not find dispatch "%s".', name) for name in remaining_dispatches]
 
-            for name in dispatch_config.keys():
-                if not dispatches or name in dispatches:
-                    self.updater.update_dispatch(name)
 
     def add_nation_cred(self, nation_name, password):
         """Add a new credential.
