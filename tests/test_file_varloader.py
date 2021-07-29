@@ -5,22 +5,35 @@ import toml
 
 from nsdu import exceptions
 from nsdu.loaders import file_varloader
+    
 
+class TestLoadVarsFromFiles():
+    def test_with_existing_files(self, toml_files):
+        paths = toml_files({'test1.toml': {'foo1': {'bar1': 'john1'}},
+                            'test2.toml': {'foo2': {'bar2': 'john2'}}})
 
-@pytest.fixture(scope='module')
-def setup_vars_files():
-    vars_1 = {'foo1': {'bar1': 'john1'}}
-    with open('test1.toml', 'w') as f:
-        toml.dump(vars_1, f)
+        r = file_varloader.load_vars_from_files([str(paths / 'test1.toml'), str(paths / 'test2.toml')])
 
-    vars_2 = {'foo2': {'bar2': 'john2'}}
-    with open('test2.toml', 'w') as f:
-        toml.dump(vars_2, f)
+        expected = {'foo1': {'bar1': 'john1'}, 'foo2': {'bar2': 'john2'}}
+        assert r == expected
 
-    yield 0
+    def test_with_non_existent_file(self):
+        with pytest.raises(exceptions.LoaderConfigError):
+            file_varloader.load_vars_from_files(['non_existent.toml'])
+    
+    def test_with_empty_file(self, toml_files):
+        paths = toml_files({'test1.toml': {'foo1': {'bar1': 'john1'}},
+                            'test2.toml': ''})
 
-    os.remove('test1.toml')
-    os.remove('test2.toml')
+        r = file_varloader.load_vars_from_files([str(paths / 'test1.toml'), str(paths / 'test2.toml')])
+        assert r == {'foo1': {'bar1': 'john1'}}
+    
+    def test_with_empty_file_list(self):
+        """Load vars if no file is provided in the list.
+        Nothing should happen.
+        """
+
+        file_varloader.load_vars_from_files([])
 
 
 class TestAddPersonnelInfo():
@@ -37,13 +50,15 @@ class TestAddPersonnelInfo():
     
         file_varloader.add_personnel_info(vars, ['personnel1', 'personnel2'], ['info1', 'info2'])
     
-        expected_personnel = {'personnel1': {'position1': {'name': 'Frodo', 'nation': 'Frodonia', 'discord_handle': 'Frodo#1234'},
-                                             'position2': {'name': 'Gandalf', 'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'}},
-                              'personnel2': {'position1': {'name': 'Sauron', 'nation': 'Sauron', 'discord_handle': 'Sauron#5050'},
-                                             'position2': {'name': 'Theoden', 'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}}}
-        expected = {'foo1': 'bar1'}
-        expected.update(expected_personnel)
-        expected.update(personnel_info)
+        expected = {'personnel1': {'position1': {'name': 'Frodo', 'nation': 'Frodonia', 'discord_handle': 'Frodo#1234'},
+                                   'position2': {'name': 'Gandalf', 'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'}},
+                    'personnel2': {'position1': {'name': 'Sauron', 'nation': 'Sauron', 'discord_handle': 'Sauron#5050'},
+                                   'position2': {'name': 'Theoden', 'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}},
+                    'foo1': 'bar1',
+                    'info1': {'Frodo': {'nation': 'Frodonia', 'discord_handle': 'Frodo#1234'},
+                              'Gandalf': {'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'},
+                              'Sauron': {'nation': 'Sauron', 'discord_handle': 'Sauron#5050'}},
+                    'info2': {'Theoden': {'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}}}
         assert vars == expected
     
     def test_with_non_existent_personnel_group(self):
@@ -85,37 +100,29 @@ class TestAddPersonnelInfo():
 
 
 class TestFileVarLoader():
-    def test_load_vars_with_one_file(self, setup_vars_files):
-        r = file_varloader.get_all_vars('test1.toml')
+    def test_integration(self, toml_files):
+        vars_1 = {'personnel1': {'position1': 'Frodo', 'position2': 'Gandalf'},
+                  'personnel2': {'position1': 'Sauron', 'position2': 'Theoden'}}
+        vars_2 = {'foo1': 'bar1', 'foo2': 'bar2'}
+        vars_3 = {'info1': {'Frodo': {'nation': 'Frodonia', 'discord_handle': 'Frodo#1234'},
+                            'Gandalf': {'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'},
+                            'Sauron': {'nation': 'Sauron', 'discord_handle': 'Sauron#5050'}},
+                  'info2': {'Theoden': {'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}}}
+        path = toml_files({'test1.toml': vars_1, 'test2.toml': vars_2, 'test3.toml': vars_3})
+        config = {'var_paths': [str(path / 'test1.toml'), str(path / 'test2.toml'),
+                                str(path / 'test3.toml')],
+                  'personnel_groups': ['personnel1', 'personnel2'],
+                  'personnel_info_groups': ['info1', 'info2']}
+    
+        r = file_varloader.get_vars({'file_varloader': config})
 
-        assert r['foo1']['bar1'] == 'john1'
-
-    def test_load_vars_with_many_files(self, setup_vars_files):
-        r = file_varloader.get_all_vars(['test1.toml', 'test2.toml'])
-
-        assert r['foo1']['bar1'] == 'john1' and r['foo2']['bar2'] == 'john2'
-
-    def test_load_vars_with_non_existent_file(self, caplog):
-        file_varloader.get_all_vars('meguminbestgirl.toml')
-
-        assert caplog.records[-1].levelname == 'ERROR'
-
-    def test_load_vars_with_non_existent_file_in_list(self, setup_vars_files, caplog):
-        file_varloader.get_all_vars(['meguminbestgirl.toml', 'meguminworstgirl.toml', 'test1.toml'])
-
-        assert caplog.records[-1].levelname == 'ERROR'
-        assert caplog.records[-2].levelname == 'ERROR'
-
-    def test_load_vars_with_empty_filename(self):
-        """Load custom vars if no file is provided.
-        Nothing should happen.
-        """
-
-        file_varloader.get_all_vars('')
-
-    def test_load_vars_with_empty_file_list(self):
-        """Load custom vars if no file is provided.
-        Nothing should happen.
-        """
-
-        file_varloader.get_all_vars([])
+        expected = {'personnel1': {'position1': {'name': 'Frodo', 'nation': 'Frodonia', 'discord_handle': 'Frodo#1234'},
+                                   'position2': {'name': 'Gandalf', 'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'}},
+                    'personnel2': {'position1': {'name': 'Sauron', 'nation': 'Sauron', 'discord_handle': 'Sauron#5050'},
+                                   'position2': {'name': 'Theoden', 'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}},
+                    'foo1': 'bar1', 'foo2': 'bar2',
+                    'info1': {'Frodo': {'nation': 'Frodonia', 'discord_handle': 'Frodo#1234'},
+                              'Gandalf': {'nation': 'Gandalf Republic', 'discord_handle': 'Gandalf#4321'},
+                              'Sauron': {'nation': 'Sauron', 'discord_handle': 'Sauron#5050'}},
+                    'info2': {'Theoden': {'nation': 'Theoden Federation', 'discord_handle': 'Theoden#0974'}}}
+        assert r == expected

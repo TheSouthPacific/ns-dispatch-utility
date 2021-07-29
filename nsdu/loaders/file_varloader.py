@@ -1,44 +1,26 @@
 """Load variables from TOML files.
 """
 
+import copy
 import os
 import logging
+import pathlib
 
 import toml
 
 from nsdu import loader_api
 from nsdu import exceptions
+from nsdu import utils
 
 
 logger = logging.getLogger(__name__)
 
 
-def load_vars_from_file(path):
-    """Load variables from a TOML file.
+def load_vars_from_files(paths):
+    """Get all variables from file(s).
 
     Args:
-        path (str): File path
-
-    Raises:
-        FileNotFoundError: [description]
-
-    Returns:
-        [type]: [description]
-    """
-    try:
-        vars = toml.load(os.path.expanduser(path))
-        logger.debug('Loaded var file "%s"', path)
-        return vars
-    except FileNotFoundError:
-        logger.error('Could not find var file "{}"'.format(path))
-        return None
-
-
-def get_all_vars(paths):
-    """Get variables from file(s).
-
-    Args:
-        paths (str|list): File path(s)
+        paths (list): File paths
 
     Returns:
         dict: Variables
@@ -46,15 +28,17 @@ def get_all_vars(paths):
 
     loaded_vars = {}
 
-    if not paths or paths == '':
-        logger.debug('No var file found')
-    elif isinstance(paths, list):
-        for path in paths:
-            file_vars = load_vars_from_file(path)
-            if file_vars is not None:
-                loaded_vars.update(file_vars)
-    else:
-        loaded_vars = load_vars_from_file(paths)
+    for path in paths:
+        try:
+            file_vars = utils.get_config_from_toml(pathlib.Path(path))
+            logger.debug('Loaded var file "%s"', path)
+        except FileNotFoundError:
+            raise exceptions.LoaderConfigError('Var file "{}" not found'.format(path))
+
+        if file_vars is not None:
+            loaded_vars.update(file_vars)
+        else:
+            logger.warning('Var file "%s" is empty', path)
 
     return loaded_vars
 
@@ -63,12 +47,12 @@ def add_personnel_info(vars, personnel_groups, personnel_info_groups):
     personnel_info = {}
     for group in personnel_info_groups:
         try:
-            group_info = vars[group]
-            for name in group_info.keys():
-                group_info[name]['name'] = name
-            personnel_info.update(group_info)
+            personnel_info.update(copy.deepcopy(vars[group]))
         except KeyError:
             raise exceptions.LoaderConfigError('Personnel info var group "{}" not found'.format(group))
+    
+    for name, info in personnel_info.items():
+        info['name'] = name
 
     for group in personnel_groups:
         try:
@@ -86,5 +70,8 @@ def add_personnel_info(vars, personnel_groups, personnel_info_groups):
 @loader_api.var_loader
 def get_vars(config):
     loader_config = config['file_varloader']
-    vars = get_all_vars(loader_config['var_paths'])
-    return add_personnel_info(vars, loader_config['personnel_groups'], loader_config['personnel_info_groups'])
+
+    vars = load_vars_from_files(loader_config['var_paths'])
+    add_personnel_info(vars, loader_config['personnel_groups'], loader_config['personnel_info_groups'])
+
+    return vars
