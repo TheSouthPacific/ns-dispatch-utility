@@ -25,6 +25,9 @@ dispatch_template_path = '~/ns_dispatches'
 # Dispatch file extension
 # file_ext = '.txt'
 
+[loader_config.file_simplebbloader]
+file_path = '~/ns_dispatches/simple_bb_config.toml'
+
 [loader_config.file_varloader]
 var_paths = '~/ns_dispatches/vars.toml'
 
