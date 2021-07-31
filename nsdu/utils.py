@@ -71,7 +71,6 @@ class CredManager(collections.UserDict):
             self.cred_loader.remove_cred(nation_name)
         
 
-
 def get_config_from_toml(config_path):
     """Get configuration from TOML file.
 
@@ -167,7 +166,7 @@ def get_dispatch_info(dispatch_config):
     return dispatch_info
 
 
-def get_funcs(path):
+def get_functions_from_module(path):
     """Get functions from a module file (.py).
 
     Args:

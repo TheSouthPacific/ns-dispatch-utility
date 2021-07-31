@@ -76,6 +76,6 @@ class BBParsingError(DispatchRenderingError):
     """
 
 
-class TemplateRendererError(DispatchRenderingError):
+class TemplateRenderingError(DispatchRenderingError):
     """Jinja template rendering errors.
     """

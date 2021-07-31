@@ -54,7 +54,7 @@ class TemplateRenderer():
 
         if filter_path is not None:
             try:
-                filters = utils.get_funcs(pathlib.Path(filter_path))
+                filters = utils.get_functions_from_module(pathlib.Path(filter_path))
             except FileNotFoundError:
                 raise exceptions.ConfigError('Filter file not found at "{}"'.format(filter_path))
             else:
