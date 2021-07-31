@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "nsdu"
-version = "0.0.1"
+version = "0.1.0"
 description = "A tool to manage and format NationStates dispatches."
 authors = ["watarinishin <watarichanno.com>"]
 license = "MIT"
