@@ -1,8 +1,10 @@
 [general]
 user_agent = 'United States of Vietnam'
 
+# Path to directory containing source files of your own loaders
+# custom_loader_dir_path = '~/my_nsdu_loaders'
+
 [bbcode]
-simple_formatter_path = '~/ns_dispatches/design/simple_tags.toml'
 complex_formatter_path = '~/ns_dispatches/design/complex_tags.toml'
 complex_formatter_config_path = '~/ns_dispatches/design/complex_tags_config.toml'
 
@@ -12,6 +14,8 @@ filter_path = '~/ns_dispatches/design/filters.toml'
 [plugins]
 # Choose loader to load dispatch config and content.
 dispatch_loader = 'file_dispatchloader'
+# Choose loader to load simple BBCode fornatters
+simple_bb_loader = 'file_simplebbloader'
 # Choose loader to load variables.
 var_loader = 'file_varloader'
 # Choose loader to load nation login credentials.

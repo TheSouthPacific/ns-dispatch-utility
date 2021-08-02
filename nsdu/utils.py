@@ -66,10 +66,10 @@ class CredManager(collections.UserDict):
         for nation_name, password in self.new_creds.items():
             x_autologin = self.dispatch_api.login(nation_name, password=password)
             self.cred_loader.add_cred(nation_name, x_autologin)
-        
+
         for nation_name in self.delete_creds:
             self.cred_loader.remove_cred(nation_name)
-        
+
 
 def get_config_from_toml(config_path):
     """Get configuration from TOML file.
@@ -177,15 +177,15 @@ def get_functions_from_module(path):
     return inspect.getmembers(module, inspect.isfunction)
 
 
-def load_module(path, name='module'):
-    """Load module from a path.
+def load_module(path):
+    """Load module from a file.
 
     Args:
-        path (pathlib.Path): Path to module file (.py)
-        name (str): Name of module for reference needs. Defaults to 'module'
+        path (pathlib.Path): Directory containing module file
+        name (str): Name of module file
     """
 
-    spec = importlib.util.spec_from_file_location(name, path.expanduser())
+    spec = importlib.util.spec_from_file_location(path.name, path.expanduser())
     if spec is not None:
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)

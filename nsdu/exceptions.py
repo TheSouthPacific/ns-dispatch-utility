@@ -12,6 +12,11 @@ class ConfigError(NSDUError):
     """
 
 
+class LoaderNotFound(NSDUError):
+    """Loader source file not found.
+    """
+
+
 class LoaderError(NSDUError):
     """Error of loader plugins.
     """

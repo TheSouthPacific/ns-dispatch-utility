@@ -2,6 +2,7 @@
 
 import os
 import argparse
+import importlib.metadata as import_metadata
 import logging
 import logging.config
 
@@ -32,18 +33,18 @@ class NSDU():
         ns_api = nationstates.Nationstates(user_agent=config['general']['user_agent'])
         dispatch_api = api_adapter.DispatchAPI(ns_api)
 
-        plugin_opt = self.config['plugins']
+        self.custom_loader_dir_path = self.config['general'].get('custom_loader_dir_path', None)
         loader_config = self.config['loader_config']
 
-        self.dispatch_loader = loader.DispatchLoader(plugin_opt['dispatch_loader'], loader_config)
-        self.var_loader = loader.VarLoader(plugin_opt['var_loader'], loader_config)
-        self.simple_bb_loader = loader.SimpleBBLoader(plugin_opt['simple_bb_loader'], loader_config)
+        self.dispatch_loader = loader.DispatchLoaderHandle(loader_config)
+        self.var_loader = loader.VarLoaderHandle(loader_config)
+        self.simple_bb_loader = loader.SimpleBBLoaderHandle(loader_config)
 
         self.dispatch_config = None
 
         self.renderer = renderer.DispatchRenderer(self.dispatch_loader)
 
-        self.cred_loader = loader.CredLoader(plugin_opt['cred_loader'], loader_config)
+        self.cred_loader = loader.CredLoaderHandle(loader_config)
         self.creds = utils.CredManager(self.cred_loader, dispatch_api)
 
         self.updater = updater.DispatchUpdater(dispatch_api, self.creds,
@@ -56,18 +57,26 @@ class NSDU():
             only_cred (bool): Only load credential loader
         """
 
-        self.cred_loader.load_loader()
+        plugin_opt = self.config['plugins']
+        single_loader_builder = loader.SingleLoaderHandleBuilder(info.LOADER_DIR_PATH,
+                                                                 self.custom_loader_dir_path,
+                                                                 import_metadata.entry_points())
+
+        single_loader_builder.build_loader(self.cred_loader, plugin_opt['cred_loader'])
         if only_cred:
             return
         self.creds.load_creds()
 
-        self.dispatch_loader.load_loader()
+        single_loader_builder.build_loader(self.dispatch_loader, plugin_opt['dispatch_loader'])
         self.dispatch_config = self.dispatch_loader.get_dispatch_config()
 
-        self.simple_bb_loader.load_loader()
+        single_loader_builder.build_loader(self.simple_bb_loader, plugin_opt['simple_bb_loader'])
         simple_bb_config = self.simple_bb_loader.get_simple_bb_config()
 
-        self.var_loader.load_loader()
+        multiple_loaders_builder = loader.MultiLoadersHandleBuilder(info.LOADER_DIR_PATH,
+                                                                    self.custom_loader_dir_path,
+                                                                    import_metadata.entry_points())
+        multiple_loaders_builder.build_loader(self.var_loader, plugin_opt['var_loader'])
         vars = self.var_loader.get_all_vars()
 
         self.renderer.load(simple_bb_config, self.config['complex_bb_parser'],
@@ -87,7 +96,7 @@ class NSDU():
             except exceptions.NationLoginError:
                 logger.error('Could not log into nation "%s".', owner_nation)
                 continue
-            
+
             if not dispatches:
                 [self.updater.update_dispatch(name) for name in dispatch_config.keys()]
             else:

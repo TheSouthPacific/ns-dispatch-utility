@@ -27,6 +27,8 @@ NSDU_PATH = Path('nsdu')
 # Loader plugin directory path.
 LOADER_DIR_PATH = NSDU_PATH / 'loaders'
 
+LOADER_ENTRY_POINT_NAME = 'nationstates-nsdu'
+
 CONFIG_ENVVAR = 'NSDU_CONFIG'
 CONFIG_NAME = 'config.toml'
 # Default general configuration path for copying to proper place
