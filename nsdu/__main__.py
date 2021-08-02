@@ -207,9 +207,10 @@ def main():
         app = NSDU(config)
         run(app, inputs)
         app.close()
+    except exceptions.NSDUError as err:
+        logger.error(err)
     except Exception as err:
         logger.exception(err)
-        raise err
 
 
 if __name__ == "__main__":
