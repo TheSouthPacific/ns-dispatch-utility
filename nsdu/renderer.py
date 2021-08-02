@@ -15,15 +15,15 @@ logger = logging.getLogger(__name__)
 
 
 class DispatchJinjaLoader(jinja2.BaseLoader):
-    """Wrapper around dispatch loader for Jinja environment.
+    """Wrapper around dispatch loader handle for Jinja.
     """
 
-    def __init__(self, dispatch_loader):
-        self.dispatch_loader = dispatch_loader
+    def __init__(self, dispatch_loader_handle):
+        self.dispatch_loader_handle = dispatch_loader_handle
 
     def get_source(self, environment, template):
         try:
-            text = self.dispatch_loader.get_dispatch_text(template)
+            text = self.dispatch_loader_handle.get_dispatch_text(template)
         except exceptions.DispatchTextNotFound as err:
             if not err.suppress_nsdu_error:
                 logger.error('Text %s "%s" of dispatch "%s" not found.')
@@ -36,11 +36,11 @@ class TemplateRenderer():
     """Render a dispatch template.
 
     Args:
-        dispatch_loader (str): Dispatch loader plugin.
+        dispatch_loader_handle (str): Dispatch loader handle
     """
 
-    def __init__(self, dispatch_loader):
-        template_loader = DispatchJinjaLoader(dispatch_loader)
+    def __init__(self, dispatch_loader_handle):
+        template_loader = DispatchJinjaLoader(dispatch_loader_handle)
         # Make access to undefined context variables generate logs.
         undef = jinja2.make_logging_undefined(logger=logger)
         self.env = jinja2.Environment(loader=template_loader, trim_blocks=True, undefined=undef)

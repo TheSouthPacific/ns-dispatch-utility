@@ -14,6 +14,15 @@ from nsdu import utils
 
 
 def load_module_from_entry_points(entry_points, name):
+    """Load module found via metadata entry points.
+
+    Args:
+        entry_points (list): List of entry points
+        name (str): Entry point's name
+
+    Returns:
+        Loaded Python module
+    """
     for entry_point in entry_points:
         if entry_point.name == name:
             return entry_point.load()
@@ -21,6 +30,16 @@ def load_module_from_entry_points(entry_points, name):
 
 
 def load_all_modules_from_entry_points(entry_points, names):
+    """Load all modules with name in names via metadata entry points.
+
+    Args:
+        entry_points (list): List of entry points
+        names (list): List of entry points' names
+
+    Returns:
+        Loaded Python module
+    """
+
     modules = {}
     for entry_point in entry_points:
         if entry_point.name in names:
@@ -29,33 +48,55 @@ def load_all_modules_from_entry_points(entry_points, names):
 
 
 class LoaderHandleBuilder():
+    """Abstract class for loader handle builders.
+
+    Args:
+        default_dir_path (pathlib.Path): Default loader directory
+        custom_dir_path (pathlib.Path): User-confiured loader directory
+        entry_points (list): List of entry points
+    """
+
     def __init__(self, default_dir_path, custom_dir_path, entry_points):
+
         self.default_dir_path = default_dir_path
         self.custom_dir_path = custom_dir_path
         self.entry_points = entry_points
 
 
 class SingleLoaderHandleBuilder(LoaderHandleBuilder):
+    """Build loader handle that handles one loader only.
+    """
+
     def __init__(self, default_dir_path, custom_dir_path, entry_points):
         super().__init__(default_dir_path, custom_dir_path, entry_points)
 
-    def load_loader(self, loader_obj, name):
+    def load_loader(self, handle, name):
+        """Load loader into handle.
+
+        Args:
+            handle (loader.LoaderHandle): Single loader handle object
+            name (str): Loader name
+
+        Raises:
+            exceptions.LoaderNotFound: Failed to find loader
+        """
+
         if self.custom_dir_path is not None:
             try:
                 loaded_module = utils.load_module((self.custom_dir_path / name).with_suffix('.py'))
-                loader_obj.load_loader(loaded_module)
+                handle.load_loader(loaded_module)
                 return
             except FileNotFoundError:
                 pass
 
         loaded_module = load_module_from_entry_points(self.entry_points, name)
         if loaded_module is not None:
-            loader_obj.load_loader(loaded_module)
+            handle.load_loader(loaded_module)
             return
 
         try:
             loaded_module = utils.load_module((self.default_dir_path / name).with_suffix('.py'))
-            loader_obj.load_loader(loaded_module)
+            handle.load_loader(loaded_module)
             return
         except FileNotFoundError:
             raise exceptions.LoaderNotFound('Loader "{}" not found.'.format(name))
@@ -65,7 +106,7 @@ class MultiLoadersHandleBuilder(LoaderHandleBuilder):
     def __init__(self, default_dir_path, custom_dir_path, entry_points):
         super().__init__(default_dir_path, custom_dir_path, entry_points)
 
-    def load_loader(self, loader_obj, names):
+    def load_loader(self, handle, names):
         loaded_modules = {}
         for name in names:
             try:
@@ -84,7 +125,7 @@ class MultiLoadersHandleBuilder(LoaderHandleBuilder):
 
         for name in names:
             if name in loaded_modules:
-                loader_obj.load_loader(loaded_modules[name])
+                handle.load_loader(loaded_modules[name])
             else:
                 raise exceptions.LoaderNotFound('Loader "{}" not found.'.format(name))
 
