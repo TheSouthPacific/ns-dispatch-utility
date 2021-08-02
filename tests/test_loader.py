@@ -117,9 +117,9 @@ class TestSingleLoaderHandleBuilder():
     @pytest.fixture
     def entry_points(self):
         module_1 = mock.Mock()
-        module_1.__file__ = 'entry_point_1'
+        module_1.__file__ = 'someplaces/simplebbloader-test1.py'
         module_2 = mock.Mock()
-        module_2.__file__ = 'entry_point_2'
+        module_2.__file__ = 'someplaces/someloader.py'
         entry_points = [mock.Mock(load=mock.Mock(return_value=module_1)),
                         mock.Mock(load=mock.Mock(return_value=module_2))]
         entry_points[0].name = 'simplebbloader-test1'
@@ -140,7 +140,7 @@ class TestSingleLoaderHandleBuilder():
 
         builder.load_loader(handle, 'someloader')
 
-        assert handle.module.__file__ == 'entry_point_2'
+        assert handle.module.__file__ == 'someplaces/someloader.py'
 
     def test_load_loader_in_default_source_dir(self, entry_points):
         handle = MockSingleLoaderHandle()
@@ -149,6 +149,13 @@ class TestSingleLoaderHandleBuilder():
         builder.load_loader(handle, 'simplebbloader-test2')
 
         assert handle.module.__file__ == str(DEFAULT_LOADER_DIR_PATH / 'simplebbloader-test2.py')
+
+    def test_load_loader_with_no_custom_source_dir(self, entry_points):
+        handle = MockSingleLoaderHandle()
+        builder = loader.SingleLoaderHandleBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
+
+        builder.load_loader(handle, 'simplebbloader-test1')
+        assert handle.module.__file__ == 'someplaces/simplebbloader-test1.py'
 
     def test_load_loader_with_non_existent_loader(self, entry_points):
         handle = MockSingleLoaderHandle()
@@ -200,6 +207,14 @@ class TestMultiLoadersHandleBuilder():
         assert handle.modules[1].__file__ == str(LOADER_DIR_PATH / 'varloader-test2.py')
         assert handle.modules[2].__file__ == str(DEFAULT_LOADER_DIR_PATH / 'varloader-test3.py')
         assert handle.modules[3].__file__ == 'someplaces/varloader-test4'
+
+    def test_load_loader_with_no_custom_source_dir(self, entry_points):
+        handle = MockMultiLoadersHandle()
+        builder = loader.MultiLoadersHandleBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
+
+        builder.load_loader(handle, ['varloader-test1', 'varloader-test2'])
+        assert handle.modules[0].__file__ == str(DEFAULT_LOADER_DIR_PATH / 'varloader-test1.py')
+        assert handle.modules[1].__file__ == 'someplaces/varloader-test2'
 
     def test_load_loader_with_a_non_existent_loader(self, entry_points):
         handle = MockMultiLoadersHandle()
