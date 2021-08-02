@@ -23,6 +23,7 @@ def load_module_from_entry_points(entry_points, name):
     Returns:
         Loaded Python module
     """
+
     for entry_point in entry_points:
         if entry_point.name == name:
             return entry_point.load()
@@ -57,7 +58,6 @@ class LoaderHandleBuilder():
     """
 
     def __init__(self, default_dir_path, custom_dir_path, entry_points):
-
         self.default_dir_path = default_dir_path
         self.custom_dir_path = custom_dir_path
         self.entry_points = entry_points
@@ -83,7 +83,7 @@ class SingleLoaderHandleBuilder(LoaderHandleBuilder):
 
         if self.custom_dir_path is not None:
             try:
-                loaded_module = utils.load_module((self.custom_dir_path / name).with_suffix('.py'))
+                loaded_module = utils.load_module(pathlib.Path(self.custom_dir_path / name).with_suffix('.py'))
                 handle.load_loader(loaded_module)
                 return
             except FileNotFoundError:
@@ -103,10 +103,22 @@ class SingleLoaderHandleBuilder(LoaderHandleBuilder):
 
 
 class MultiLoadersHandleBuilder(LoaderHandleBuilder):
+    """Build loader handle that handles many loaders
+    """
     def __init__(self, default_dir_path, custom_dir_path, entry_points):
         super().__init__(default_dir_path, custom_dir_path, entry_points)
 
     def load_loader(self, handle, names):
+        """Load loaders into handle.
+
+        Args:
+            handle (loader.LoaderHandle): Multi-loaders handle object
+            names (list): Loader names
+
+        Raises:
+            exceptions.LoaderNotFound: Failed to find loader
+        """
+
         loaded_modules = {}
         for name in names:
             try:
@@ -119,7 +131,7 @@ class MultiLoadersHandleBuilder(LoaderHandleBuilder):
         if self.custom_dir_path is not None:
             for name in names:
                 try:
-                    loaded_modules[name] = utils.load_module((self.custom_dir_path / name).with_suffix('.py'))
+                    loaded_modules[name] = utils.load_module(pathlib.Path(self.custom_dir_path / name).with_suffix('.py'))
                 except FileNotFoundError:
                     pass
 

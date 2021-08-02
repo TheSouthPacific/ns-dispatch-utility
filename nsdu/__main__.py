@@ -59,26 +59,29 @@ class NSDU():
 
         plugin_opt = self.config['plugins']
 
-        entry_points = import_metadata.entry_points()[info.LOADER_ENTRY_POINT_NAME]
-        single_loader_builder = loader.SingleLoaderHandleBuilder(info.LOADER_DIR_PATH,
-                                                                 self.custom_loader_dir_path,
-                                                                 entry_points)
-        multiple_loaders_builder = loader.MultiLoadersHandleBuilder(info.LOADER_DIR_PATH,
-                                                                    self.custom_loader_dir_path,
-                                                                    entry_points)
+        try:
+            entry_points = import_metadata.entry_points()[info.LOADER_ENTRY_POINT_NAME]
+        except KeyError:
+            entry_points = []
+        singleloader_builder = loader.SingleLoaderHandleBuilder(info.LOADER_DIR_PATH,
+                                                                self.custom_loader_dir_path,
+                                                                entry_points)
+        multiloaders_builder = loader.MultiLoadersHandleBuilder(info.LOADER_DIR_PATH,
+                                                                self.custom_loader_dir_path,
+                                                                entry_points)
 
-        single_loader_builder.load_loader(self.cred_loader_handle, plugin_opt['cred_loader'])
+        singleloader_builder.load_loader(self.cred_loader_handle, plugin_opt['cred_loader'])
         if only_cred:
             return
         self.creds.load_creds()
 
-        single_loader_builder.load_loader(self.dispatch_loader_handle, plugin_opt['dispatch_loader'])
+        singleloader_builder.load_loader(self.dispatch_loader_handle, plugin_opt['dispatch_loader'])
         self.dispatch_config = self.dispatch_loader_handle.get_dispatch_config()
 
-        single_loader_builder.load_loader(self.simple_bb_loader_handle, plugin_opt['simple_bb_loader'])
+        singleloader_builder.load_loader(self.simple_bb_loader_handle, plugin_opt['simple_bb_loader'])
         simple_bb_config = self.simple_bb_loader_handle.get_simple_bb_config()
 
-        multiple_loaders_builder.load_loader(self.var_loader_handle, plugin_opt['var_loader'])
+        multiloaders_builder.load_loader(self.var_loader_handle, plugin_opt['var_loader'])
         vars = self.var_loader_handle.get_all_vars()
 
         self.renderer.load(simple_bb_config, self.config['complex_bb_parser'],
