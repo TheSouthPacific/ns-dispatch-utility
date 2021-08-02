@@ -36,19 +36,19 @@ class NSDU():
         self.custom_loader_dir_path = self.config['general'].get('custom_loader_dir_path', None)
         loader_config = self.config['loader_config']
 
-        self.dispatch_loader = loader.DispatchLoaderHandle(loader_config)
-        self.var_loader = loader.VarLoaderHandle(loader_config)
-        self.simple_bb_loader = loader.SimpleBBLoaderHandle(loader_config)
+        self.dispatch_loader_handle = loader.DispatchLoaderHandle(loader_config)
+        self.var_loader_handle = loader.VarLoaderHandle(loader_config)
+        self.simple_bb_loader_handle = loader.SimpleBBLoaderHandle(loader_config)
 
         self.dispatch_config = None
 
-        self.renderer = renderer.DispatchRenderer(self.dispatch_loader)
+        self.renderer = renderer.DispatchRenderer(self.dispatch_loader_handle)
 
-        self.cred_loader = loader.CredLoaderHandle(loader_config)
-        self.creds = utils.CredManager(self.cred_loader, dispatch_api)
+        self.cred_loader_handle = loader.CredLoaderHandle(loader_config)
+        self.creds = utils.CredManager(self.cred_loader_handle, dispatch_api)
 
         self.updater = updater.DispatchUpdater(dispatch_api, self.creds,
-                                               self.renderer, self.dispatch_loader)
+                                               self.renderer, self.dispatch_loader_handle)
 
     def load(self, only_cred=False):
         """Load all loaders and the renderer.
@@ -62,22 +62,22 @@ class NSDU():
                                                                  self.custom_loader_dir_path,
                                                                  import_metadata.entry_points())
 
-        single_loader_builder.build_loader(self.cred_loader, plugin_opt['cred_loader'])
+        single_loader_builder.load_loader(self.cred_loader_handle, plugin_opt['cred_loader'])
         if only_cred:
             return
         self.creds.load_creds()
 
-        single_loader_builder.build_loader(self.dispatch_loader, plugin_opt['dispatch_loader'])
-        self.dispatch_config = self.dispatch_loader.get_dispatch_config()
+        single_loader_builder.load_loader(self.dispatch_loader_handle, plugin_opt['dispatch_loader'])
+        self.dispatch_config = self.dispatch_loader_handle.get_dispatch_config()
 
-        single_loader_builder.build_loader(self.simple_bb_loader, plugin_opt['simple_bb_loader'])
-        simple_bb_config = self.simple_bb_loader.get_simple_bb_config()
+        single_loader_builder.load_loader(self.simple_bb_loader_handle, plugin_opt['simple_bb_loader'])
+        simple_bb_config = self.simple_bb_loader_handle.get_simple_bb_config()
 
         multiple_loaders_builder = loader.MultiLoadersHandleBuilder(info.LOADER_DIR_PATH,
                                                                     self.custom_loader_dir_path,
                                                                     import_metadata.entry_points())
-        multiple_loaders_builder.build_loader(self.var_loader, plugin_opt['var_loader'])
-        vars = self.var_loader.get_all_vars()
+        multiple_loaders_builder.load_loader(self.var_loader_handle, plugin_opt['var_loader'])
+        vars = self.var_loader_handle.get_all_vars()
 
         self.renderer.load(simple_bb_config, self.config['complex_bb_parser'],
                            self.config['template_renderer'],vars, self.dispatch_config)
@@ -132,9 +132,9 @@ class NSDU():
         """Cleanup.
         """
 
-        self.dispatch_loader.cleanup_loader()
+        self.dispatch_loader_handle.cleanup_loader()
         self.creds.save()
-        self.cred_loader.cleanup_loader()
+        self.cred_loader_handle.cleanup_loader()
 
 
 def cli():
