@@ -25,14 +25,14 @@ def reraise_exception(err):
 
 
 class DispatchAPI():
-    """pynationstates wrapper for dispatch functions.
+    """Wrapper around pynationstates for dispatch functions.
 
     Args:
-        ns_api (nationstates.Nationstates): Real API object
+        user_agent (str): User agent
     """
 
-    def __init__(self, ns_api):
-        self.api = ns_api
+    def __init__(self, user_agent):
+        self.api = nationstates.Nationstates(user_agent=user_agent)
         self.owner_nation = None
 
     def login(self, nation_name, password=None, autologin=None):

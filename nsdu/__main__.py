@@ -6,8 +6,6 @@ import importlib.metadata as import_metadata
 import logging
 import logging.config
 
-import nationstates
-
 from nsdu import info
 from nsdu import exceptions
 from nsdu import api_adapter
@@ -30,8 +28,7 @@ class NSDU():
     def __init__(self, config):
         self.config = config
 
-        ns_api = nationstates.Nationstates(user_agent=config['general']['user_agent'])
-        dispatch_api = api_adapter.DispatchAPI(ns_api)
+        dispatch_api = api_adapter.DispatchAPI(self.config['general']['user_agent'])
 
         self.custom_loader_dir_path = self.config['general'].get('custom_loader_dir_path', None)
         loader_config = self.config['loader_config']
@@ -112,7 +109,6 @@ class NSDU():
                         remaining_dispatches.discard(name)
                 if remaining_dispatches:
                     [logger.error('Could not find dispatch "%s".', name) for name in remaining_dispatches]
-
 
     def add_nation_cred(self, nation_name, password):
         """Add new credentials.

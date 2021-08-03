@@ -22,9 +22,10 @@ class TestReraiseException():
 class TestDispatchAPI():
     def test_login_with_password_and_get_autologin(self):
         response = {'headers': {'X-Autologin': '123456'}}
-        mock_nation =  mock.Mock(get_shards=mock.Mock(return_value=response))
-        mock_nsapi = mock.Mock(nation=mock.Mock(return_value=mock_nation))
-        dispatch_api = api_adapter.DispatchAPI(mock_nsapi)
+        nation = mock.Mock(get_shards=mock.Mock(return_value=response))
+        ns_api = mock.Mock(nation=mock.Mock(return_value=nation))
+        dispatch_api = api_adapter.DispatchAPI('Maxtopia')
+        dispatch_api.api = ns_api
 
         autologin = dispatch_api.login('my_nation', password='hunterprime123')
 
@@ -32,25 +33,27 @@ class TestDispatchAPI():
 
     def test_login_with_autologin(self):
         response = {'headers': {'XYZ': '123'}}
-        mock_nation =  mock.Mock(get_shards=mock.Mock(return_value=response))
-        mock_nsapi = mock.Mock(nation=mock.Mock(return_value=mock_nation))
-        dispatch_api = api_adapter.DispatchAPI(mock_nsapi)
+        nation = mock.Mock(get_shards=mock.Mock(return_value=response))
+        ns_api = mock.Mock(nation=mock.Mock(return_value=nation))
+        dispatch_api = api_adapter.DispatchAPI('Maxtopia')
+        dispatch_api.api = ns_api
 
         dispatch_api.login('my_nation', autologin='123456')
 
-        mock_nsapi.nation.assert_called_with('my_nation', autologin='123456')
+        ns_api.nation.assert_called_with('my_nation', autologin='123456')
 
     def test_login_forbidden_exception(self):
-        mock_nation =  mock.Mock(get_shards=mock.Mock(side_effect=nationstates.exceptions.Forbidden))
-        mock_nsapi = mock.Mock(nation=mock.Mock(return_value=mock_nation))
-        dispatch_api = api_adapter.DispatchAPI(mock_nsapi)
+        nation =  mock.Mock(get_shards=mock.Mock(side_effect=nationstates.exceptions.Forbidden))
+        ns_api = mock.Mock(nation=mock.Mock(return_value=nation))
+        dispatch_api = api_adapter.DispatchAPI('Maxtopia')
+        dispatch_api.api = ns_api
 
         with pytest.raises(exceptions.DispatchAPIError):
             dispatch_api.login('my_nation', 'hunterprime123')
 
     def test_create_dispatch(self):
         resp = 'New factbook posted! <a href="/nation=test/detail=factbook/id=1234567">View Your Factbook</a>'
-        dispatch_api = api_adapter.DispatchAPI(mock.Mock())
+        dispatch_api = api_adapter.DispatchAPI('Maxtopia')
         create_dispatch = mock.Mock(return_value={'success': resp})
         dispatch_api.owner_nation = mock.Mock(create_dispatch=create_dispatch)
 
@@ -63,7 +66,7 @@ class TestDispatchAPI():
 
     def test_edit_dispatch(self):
         resp = 'New factbook edited! <a href="/nation=test/detail=factbook/id=1234567">View Your Factbook</a>'
-        dispatch_api = api_adapter.DispatchAPI(mock.Mock())
+        dispatch_api = api_adapter.DispatchAPI('Maxtopia')
         edit_dispatch = mock.Mock(return_value={'success': resp})
         dispatch_api.owner_nation = mock.Mock(edit_dispatch=edit_dispatch)
 
@@ -75,7 +78,7 @@ class TestDispatchAPI():
 
     def test_remove_dispatch(self):
         resp = 'Remove dispatch "test."'
-        dispatch_api = api_adapter.DispatchAPI(mock.Mock())
+        dispatch_api = api_adapter.DispatchAPI('Maxtopia')
         dispatch_api.owner_nation = mock.Mock(remove_dispatch=mock.Mock(return_value={'success': resp}))
 
         dispatch_api.remove_dispatch(dispatch_id='1234567')
