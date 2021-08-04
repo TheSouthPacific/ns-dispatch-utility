@@ -1,6 +1,6 @@
 import pathlib
 import importlib
-import mock
+from unittest import mock
 
 import pytest
 

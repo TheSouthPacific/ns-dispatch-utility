@@ -1,7 +1,7 @@
 import os
 import pathlib
 import shutil
-import mock
+from unittest import mock
 import json
 
 import pytest
