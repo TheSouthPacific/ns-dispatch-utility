@@ -5,7 +5,7 @@ user_agent = 'United States of Vietnam'
 # custom_loader_dir_path = '~/my_nsdu_loaders'
 
 [rendering]
-complex_formatter_path = '~/ns_dispatches/design/complex_tags.toml'
+complex_formatter_source_path = '~/ns_dispatches/design/complex_tags.toml'
 filter_paths = ['~/ns_dispatches/design/filters.toml']
 
 [plugins]
