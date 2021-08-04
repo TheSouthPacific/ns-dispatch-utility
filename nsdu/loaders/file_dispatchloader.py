@@ -137,7 +137,7 @@ class FileDispatchLoader():
             return file_path.read_text()
         except FileNotFoundError as err:
             logger.error('Could not find dispatch template file "%s".', file_path)
-            raise exceptions.DispatchTextNotFound from err
+            return None
 
     def add_new_dispatch_id(self, name, dispatch_id):
         """Add id of new dispatch into id store.

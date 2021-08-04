@@ -85,13 +85,13 @@ class TestBBParserIntegration():
         complex_formatter_source_path = 'tests/resources/bb_complex_formatters.py'
         ins = bb_parser.BBParser(simple_formatter_config, complex_formatter_source_path)
         text = ('[simple1]Simple[/simple1][simple2]Simple [simple3]nested[/simple3][/simple2]'
-                '[complex]Complex[/complex][complexctx]Complex context[/complexctx]'
+                '[complex]Complex[/complex][complexctx][complex]Complex context[/complex][/complexctx]'
                 '[complexopt opt=test]option[/complexopt]')
 
         r = ins.format(text, example={'foo': 'bar'})
 
         assert r == ('[simple1r]Simple[/simple1r][simple2r]Simple [simple3r]nested[/simple3r][/simple2r]'
-                     '[simple1r]Complex[/simple1r][complexctxr=bar]Complex context[/complexctxr]'
+                     '[simple1r]Complex[/simple1r][complexctxr=bar][complex]Complex context[/complex][/complexctxr]'
                      '[complexoptr=test]option[/complexoptr]')
 
     def test_format_with_simple_formatters_and_no_complex_formatters(self):
@@ -101,24 +101,24 @@ class TestBBParserIntegration():
                                                'render_embedded': False}}
         ins = bb_parser.BBParser(simple_formatter_config, None)
         text = ('[simple1]Simple[/simple1][simple2]Simple [simple3]nested[/simple3][/simple2]'
-                '[complex]Complex[/complex][complexctx]Complex context[/complexctx]'
+                '[complex]Complex[/complex][complexctx][complex]Complex context[/complex][/complexctx]'
                 '[complexopt opt=test]option[/complexopt]')
 
         r = ins.format(text, example={'foo': 'bar'})
 
         assert r == ('[simple1r]Simple[/simple1r][simple2r]Simple [simple3r]nested[/simple3r][/simple2r]'
-                     '[complex]Complex[/complex][complexctx]Complex context[/complexctx]'
+                     '[complex]Complex[/complex][complexctx][complex]Complex context[/complex][/complexctx]'
                      '[complexopt opt=test]option[/complexopt]')
 
     def test_format_with_complex_formatters_and_no_simple_formatters(self):
         complex_formatter_source_path = 'tests/resources/bb_complex_formatters.py'
         ins = bb_parser.BBParser(None, complex_formatter_source_path)
         text = ('[simple1]Simple[/simple1][simple2]Simple [simple3]nested[/simple3][/simple2]'
-                '[complex]Complex[/complex][complexctx]Complex context[/complexctx]'
+                '[complex]Complex[/complex][complexctx][complex]Complex context[/complex][/complexctx]'
                 '[complexopt opt=test]option[/complexopt]')
 
         r = ins.format(text, example={'foo': 'bar'})
 
         assert r == ('[simple1]Simple[/simple1][simple2]Simple [simple3]nested[/simple3][/simple2]'
-                     '[simple1]Complex[/simple1][complexctxr=bar]Complex context[/complexctxr]'
+                     '[simple1]Complex[/simple1][complexctxr=bar][complex]Complex context[/complex][/complexctxr]'
                      '[complexoptr=test]option[/complexoptr]')

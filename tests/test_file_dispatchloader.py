@@ -244,8 +244,7 @@ class TestFileDispatchLoaderObj():
     def test_get_dispatch_text_with_non_existing_file(self, tmp_path):
         obj = file_dispatchloader.FileDispatchLoader(mock.Mock(), tmp_path, '.txt')
 
-        with pytest.raises(exceptions.DispatchTextNotFound):
-            obj.get_dispatch_text('test2')
+        assert obj.get_dispatch_text('test2') == None
 
 
 class TestFileDispatchLoaderIntegration():

@@ -31,11 +31,6 @@ class LoaderConfigError(LoaderError):
     """
 
 
-class DispatchTextNotFound(LoaderError):
-    """Dispatch text not found.
-    """
-
-
 class DispatchAPIError(NSDUError):
     """Dispatch API error.
     """

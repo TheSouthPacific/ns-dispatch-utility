@@ -6,86 +6,87 @@ from unittest import mock
 import pytest
 import toml
 
+from nsdu import info
 from nsdu import exceptions
 from nsdu import renderer
 
 
-@pytest.fixture
-def get_mock_dispatch_loader():
-    def dispatch_loader(text="Test"):
-        return mock.Mock(get_dispatch_text=mock.Mock(return_value=text))
-
-    return dispatch_loader
-
-
 class TestDispatchTemplateLoader():
-    def test_load_text(self):
-        get_dispatch_text = mock.Mock(return_value='Test text')
-        loader_plugin = mock.Mock(get_dispatch_text=get_dispatch_text)
-        loader = renderer.DispatchJinjaLoader(loader_plugin)
+    def test_with_existent_template(self):
+        template_load_func = mock.Mock(return_value='Test text')
+        loader = renderer.JinjaTemplateLoader(template_load_func)
 
         r = loader.get_source(mock.Mock(), 'Test')
         assert r[0] == 'Test text'
-        assert r[2]()
 
-    def test_load_text_with_loader_error(self):
-        get_dispatch_text = mock.Mock(side_effect=exceptions.DispatchTextNotFound(suppress_nsdu_error=False))
-        loader_plugin = mock.Mock(get_dispatch_text=get_dispatch_text)
-        loader = renderer.DispatchJinjaLoader(loader_plugin)
+    def test_with_non_existent_template(self):
+        template_load_func = mock.Mock(return_value=None)
+        loader = renderer.JinjaTemplateLoader(template_load_func)
 
-        with pytest.raises(exceptions.DispatchRenderingError):
-            loader.get_source(mock.Mock(), 'Test')
+        r = loader.get_source(mock.Mock(), 'Test')
+        assert r[0] == info.DEFAULT_TEMPLATE
 
 
 class TestTemplateRenderer():
-    def test_load_filters(self, get_mock_dispatch_loader):
-        dispatch_loader = get_mock_dispatch_loader()
-        ins = renderer.TemplateRenderer(dispatch_loader)
+    def test_render_with_non_existent_template(self):
+        template_load_func = mock.Mock(return_value=None)
+        ins = renderer.TemplateRenderer(template_load_func)
 
-        ins.load_filters('tests/resources/filters.py')
+        assert ins.render('foo', {}) == info.DEFAULT_TEMPLATE
 
-        assert ins.env.filters['filter1']
+    def test_render_with_existent_template(self):
+        template = '{% for i in j %}{{ i }}{% endfor %}'
+        template_load_func = mock.Mock(return_value=template)
+        ins = renderer.TemplateRenderer(template_load_func)
 
-    def test_load_filters_with_non_existent_filter_file(self, get_mock_dispatch_loader):
-        dispatch_loader = get_mock_dispatch_loader()
-        ins = renderer.TemplateRenderer(dispatch_loader)
+        r = ins.render('foo', {'j': [1, 2]})
+
+        assert r == '12'
+
+    def test_load_filters_and_render(self):
+        template = '{% for i in j %}{{ i|foo_filter }}{% endfor %}'
+        template_load_func = mock.Mock(return_value=template)
+        ins = renderer.TemplateRenderer(template_load_func)
+        def foo_filter(a):
+            return '[{}]'.format(a)
+
+        ins.load_filters({'foo_filter': foo_filter})
+        r = ins.render('foo', {'j': [1, 2]})
+
+        assert r == '[1][2]'
+
+
+class TestLoadFiltersFromSource():
+    def test_with_existent_files(self):
+        template = '{% for i in j %}{{ i|filter1 }}{{ i|filter2(0)}}{{ i|filter3 }}{% endfor %}'
+        template_load_func = mock.Mock(return_value=template)
+        ins = renderer.TemplateRenderer(template_load_func)
+
+        renderer.load_filters_from_source(ins, ['tests/resources/filters-1.py', 'tests/resources/filters-2.py'])
+        r = ins.render('foo', {'j': [1,2 ]})
+
+        assert r == '[1]1and0<1>[2]2and0<2>'
+
+    def test_with_a_non_existent_file(self):
+        ins = renderer.TemplateRenderer(mock.Mock())
 
         with pytest.raises(exceptions.ConfigError):
-            ins.load_filters('non_existent.py')
-
-    def test_render_with_filters(self, get_mock_dispatch_loader):
-        template_text = '{% for i in j %}{{ i|filter1(2) }} {{ i|filter2(3) }} {% endfor %}'
-        dispatch_loader = get_mock_dispatch_loader(template_text)
-        ins = renderer.TemplateRenderer(dispatch_loader)
-        ins.load_filters('tests/resources/filters.py')
-
-        r = ins.render('template', context={'j': [1, 2]})
-
-        assert r == '1 2 1and3 2 2 2and3 '
+            renderer.load_filters_from_source(ins, ['tests/resources/filter-1.py', 'non-existent.py'])
 
 
 class TestDispatchRenderer():
-    def test_render(self, get_mock_dispatch_loader):
-        template_text = ('{% for i in j %}[simple1]{{ i|filter2(1) }}[/simple1]{% endfor %}'
-                         '[complex]{{ john.dave }}{{ current_dispatch }}[/complex][complexcfg]'
-                         '{{ key1 }}[/complexcfg]')
-        dispatch_loader = get_mock_dispatch_loader(template_text)
-        simple_bb_config = {'simple1': {'format_string': '[simple1r]%(value)s[/simple1r]'},
-                            'simple2': {'format_string': '[simple2r]%(value)s[/simple2r]'},
-                            'simple3': {'format_string': '[simple3r]%(value)s[/simple3r]',
-                                        'render_embedded': False}}
-        complex_bb_config = {'complex_formatter_source_path': 'tests/resources/bb_complex_formatters.py',
-                             'complex_formatter_config_path': 'tests/resources/bb_complex_formatter_config.toml'}
-        template_config = {'filter_path': 'tests/resources/filters.py'}
-        vars = {'j': [1, 2, 3],
-                'john': {'dave': 'marry'},
-                'key1': 'val1'}
-        dispatch_config = {'nation1': {'test1': {'ns_id': 1234567, 'title': 'ABC'},
-                                       'test2': {'ns_id': 7890123, 'title': 'DEF'}}}
-        ins = renderer.DispatchRenderer(dispatch_loader)
-        ins.load(simple_bb_config, complex_bb_config, template_config, vars, dispatch_config)
+    def test_render(self):
+        template = ('{% for i in j %}[complex]{{ i|filter1 }}[/complex]'
+                    '[complexctx][complex]{{ i|filter2(0)}}[/complex][/complexctx]'
+                    '[complexopt opt=1]{{ i|filter3 }}[/complexopt]{% endfor %}')
+        template_load_func = mock.Mock(return_value=template)
+        simple_bb_config = {'simple1': {'format_string': '[simple1r]%(value)s[/simple1r]'}}
+        complex_formatter_source_path = 'tests/resources/bb_complex_formatters.py'
+        template_filter_paths = ['tests/resources/filters-1.py', 'tests/resources/filters-2.py']
+        vars = {'j': [1, 2], 'example': {'foo': 'cool'}}
+        ins = renderer.DispatchRenderer(template_load_func, simple_bb_config,
+                                        complex_formatter_source_path, template_filter_paths, vars)
 
-        expected = ('[simple1r]1and1[/simple1r][simple1r]2and1[/simple1r][simple1r]3and1[/simple1r]'
-                    '[simple1r]marrytest1[/simple1r][complexcfgr=testcfgval]val1[/complexcfgr]')
+        expected = ('[simple1r][1][/simple1r][complexctxr=cool][complex]1and0[/complex][/complexctxr][complexoptr=1]<1>[/complexoptr]'
+                    '[simple1r][2][/simple1r][complexctxr=cool][complex]2and0[/complex][/complexctxr][complexoptr=1]<2>[/complexoptr]')
         assert ins.render('test1') == expected
-

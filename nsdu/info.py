@@ -10,6 +10,8 @@ APP_NAME = 'nsdu'
 AUTHOR = 'ns_tsp_usovietnam'
 DESCRIPTION = 'Automatically update and format dispatches.'
 
+DEFAULT_TEMPLATE = '[reserved]'
+
 # Pluggy project name for loader plugins.
 DISPATCH_LOADER_PROJ = 'NSDUDispatchLoader'
 VAR_LOADER_PROJ = 'NSDUVarLoader'
