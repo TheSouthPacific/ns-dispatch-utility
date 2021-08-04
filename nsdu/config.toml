@@ -4,12 +4,9 @@ user_agent = 'United States of Vietnam'
 # Path to directory containing source files of your own loaders
 # custom_loader_dir_path = '~/my_nsdu_loaders'
 
-[bbcode]
+[rendering]
 complex_formatter_path = '~/ns_dispatches/design/complex_tags.toml'
-complex_formatter_config_path = '~/ns_dispatches/design/complex_tags_config.toml'
-
-[template_renderer]
-filter_path = '~/ns_dispatches/design/filters.toml'
+filter_paths = ['~/ns_dispatches/design/filters.toml']
 
 [plugins]
 # Choose loader to load dispatch config and content.
