@@ -48,8 +48,8 @@ def load_all_modules_from_entry_points(entry_points, names):
     return modules
 
 
-class LoaderHandleBuilder():
-    """Abstract class for loader handle builders.
+class LoaderManagerBuilder():
+    """Abstract class for loader manager builders.
 
     Args:
         default_dir_path (pathlib.Path): Default loader directory
@@ -63,18 +63,18 @@ class LoaderHandleBuilder():
         self.entry_points = entry_points
 
 
-class SingleLoaderHandleBuilder(LoaderHandleBuilder):
-    """Build loader handle that handles one loader only.
+class SingleLoaderManagerBuilder(LoaderManagerBuilder):
+    """Build loader manager that managers one loader only.
     """
 
     def __init__(self, default_dir_path, custom_dir_path, entry_points):
         super().__init__(default_dir_path, custom_dir_path, entry_points)
 
-    def load_loader(self, handle, name):
-        """Load loader into handle.
+    def load_loader(self, manager, name):
+        """Load loader into manager.
 
         Args:
-            handle (loader.LoaderHandle): Single loader handle object
+            manager (loader.LoaderManager): Single loader manager object
             name (str): Loader name
 
         Raises:
@@ -84,35 +84,35 @@ class SingleLoaderHandleBuilder(LoaderHandleBuilder):
         if self.custom_dir_path is not None:
             try:
                 loaded_module = utils.load_module(pathlib.Path(self.custom_dir_path / name).with_suffix('.py'))
-                handle.load_loader(loaded_module)
+                manager.load_loader(loaded_module)
                 return
             except FileNotFoundError:
                 pass
 
         loaded_module = load_module_from_entry_points(self.entry_points, name)
         if loaded_module is not None:
-            handle.load_loader(loaded_module)
+            manager.load_loader(loaded_module)
             return
 
         try:
             loaded_module = utils.load_module((self.default_dir_path / name).with_suffix('.py'))
-            handle.load_loader(loaded_module)
+            manager.load_loader(loaded_module)
             return
         except FileNotFoundError:
             raise exceptions.LoaderNotFound('Loader "{}" not found.'.format(name))
 
 
-class MultiLoadersHandleBuilder(LoaderHandleBuilder):
-    """Build loader handle that handles many loaders
+class MultiLoadersManagerBuilder(LoaderManagerBuilder):
+    """Build loader manager that managers many loaders
     """
     def __init__(self, default_dir_path, custom_dir_path, entry_points):
         super().__init__(default_dir_path, custom_dir_path, entry_points)
 
-    def load_loader(self, handle, names):
-        """Load loaders into handle.
+    def load_loader(self, manager, names):
+        """Load loaders into manager.
 
         Args:
-            handle (loader.LoaderHandle): Multi-loaders handle object
+            manager (loader.LoaderManager): Multi-loaders manager object
             names (list): Loader names
 
         Raises:
@@ -137,13 +137,13 @@ class MultiLoadersHandleBuilder(LoaderHandleBuilder):
 
         for name in names:
             if name in loaded_modules:
-                handle.load_loader(loaded_modules[name])
+                manager.load_loader(loaded_modules[name])
             else:
                 raise exceptions.LoaderNotFound('Loader "{}" not found.'.format(name))
 
 
-class LoaderHandle():
-    """Handle for loaded loaders.
+class LoaderManager():
+    """Manager for loaded loaders.
 
     Args:
         proj_name (str): Pluggy project name for this plugin type
@@ -165,8 +165,8 @@ class LoaderHandle():
         self.manager.register(module)
 
 
-class PersistentLoaderHandle(LoaderHandle):
-    """Handle for loaders that maintain state for the entire duration of the app.
+class PersistentLoaderManager(LoaderManager):
+    """Manager for loaders that maintain state for the entire duration of the app.
 
     Args:
         Same as Loader class
@@ -180,7 +180,7 @@ class PersistentLoaderHandle(LoaderHandle):
 
     def load_loader(self, module):
         """Load a loader and return its instance for
-        reusing file handlers/database connections.
+        reusing file managerrs/database connections.
         """
 
         super().load_loader(module)
@@ -194,8 +194,8 @@ class PersistentLoaderHandle(LoaderHandle):
 
 
 # pylint: disable=maybe-no-member
-class VarLoaderHandle(LoaderHandle):
-    """Handle for variable loaders.
+class VarLoaderManager(LoaderManager):
+    """Manager for variable loaders.
     """
 
     def __init__(self, loader_config):
@@ -207,8 +207,8 @@ class VarLoaderHandle(LoaderHandle):
         return merged_vars_dict
 
 
-class DispatchLoaderHandle(PersistentLoaderHandle):
-    """Handle for a dispatch loader.
+class DispatchLoaderManager(PersistentLoaderManager):
+    """Manager for a dispatch loader.
     """
 
     def __init__(self, loader_config):
@@ -232,8 +232,8 @@ class DispatchLoaderHandle(PersistentLoaderHandle):
                                                  dispatch_id=dispatch_id)
 
 
-class SimpleBBLoaderHandle(LoaderHandle):
-    """Handle for a simple BBCode formatter loader.
+class SimpleBBLoaderManager(LoaderManager):
+    """Manager for a simple BBCode formatter loader.
     """
 
     def __init__(self, loader_config):
@@ -243,8 +243,8 @@ class SimpleBBLoaderHandle(LoaderHandle):
         return self.manager.hook.get_simple_bb_config(config=self.loader_config)
 
 
-class CredLoaderHandle(PersistentLoaderHandle):
-    """Handle for a login credential loader.
+class CredLoaderManager(PersistentLoaderManager):
+    """Manager for a login credential loader.
     """
 
     def __init__(self, loader_config):
