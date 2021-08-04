@@ -80,6 +80,13 @@ class NsduDispatch():
             dispatches (list): Dispatch names
         """
 
+        if dispatches:
+            while (dispatches[-1] not in self.dispatch_info):
+                logger.error('Could not find dispatch "%s"', dispatches[-1])
+                dispatches.pop()
+                if not dispatches:
+                    return
+
         for owner_nation, dispatch_config in self.dispatch_config.items():
             try:
                 self.updater.login_owner_nation(owner_nation, dispatch_config)
@@ -91,13 +98,7 @@ class NsduDispatch():
             if not dispatches:
                 [self.updater.update_dispatch(name) for name in dispatch_config.keys()]
             else:
-                remaining_dispatches = set(dispatches)
-                for name in dispatch_config.keys():
-                    if name in remaining_dispatches:
-                        self.updater.update_dispatch(name)
-                        remaining_dispatches.discard(name)
-                if remaining_dispatches:
-                    [logger.error('Could not find dispatch "%s".', name) for name in remaining_dispatches]
+                [self.updater.update_dispatch(name) for name in dispatch_config.keys() if name in dispatches]
 
     def add_nation_cred(self, nation_name, password):
         """Add new credentials.
