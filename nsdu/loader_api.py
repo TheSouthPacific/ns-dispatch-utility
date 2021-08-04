@@ -44,8 +44,8 @@ def get_dispatch_config(loader):
 
 
 @dispatch_loader_specs(firstresult=True)
-def get_dispatch_text(loader, name):
-    """Get content text of a dispatch.
+def get_dispatch_template(loader, name):
+    """Get template text of a dispatch.
 
     Args:
         loader: Loader

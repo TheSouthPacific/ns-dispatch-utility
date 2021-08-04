@@ -66,7 +66,7 @@ class NsduDispatch():
         template_vars['dispatch_info'] = self.dispatch_info
 
         rendering_config = self.config.get('rendering', {})
-        self.renderer = renderer.DispatchRenderer(self.dispatch_loader_manager.get_dispatch_text, simple_bb_config,
+        self.renderer = renderer.DispatchRenderer(self.dispatch_loader_manager.get_dispatch_template, simple_bb_config,
                                                   rendering_config.get('complex_formatter_source_path', None),
                                                   rendering_config.get('filter_paths', None), template_vars)
 

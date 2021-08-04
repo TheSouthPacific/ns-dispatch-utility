@@ -223,8 +223,8 @@ class DispatchLoaderManager(PersistentLoaderManager):
     def get_dispatch_config(self):
         return self.manager.hook.get_dispatch_config(loader=self._loader)
 
-    def get_dispatch_text(self, name):
-        return self.manager.hook.get_dispatch_text(loader=self._loader, name=name)
+    def get_dispatch_template(self, name):
+        return self.manager.hook.get_dispatch_template(loader=self._loader, name=name)
 
     def add_dispatch_id(self, name, dispatch_id):
         return self.manager.hook.add_dispatch_id(loader=self._loader,

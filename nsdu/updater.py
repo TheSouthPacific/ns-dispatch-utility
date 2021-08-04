@@ -102,7 +102,7 @@ class DispatchUpdater():
         except exceptions.DispatchAPIError:
             logger.exception('Dispatch API error')
 
-    def get_dispatch_text(self, name):
+    def get_dispatch_template(self, name):
         """Get rendered text for a dispatch.
 
         Args:
@@ -139,7 +139,7 @@ class DispatchUpdater():
             return
 
         try:
-            text = self.get_dispatch_text(name)
+            text = self.get_dispatch_template(name)
         except exceptions.DispatchRenderingError as err:
             return
 

@@ -60,7 +60,7 @@ class TestDispatchUpdater():
         mock_obj = mock.Mock()
         ins = updater.DispatchUpdater(mock_obj, mock_obj, mock_obj, mock_obj)
         ins.create_dispatch = mock.Mock()
-        ins.get_dispatch_text = mock.Mock(return_value='test_text')
+        ins.get_dispatch_template = mock.Mock(return_value='test_text')
         this_dispatch_config = {'title': 'test_title',
                                 'category': '1',
                                 'subcategory': '100',
@@ -78,7 +78,7 @@ class TestDispatchUpdater():
         mock_obj = mock.Mock()
         ins = updater.DispatchUpdater(mock_obj, mock_obj, mock_obj, mock_obj)
         ins.edit_dispatch = mock.Mock()
-        ins.get_dispatch_text = mock.Mock(return_value='test_text')
+        ins.get_dispatch_template = mock.Mock(return_value='test_text')
         this_dispatch_config = {'title': 'test_title',
                                 'category': '1',
                                 'subcategory': '100',
@@ -96,7 +96,7 @@ class TestDispatchUpdater():
         mock_obj = mock.Mock()
         ins = updater.DispatchUpdater(mock_obj, mock_obj, mock_obj, mock_obj)
         ins.edit_dispatch = mock.Mock()
-        ins.get_dispatch_text = mock.Mock(side_effect=exceptions.DispatchRenderingError)
+        ins.get_dispatch_template = mock.Mock(side_effect=exceptions.DispatchRenderingError)
         this_dispatch_config = {'title': 'test_title',
                                 'category': '1',
                                 'subcategory': '100',

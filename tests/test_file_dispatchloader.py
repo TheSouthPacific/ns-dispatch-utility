@@ -234,17 +234,17 @@ class TestDispatchConfigManager():
         assert toml.load(dispatch_config_file_2_path) == expected_2
 
 class TestFileDispatchLoaderObj():
-    def test_get_dispatch_text(self, text_files):
+    def test_get_dispatch_template(self, text_files):
         template_path = text_files({'test1.txt': 'Test text 1', 'test2.txt': 'Test text 2'})
 
         obj = file_dispatchloader.FileDispatchLoader(mock.Mock(), template_path, '.txt')
 
-        assert obj.get_dispatch_text('test1') == 'Test text 1'
+        assert obj.get_dispatch_template('test1') == 'Test text 1'
 
-    def test_get_dispatch_text_with_non_existing_file(self, tmp_path):
+    def test_get_dispatch_template_with_non_existing_file(self, tmp_path):
         obj = file_dispatchloader.FileDispatchLoader(mock.Mock(), tmp_path, '.txt')
 
-        assert obj.get_dispatch_text('test2') == None
+        assert obj.get_dispatch_template('test2') == None
 
 
 class TestFileDispatchLoaderIntegration():
@@ -278,7 +278,7 @@ class TestFileDispatchLoaderIntegration():
 
         loader = file_dispatchloader.init_dispatch_loader({'file_dispatchloader': loader_config})
         r_dispatch_config = file_dispatchloader.get_dispatch_config(loader)
-        r_dispatch_text = file_dispatchloader.get_dispatch_text(loader, 'test1')
+        r_dispatch_text = file_dispatchloader.get_dispatch_template(loader, 'test1')
         file_dispatchloader.cleanup_dispatch_loader(loader)
 
         assert r_dispatch_config['nation1']['test4']['ns_id'] == '98765'
@@ -311,7 +311,7 @@ class TestFileDispatchLoaderIntegration():
 
         loader = file_dispatchloader.init_dispatch_loader({'file_dispatchloader': loader_config})
         r_dispatch_config = file_dispatchloader.get_dispatch_config(loader)
-        r_dispatch_text = file_dispatchloader.get_dispatch_text(loader, 'test1')
+        r_dispatch_text = file_dispatchloader.get_dispatch_template(loader, 'test1')
         file_dispatchloader.add_dispatch_id(loader, 'test2', '54321')
         file_dispatchloader.cleanup_dispatch_loader(loader)
 

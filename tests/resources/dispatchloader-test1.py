@@ -12,7 +12,7 @@ class DispatchLoaderTest1():
     def get_dispatch_config(self):
         return {'foo1': 'bar1', 'foo2': 'bar2'}
 
-    def get_dispatch_text(self, name):
+    def get_dispatch_template(self, name):
         return 'Dispatch content of {}'.format(name)
 
     def add_dispatch_id(self, name, id):
@@ -33,8 +33,8 @@ def get_dispatch_config(loader):
 
 
 @loader_api.dispatch_loader
-def get_dispatch_text(loader, name):
-    return loader.get_dispatch_text(name)
+def get_dispatch_template(loader, name):
+    return loader.get_dispatch_template(name)
 
 
 @loader_api.dispatch_loader

@@ -239,11 +239,11 @@ class TestDispatchLoaderManager():
 
         assert r == {'foo1': 'bar1', 'foo2': 'bar2'}
 
-    def test_get_dispatch_text(self):
+    def test_get_dispatch_template(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
         manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
-        r = manager.get_dispatch_text('test')
+        r = manager.get_dispatch_template('test')
 
         manager.cleanup_loader()
 

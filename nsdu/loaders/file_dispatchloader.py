@@ -119,8 +119,8 @@ class FileDispatchLoader():
 
         return self.dispatch_config_manager.get_canonical_dispatch_config()
 
-    def get_dispatch_text(self, name):
-        """Get a dispatch's text content.
+    def get_dispatch_template(self, name):
+        """Get the template text of a dispatch.
 
         Args:
             name (str): Dispatch name
@@ -135,7 +135,7 @@ class FileDispatchLoader():
         file_path = pathlib.Path(self.template_path, name).with_suffix(self.file_ext)
         try:
             return file_path.read_text()
-        except FileNotFoundError as err:
+        except FileNotFoundError:
             logger.error('Could not find dispatch template file "%s".', file_path)
             return None
 
@@ -191,8 +191,8 @@ def get_dispatch_config(loader):
 
 
 @loader_api.dispatch_loader
-def get_dispatch_text(loader, name):
-    return loader.get_dispatch_text(name)
+def get_dispatch_template(loader, name):
+    return loader.get_dispatch_template(name)
 
 
 @loader_api.dispatch_loader
