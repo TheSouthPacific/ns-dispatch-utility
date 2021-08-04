@@ -13,12 +13,6 @@ class ComplexCtx():
         return "[complexctxr={}]{}[/complexctxr]".format(context['example']['foo'], value)
 
 
-@BBCode.register('complexcfg')
-class ComplexCfg():
-    def format(self, tag_name, value, options, parent, context):
-        return "[complexcfgr={}]{}[/complexcfgr]".format(self.config['testcfgkey'], value)
-
-
 @BBCode.register('complexopt')
 class ComplexOpt():
     def format(self, tag_name, value, options, parent, context):

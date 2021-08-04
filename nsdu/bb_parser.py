@@ -41,7 +41,7 @@ class BBRegistry():
         return decorator
 
     @classmethod
-    def init_complex_formatters(cls, source_path, config):
+    def init_complex_formatters(cls):
         """Initialize complex formatters and give them config.
 
         Args:
@@ -49,15 +49,10 @@ class BBRegistry():
             config (dict|None): Complex formatter config
         """
 
-        utils.load_module(source_path)
-        logger.debug('Loaded complex formatter source file at "%s"', source_path)
-
         inited_formatters = []
         for formatter_info in cls.complex_formatters:
             tag_name = formatter_info['tag_name']
             formatter_info['obj'].config = None
-            if config is not None and tag_name in config:
-                formatter_info['obj'].config = config[tag_name]
             formatter_info['obj'] = formatter_info['obj']()
             inited_formatters.append(formatter_info)
             logger.debug('Initialized complex formatter "%s"', tag_name)
@@ -66,7 +61,7 @@ class BBRegistry():
         return inited_formatters
 
 
-class BBGenericParser():
+class BBParserCore():
     """Adapter of library's BBCode parser
     """
 
@@ -77,6 +72,12 @@ class BBGenericParser():
                                     replace_links=False,
                                     replace_cosmetic=False)
 
+    def add_simple_formatter(self, tag_name, format_string, **kwargs):
+        self.parser.add_simple_formatter(tag_name, format_string, **kwargs)
+
+    def add_complex_formatter(self, tag_name, render_func, **kwargs):
+        self.parser.add_formatter(tag_name, render_func, **kwargs)
+
     def format(self, text, **kwargs):
         """Format text with loaded formatters.
         """
@@ -84,74 +85,52 @@ class BBGenericParser():
         return self.parser.format(text, **kwargs)
 
 
-class BBSimpleParser(BBGenericParser):
-    """Parser for formatting with simple formatters
-    """
+def build_simple_parser_from_config(config):
+    parser = BBParserCore()
 
-    def load_formatters(self, config):
-        """Load simple formatters defined in config.
+    for tag_name, format_config in config.items():
+        parser.add_simple_formatter(
+            tag_name=tag_name,
+            format_string=format_config['format_string'],
+            escape_html=False,
+            replace_links=False,
+            replace_cosmetic=False,
+            newline_closes=format_config.get('newline_closes', False),
+            same_tag_closes=format_config.get('same_tag_closes', False),
+            standalone=format_config.get('standalone', False),
+            render_embedded=format_config.get('render_embedded', True),
+            strip=format_config.get('strip', False),
+            swallow_trailing_newline=format_config.get('swallow_trailing_newline', False))
 
-        Args:
-            config (dict): Simple formatter config
-        """
-
-        for tag_name, format_config in config.items():
-            self.parser.add_simple_formatter(
-                tag_name=tag_name,
-                format_string=format_config['format_string'],
-                escape_html=False,
-                replace_links=False,
-                replace_cosmetic=False,
-                newline_closes=format_config.get('newline_closes', False),
-                same_tag_closes=format_config.get('same_tag_closes', False),
-                standalone=format_config.get('standalone', False),
-                render_embedded=format_config.get('render_embedded', True),
-                strip=format_config.get('strip', False),
-                swallow_trailing_newline=format_config.get('swallow_trailing_newline', False))
+    return parser
 
 
-class BBComplexParser(BBGenericParser):
-    """Parser for formatting with complex formatters
-    """
+def build_complex_parser_from_source(source_path):
+    try:
+        utils.load_module(source_path)
+        formatters = BBRegistry.init_complex_formatters()
+        logger.debug('Loaded complex formatter source file at "%s"', source_path)
+    except FileNotFoundError:
+        raise exceptions.ConfigError('Complex formatter source file not found at "{}"'.format(source_path))
 
-    def load_formatters(self, bb_registry, source_path, config_path):
-        """Load complex formatters from Python source file.
+    parser = BBParserCore()
 
-        Args:
-            bb_registry (BBRegistry): Complex formatter registry
-            source_path (pathlib.Path): Complex formatter source file path
-            config_path (pathlib.Path|None): Complex formatter config file path
+    for formatter_info in formatters:
+        parser.add_complex_formatter(
+            tag_name=formatter_info['tag_name'],
+            render_func=formatter_info.pop('obj').format,
+            escape_html=False,
+            replace_links=False,
+            replace_cosmetic=False,
+            newline_closes=formatter_info.get('newline_closes', False),
+            same_tag_closes=formatter_info.get('same_tag_closes', False),
+            standalone=formatter_info.get('standalone', False),
+            render_embedded=formatter_info.get('render_embedded', True),
+            strip=formatter_info.get('strip', False),
+            swallow_trailing_newline=formatter_info.get('swallow_trailing_newline', False))
+        logger.debug('Loaded complex formatter "%s"', formatter_info['tag_name'])
 
-        Raises:
-            exceptions.ConfigError: Failed to find source or config file
-        """
-
-        config = {}
-        if config_path is not None:
-            try:
-                config = utils.get_config_from_toml(config_path)
-            except FileNotFoundError:
-                raise exceptions.ConfigError('Complex formatter config file not found at "{}"'.format(config_path))
-
-        try:
-            formatters = bb_registry.init_complex_formatters(source_path, config)
-        except FileNotFoundError:
-            raise exceptions.ConfigError('Complex formatter source file not found at "{}"'.format(source_path))
-
-        for formatter_info in formatters:
-            self.parser.add_formatter(
-                tag_name=formatter_info['tag_name'],
-                render_func=formatter_info.pop('obj').format,
-                escape_html=False,
-                replace_links=False,
-                replace_cosmetic=False,
-                newline_closes=formatter_info.get('newline_closes', False),
-                same_tag_closes=formatter_info.get('same_tag_closes', False),
-                standalone=formatter_info.get('standalone', False),
-                render_embedded=formatter_info.get('render_embedded', True),
-                strip=formatter_info.get('strip', False),
-                swallow_trailing_newline=formatter_info.get('swallow_trailing_newline', False))
-            logger.debug('Loaded complex formatter "%s"', formatter_info['tag_name'])
+    return parser
 
 
 class BBParser():
@@ -160,41 +139,17 @@ class BBParser():
     Args:
         simple_formatter_config (dict|None): Simple formatter config
         complex_formatter_source_path (str|None): Complex formatter file path
-        complex_formatter_config_path (str|None): Complex formatter config file path
     """
 
-    def __init__(self):
+    def __init__(self, simple_formatter_config, complex_formatter_source_path):
+        self.simple_formatter_config = simple_formatter_config
+        self.complex_formatter_source_path = complex_formatter_source_path
 
-        self.simple_parser = BBSimpleParser()
-        self.registry = BBRegistry()
-        self.complex_parser = BBComplexParser()
+        if self.simple_formatter_config is not None:
+            self.simple_parser = build_simple_parser_from_config(self.simple_formatter_config)
 
-    def load_formatters(self, simple_formatter_config,
-                        complex_formatter_source_path,
-                        complex_formatter_config_path):
-        """Load all formatters from their files.
-
-        Args:
-            simple_formatter_config (dict|None): Simple formatter config
-            complex_formatter_source_path (str|None): Complex formatter file path
-            complex_formatter_config_path (str|None): Complex formatter config file path
-        """
-
-        if simple_formatter_config is None:
-            logger.debug('There is no simple formatter config')
-        else:
-            self.simple_parser.load_formatters(simple_formatter_config)
-
-        if complex_formatter_config_path is None:
-            logger.debug('There is no complex formatter config path')
-
-        if complex_formatter_source_path is None:
-            logger.debug('There is no complex formatter file path')
-        elif complex_formatter_config_path is None:
-            self.complex_parser.load_formatters(self.registry, pathlib.Path(complex_formatter_source_path), None)
-        else:
-            self.complex_parser.load_formatters(self.registry, pathlib.Path(complex_formatter_source_path),
-                                                pathlib.Path(complex_formatter_config_path))
+        if self.complex_formatter_source_path is not None:
+            self.complex_parser = build_complex_parser_from_source(pathlib.Path(self.complex_formatter_source_path))
 
     def format(self, text, **kwargs):
         """Format BBCode text.
@@ -203,5 +158,12 @@ class BBParser():
             text (str): Text
         """
 
-        complex_formatted_text = self.complex_parser.format(text=text, **kwargs)
-        return self.simple_parser.format(text=complex_formatted_text, **kwargs)
+        formatted_text = text
+
+        if self.complex_formatter_source_path is not None:
+            formatted_text = self.complex_parser.format(text=formatted_text, **kwargs)
+
+        if self.simple_formatter_config is not None:
+            formatted_text = self.simple_parser.format(text=formatted_text, **kwargs)
+
+        return formatted_text
