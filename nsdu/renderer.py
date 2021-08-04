@@ -68,6 +68,16 @@ class TemplateRenderer():
 
 
 def load_filters_from_source(template_renderer, filter_paths):
+    """Load Jinja filters from source files.
+
+    Args:
+        template_renderer (nsdu.renderer.TemplateRenderer): Template renderer
+        filter_paths (list): Paths to filter source files
+
+    Raises:
+        exceptions.ConfigError: Filter file not found
+    """
+
     loaded_filters = {}
 
     for path in filter_paths:
