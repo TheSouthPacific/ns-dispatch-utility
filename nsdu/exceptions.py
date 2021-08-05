@@ -31,22 +31,22 @@ class LoaderConfigError(LoaderError):
     """
 
 
-class DispatchAPIError(NSDUError):
+class DispatchApiError(NSDUError):
     """Dispatch API error.
     """
 
 
-class UnknownDispatchError(DispatchAPIError):
+class UnknownDispatchError(DispatchApiError):
     """This dispatch does not exist.
     """
 
 
-class NotOwnerDispatchError(DispatchAPIError):
+class NotOwnerDispatchError(DispatchApiError):
     """You do not own this dispatch.
     """
 
 
-class NationLoginError(DispatchAPIError):
+class NationLoginError(DispatchApiError):
     """Failed to log in to nation.
     """
 

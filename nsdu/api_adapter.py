@@ -21,10 +21,10 @@ def reraise_exception(err):
     if 'not the author of this dispatch' in str(err):
         raise exceptions.NotOwnerDispatchError from err
 
-    raise exceptions.DispatchAPIError from err
+    raise exceptions.DispatchApiError from err
 
 
-class DispatchAPI():
+class DispatchApi():
     """Wrapper around pynationstates for dispatch functions.
 
     Args:
