@@ -18,59 +18,6 @@ from nsdu import exceptions
 logger = logging.getLogger(__name__)
 
 
-class CredManager(collections.UserDict):
-    """Nation login credential manager.
-
-    Args:
-        cred_loader: Credential loader
-        dispatch_api: Dispatch API
-    """
-
-    def __init__(self, cred_loader, dispatch_api):
-        super().__init__()
-        self.cred_loader = cred_loader
-        self.dispatch_api = dispatch_api
-        self.new_creds = {}
-        self.delete_creds = []
-
-    def load_creds(self):
-        """Load all credentials from loader.
-        """
-
-        self.data = self.cred_loader.get_creds()
-
-    def __setitem__(self, nation_name, password):
-        """Add a new credential.
-
-        Args:
-            nation_name (str): Nation name
-            password (str): Password
-        """
-
-        self.new_creds[nation_name] = password
-
-    def __delitem__(self, nation_name):
-        """Delete a credential
-
-        Args:
-            nation_name (str): Nation name
-        """
-
-        self.delete_creds.append(nation_name)
-
-    def save(self):
-        """Get autologin codes for new credentials.
-        Tell cred loader to save new credentials and delete those requested by user.
-        """
-
-        for nation_name, password in self.new_creds.items():
-            x_autologin = self.dispatch_api.login(nation_name, password=password)
-            self.cred_loader.add_cred(nation_name, x_autologin)
-
-        for nation_name in self.delete_creds:
-            self.cred_loader.remove_cred(nation_name)
-
-
 def get_config_from_toml(config_path):
     """Get configuration from TOML file.
 

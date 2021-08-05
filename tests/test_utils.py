@@ -13,42 +13,6 @@ from nsdu import exceptions
 from nsdu import utils
 
 
-class TestCredManager():
-    def test_load_creds(self):
-        mock_creds = {'nation1': '123456', 'nation2': '567890'}
-        mock_cred_loader = mock.Mock(get_creds=mock.Mock(return_value=mock_creds))
-        creds = utils.CredManager(mock_cred_loader, mock.Mock())
-
-        creds.load_creds()
-
-        assert creds['nation1'] == '123456'
-
-    def test_add_cred(self):
-        mock_cred_loader = mock.Mock(add_cred=mock.Mock())
-        mock_dispatch_api = mock.Mock(login=mock.Mock(return_value='123456'))
-        creds = utils.CredManager(mock_cred_loader, mock_dispatch_api)
-
-        creds['nation1'] = 'hunterprime1'
-        creds['nation2'] = 'hunterprime2'
-        creds.save()
-
-        mock_cred_loader.add_cred.assert_has_calls([mock.call('nation1', '123456'), 
-                                                    mock.call('nation2', '123456')])
-        mock_dispatch_api.login.assert_has_calls([mock.call('nation1', password='hunterprime1'), 
-                                                  mock.call('nation2', password='hunterprime2')])
-
-    def test_remove_cred(self):
-        mock_cred_loader = mock.Mock(remove_cred=mock.Mock())
-        creds = utils.CredManager(mock_cred_loader, mock.Mock())
-
-        del creds['nation1']
-        del creds['nation2']
-        creds.save()
-
-        mock_cred_loader.remove_cred.assert_has_calls([mock.call('nation1'), 
-                                                       mock.call('nation2')])
-
-
 class TestGetDispatchInfo():
     def test_get_dispatch_info(self):
         dispatch_config = {'nation1': {'dispatch1': {'title': 'Test Title 1',

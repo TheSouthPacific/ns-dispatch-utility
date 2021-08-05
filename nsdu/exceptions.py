@@ -51,12 +51,12 @@ class NationLoginError(DispatchApiError):
     """
 
 
-class DispatchUpdatingError(NSDUError):
-    """Dispatch update error.
+class DispatchConfigError(NSDUError):
+    """Dispatch config error.
     """
 
 
-class NonexistentCategoryError(DispatchUpdatingError):
+class NonexistentCategoryError(DispatchConfigError):
     """Category or subcategory doesn't exist.
     """
 
