@@ -13,7 +13,7 @@ filter_paths = ['~/ns_dispatches/design/filters.toml']
 dispatch_loader = 'file_dispatchloader'
 # Choose loader to load simple BBCode fornatters
 simple_bb_loader = 'file_simplebbloader'
-# Choose loader to load variables.
+# Choose loader to load template variables.
 template_var_loader = 'file_templatevarloader'
 # Choose loader to load nation login credentials.
 cred_loader = 'json_credloader'
