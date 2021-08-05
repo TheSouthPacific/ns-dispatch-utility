@@ -8,7 +8,6 @@ import jinja2
 
 from nsdu import info
 from nsdu import exceptions
-from nsdu import info
 from nsdu import bb_parser
 from nsdu import utils
 
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 class JinjaTemplateLoader(jinja2.BaseLoader):
-    """Load Jinja templates using a function.
+    """Load Jinja templates using a callback function.
     """
 
     def __init__(self, template_load_func):
@@ -35,7 +34,7 @@ class TemplateRenderer():
     """Render a dispatch template.
 
     Args:
-        template_load_func (str): Function to load a template by name
+        template_load_func (Function): Function to load a template by name
     """
 
     def __init__(self, template_load_func):
@@ -102,7 +101,7 @@ class DispatchRenderer():
     """
 
     def __init__(self, template_load_func, simple_formatter_config,
-                 complex_formatter_source_path, template_filter_paths, vars):
+                 complex_formatter_source_path, template_filter_paths, template_vars):
         self.template_renderer = TemplateRenderer(template_load_func)
         if template_filter_paths is not None:
             load_filters_from_source(self.template_renderer, template_filter_paths)
@@ -110,7 +109,7 @@ class DispatchRenderer():
         self.bb_parser = bb_parser.BBParser(simple_formatter_config, complex_formatter_source_path)
 
         # Context all dispatches will have
-        self.global_context = vars
+        self.global_context = template_vars
 
     def render(self, name):
         """Render a dispatch.

@@ -1,11 +1,9 @@
 """Parse BBCode tags.
 """
 
-import os
 import logging
 import pathlib
 
-import toml
 import bbcode
 
 from nsdu import exceptions
@@ -73,9 +71,23 @@ class BBParserCore():
                                     replace_cosmetic=False)
 
     def add_simple_formatter(self, tag_name, format_string, **kwargs):
+        """Add simple formatter
+
+        Args:
+            tag_name (str): Tag name
+            format_string (str): Format string
+        """
+
         self.parser.add_simple_formatter(tag_name, format_string, **kwargs)
 
     def add_complex_formatter(self, tag_name, render_func, **kwargs):
+        """Add complex formatter
+
+        Args:
+            tag_name (str): Tag name
+            render_func (Function): A function that returns formatted string
+        """
+
         self.parser.add_formatter(tag_name, render_func, **kwargs)
 
     def format(self, text, **kwargs):
@@ -86,8 +98,16 @@ class BBParserCore():
 
 
 def build_simple_parser_from_config(config):
-    parser = BBParserCore()
+    """Build parser for simple formatters from config.
 
+    Args:
+        config (dict): Simple formatter config
+
+    Returns:
+        nsdu.bb_parser.BBParserCore: Loaded parser
+    """
+
+    parser = BBParserCore()
     for tag_name, format_config in config.items():
         parser.add_simple_formatter(
             tag_name=tag_name,
@@ -101,11 +121,22 @@ def build_simple_parser_from_config(config):
             render_embedded=format_config.get('render_embedded', True),
             strip=format_config.get('strip', False),
             swallow_trailing_newline=format_config.get('swallow_trailing_newline', False))
-
     return parser
 
 
 def build_complex_parser_from_source(source_path):
+    """Build parser for complex formatters from source file.
+
+    Args:
+        source_path (pathlib.Path): Path to source file
+
+    Raises:
+        exceptions.ConfigError: Source file not found
+
+    Returns:
+        nsdu.bb_parser.BBParserCore: Loaded parser
+    """
+
     try:
         utils.load_module(source_path)
         formatters = BBRegistry.init_complex_formatters()

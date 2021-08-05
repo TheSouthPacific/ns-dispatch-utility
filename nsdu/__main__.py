@@ -1,6 +1,5 @@
 """NationStates Dispatch Utility."""
 
-import os
 import argparse
 import importlib.metadata as import_metadata
 import logging
@@ -18,7 +17,18 @@ logger = logging.getLogger('NSDU')
 
 
 class NsduDispatch():
-    def __init__(self, dispatch_updater, dispatch_loader_manager, dispatch_config, dispatch_info, creds):
+    """NSDU dispatch updating utility.
+
+    Args:
+        dispatch_updater (nsdu.updater_api.DispatchUpdater): Dispatch updater
+        dispatch_loader_manager (nsdu.loader.DispatchLoaderManager): Dispatch loader manager
+        dispatch_config (dict): Dispatch config
+        dispatch_info (dict): Dispatch info
+        creds (dict): Nation login credentials
+    """
+
+    def __init__(self, dispatch_updater, dispatch_loader_manager,
+                 dispatch_config, dispatch_info, creds):
         self.dispatch_updater = dispatch_updater
         self.dispatch_loader_manager = dispatch_loader_manager
         self.dispatch_config = dispatch_config
@@ -26,6 +36,12 @@ class NsduDispatch():
         self.creds = creds
 
     def update_a_dispatch(self, name):
+        """Update a dispatch.
+
+        Args:
+            name (str): Dispatch name
+        """
+
         config = self.dispatch_info[name]
         category = config['category']
         subcategory = config['subcategory']
@@ -68,7 +84,7 @@ class NsduDispatch():
         """
 
         if names:
-            while (names[-1] not in self.dispatch_info):
+            while names[-1] not in self.dispatch_info:
                 logger.error('Could not find dispatch "%s"', names[-1])
                 names.pop()
                 if not names:
@@ -88,11 +104,14 @@ class NsduDispatch():
                 [self.update_a_dispatch(name) for name in dispatch_config.keys() if name in names]
 
     def close(self):
+        """Save dispatch config changes and close dispatch loader.
+        """
+
         self.dispatch_loader_manager.cleanup_loader()
 
 
 class NsduCred():
-    """NSDU credential management utility.
+    """NSDU credential utility.
 
     Args:
         dispatch_api (nsdu.api_adapter.DispatchApi): Dispatch API
@@ -124,13 +143,22 @@ class NsduCred():
         self.cred_loader_manager.remove_cred(nation_name)
 
     def close(self):
-        """Save changes to creds and close.
+        """Save cred changes and close.
         """
 
         self.cred_loader_manager.cleanup_loader()
 
 
 def load_nsdu_dispatch_utility_from_config(config):
+    """Build NSDU dispatch uility object from config.
+
+    Args:
+        config (dict): General config
+
+    Returns:
+        Built object
+    """
+
     custom_loader_dir_path = config['general'].get('custom_loader_dir_path', None)
     loader_config = config['loader_config']
 
@@ -173,20 +201,30 @@ def load_nsdu_dispatch_utility_from_config(config):
                                                    template_load_func=dispatch_loader_manager.get_dispatch_template,
                                                    template_vars=template_vars)
 
-    return NsduDispatch(dispatch_updater, dispatch_loader_manager, dispatch_config, dispatch_info, creds)
+    return NsduDispatch(dispatch_updater, dispatch_loader_manager,
+                        dispatch_config, dispatch_info, creds)
 
 
 def load_nsdu_cred_utility_from_config(config):
+    """Build NSDU credential uility object from config.
+
+    Args:
+        config (dict): General config
+
+    Returns:
+        Built object
+    """
+
     dispatch_api = api_adapter.DispatchApi(config['general']['user_agent'])
     cred_loader_manager = loader.CredLoaderManager(config['loader_config'])
-    return NsduCred(dispatch_api, cred_loader_manager)
+    return NsduCred(cred_loader_manager, dispatch_api)
 
 
 def run(config, inputs):
     """Run app.
 
     Args:
-        app: NSDU
+        config: General config
         inputs: CLI arguments
     """
 
@@ -251,6 +289,7 @@ def main():
         logger.error(err)
     except Exception as err:
         logger.exception(err)
+        raise err
 
 
 if __name__ == "__main__":

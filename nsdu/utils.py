@@ -2,7 +2,6 @@
 """
 
 import os
-import collections
 import shutil
 import inspect
 import logging

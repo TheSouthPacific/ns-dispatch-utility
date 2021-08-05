@@ -2,7 +2,6 @@
 """
 
 import collections
-import os
 import pathlib
 
 import pluggy
@@ -67,9 +66,6 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
     """Build loader manager that managers one loader only.
     """
 
-    def __init__(self, default_dir_path, custom_dir_path, entry_points):
-        super().__init__(default_dir_path, custom_dir_path, entry_points)
-
     def load_loader(self, manager, name):
         """Load loader into manager.
 
@@ -105,8 +101,6 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
 class MultiLoadersManagerBuilder(LoaderManagerBuilder):
     """Build loader manager that managers many loaders
     """
-    def __init__(self, default_dir_path, custom_dir_path, entry_points):
-        super().__init__(default_dir_path, custom_dir_path, entry_points)
 
     def load_loader(self, manager, names):
         """Load loaders into manager.

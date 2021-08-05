@@ -9,6 +9,15 @@ from nsdu import exceptions
 
 
 def convert_to_html_entities(text):
+    """Convert special characters to HTML entities
+
+    Args:
+        text (str): Text
+
+    Returns:
+        str: Converted text
+    """
+
     return text.encode('ascii', 'xmlcharrefreplace')
 
 
