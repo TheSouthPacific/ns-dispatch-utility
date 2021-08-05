@@ -135,7 +135,7 @@ def load_nsdu_dispatch_utility_from_config(config):
     loader_config = config['loader_config']
 
     dispatch_loader_manager = loader.DispatchLoaderManager(loader_config)
-    var_loader_manager = loader.VarLoaderManager(loader_config)
+    template_var_loader_manager = loader.TemplateVarLoaderManager(loader_config)
     simple_bb_loader_manager = loader.SimpleBBLoaderManager(loader_config)
     cred_loader_manager = loader.CredLoaderManager(loader_config)
 
@@ -160,8 +160,8 @@ def load_nsdu_dispatch_utility_from_config(config):
     singleloader_builder.load_loader(simple_bb_loader_manager, plugin_opt['simple_bb_loader'])
     simple_bb_config = simple_bb_loader_manager.get_simple_bb_config()
 
-    multiloaders_builder.load_loader(var_loader_manager, plugin_opt['var_loader'])
-    template_vars = var_loader_manager.get_all_vars()
+    multiloaders_builder.load_loader(template_var_loader_manager, plugin_opt['template_var_loader'])
+    template_vars = template_var_loader_manager.get_all_template_vars()
     dispatch_info = utils.get_dispatch_info(dispatch_config)
     template_vars['dispatch_info'] = dispatch_info
 

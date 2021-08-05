@@ -187,13 +187,13 @@ class TestMultiLoadersManagerBuilder():
     @pytest.fixture
     def entry_points(self):
         module_1 = mock.Mock()
-        module_1.__file__ = 'someplaces/varloader-test2'
+        module_1.__file__ = 'someplaces/templatevarloader-test2'
         module_2 = mock.Mock()
-        module_2.__file__ = 'someplaces/varloader-test4'
+        module_2.__file__ = 'someplaces/templatevarloader-test4'
         entry_points = [mock.Mock(load=mock.Mock(return_value=module_1)),
                         mock.Mock(load=mock.Mock(return_value=module_2))]
-        entry_points[0].name = 'varloader-test2'
-        entry_points[1].name = 'varloader-test4'
+        entry_points[0].name = 'templatevarloader-test2'
+        entry_points[1].name = 'templatevarloader-test4'
 
         yield entry_points
 
@@ -201,27 +201,27 @@ class TestMultiLoadersManagerBuilder():
         manager = MockMultiLoadersManager()
         builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, LOADER_DIR_PATH, entry_points)
 
-        builder.load_loader(manager, ['varloader-test1', 'varloader-test2', 'varloader-test3', 'varloader-test4'])
+        builder.load_loader(manager, ['templatevarloader-test1', 'templatevarloader-test2', 'templatevarloader-test3', 'templatevarloader-test4'])
 
-        assert manager.modules[0].__file__ == str(LOADER_DIR_PATH / 'varloader-test1.py')
-        assert manager.modules[1].__file__ == str(LOADER_DIR_PATH / 'varloader-test2.py')
-        assert manager.modules[2].__file__ == str(DEFAULT_LOADER_DIR_PATH / 'varloader-test3.py')
-        assert manager.modules[3].__file__ == 'someplaces/varloader-test4'
+        assert manager.modules[0].__file__ == str(LOADER_DIR_PATH / 'templatevarloader-test1.py')
+        assert manager.modules[1].__file__ == str(LOADER_DIR_PATH / 'templatevarloader-test2.py')
+        assert manager.modules[2].__file__ == str(DEFAULT_LOADER_DIR_PATH / 'templatevarloader-test3.py')
+        assert manager.modules[3].__file__ == 'someplaces/templatevarloader-test4'
 
     def test_load_loader_with_no_custom_source_dir(self, entry_points):
         manager = MockMultiLoadersManager()
         builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
 
-        builder.load_loader(manager, ['varloader-test1', 'varloader-test2'])
-        assert manager.modules[0].__file__ == str(DEFAULT_LOADER_DIR_PATH / 'varloader-test1.py')
-        assert manager.modules[1].__file__ == 'someplaces/varloader-test2'
+        builder.load_loader(manager, ['templatevarloader-test1', 'templatevarloader-test2'])
+        assert manager.modules[0].__file__ == str(DEFAULT_LOADER_DIR_PATH / 'templatevarloader-test1.py')
+        assert manager.modules[1].__file__ == 'someplaces/templatevarloader-test2'
 
     def test_load_loader_with_a_non_existent_loader(self, entry_points):
         manager = MockMultiLoadersManager()
         builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, LOADER_DIR_PATH, entry_points)
 
         with pytest.raises(exceptions.LoaderNotFound):
-            builder.load_loader(manager, ['varloader-test1', 'varloader-test3', 'nonexistentloader'])
+            builder.load_loader(manager, ['templatevarloader-test1', 'templatevarloader-test3', 'nonexistentloader'])
 
 
 DISPATCH_LOADER_NAME = 'dispatchloader-test1.py'
@@ -260,18 +260,18 @@ class TestDispatchLoaderManager():
         assert r
 
 
-VAR_LOADER_NAMES = ['varloader-test1.py', 'varloader-test2.py']
-VAR_LOADER_CONFIG = {'varloader-test1': {'key1': 'val1'},
-                     'varloader-test2': {'key2': 'val2'}}
+VAR_LOADER_NAMES = ['templatevarloader-test1.py', 'templatevarloader-test2.py']
+VAR_LOADER_CONFIG = {'templatevarloader-test1': {'key1': 'val1'},
+                     'templatevarloader-test2': {'key2': 'val2'}}
 
 
-class TestVarLoaderManager():
-    def test_get_all_vars(self):
-        manager = loader.VarLoaderManager(VAR_LOADER_CONFIG)
+class TestTemplateVarLoaderManager():
+    def test_get_all_template_vars(self):
+        manager = loader.TemplateVarLoaderManager(VAR_LOADER_CONFIG)
         for name in VAR_LOADER_NAMES:
             manager.load_loader(load_module(LOADER_DIR_PATH / name))
 
-        r = manager.get_all_vars()
+        r = manager.get_all_template_vars()
 
         assert r == {'key1': {'key1': 'val1'}, 'key2': {'key2': 'val2'}}
 

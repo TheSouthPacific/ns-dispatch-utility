@@ -9,8 +9,8 @@ from nsdu import info
 dispatch_loader_specs = pluggy.HookspecMarker(info.DISPATCH_LOADER_PROJ)
 dispatch_loader = pluggy.HookimplMarker(info.DISPATCH_LOADER_PROJ)
 
-var_loader_specs = pluggy.HookspecMarker(info.VAR_LOADER_PROJ)
-var_loader = pluggy.HookimplMarker(info.VAR_LOADER_PROJ)
+template_var_loader_specs = pluggy.HookspecMarker(info.TEMPLATE_VAR_LOADER_PROJ)
+template_var_loader = pluggy.HookimplMarker(info.TEMPLATE_VAR_LOADER_PROJ)
 
 simple_bb_loader_specs = pluggy.HookspecMarker(info.SIMPLE_BB_LOADER_PROJ)
 simple_bb_loader = pluggy.HookimplMarker(info.SIMPLE_BB_LOADER_PROJ)
@@ -75,8 +75,8 @@ def cleanup_dispatch_loader(loader):
     """
 
 
-@var_loader_specs
-def get_vars(config):
+@template_var_loader_specs
+def get_template_vars(config):
     """Get variables for placeholders.
 
     Args:

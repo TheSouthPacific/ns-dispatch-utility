@@ -83,9 +83,9 @@ class TestDispatchRenderer():
         simple_bb_config = {'simple1': {'format_string': '[simple1r]%(value)s[/simple1r]'}}
         complex_formatter_source_path = 'tests/resources/bb_complex_formatters.py'
         template_filter_paths = ['tests/resources/filters-1.py', 'tests/resources/filters-2.py']
-        vars = {'j': [1, 2], 'example': {'foo': 'cool'}}
+        template_vars = {'j': [1, 2], 'example': {'foo': 'cool'}}
         ins = renderer.DispatchRenderer(template_load_func, simple_bb_config,
-                                        complex_formatter_source_path, template_filter_paths, vars)
+                                        complex_formatter_source_path, template_filter_paths, template_vars)
 
         expected = ('[simple1r][1][/simple1r][complexctxr=cool][complex]1and0[/complex][/complexctxr][complexoptr=1]<1>[/complexoptr]'
                     '[simple1r][2][/simple1r][complexctxr=cool][complex]2and0[/complex][/complexctxr][complexoptr=1]<2>[/complexoptr]')

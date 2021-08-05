@@ -16,8 +16,8 @@ from nsdu import utils
 logger = logging.getLogger(__name__)
 
 
-def load_vars_from_files(paths):
-    """Get all variables from file(s).
+def load_template_vars_from_files(paths):
+    """Get all template variables from TOML file(s).
 
     Args:
         paths (list): File paths
@@ -50,7 +50,7 @@ def add_personnel_info(vars, personnel_groups, personnel_info_groups):
             personnel_info.update(copy.deepcopy(vars[group]))
         except KeyError:
             raise exceptions.LoaderConfigError('Personnel info var group "{}" not found'.format(group))
-    
+
     for name, info in personnel_info.items():
         info['name'] = name
 
@@ -67,11 +67,11 @@ def add_personnel_info(vars, personnel_groups, personnel_info_groups):
             raise exceptions.LoaderConfigError('Personnel var group "{}" not found'.format(group))
 
 
-@loader_api.var_loader
-def get_vars(config):
-    loader_config = config['file_varloader']
+@loader_api.template_var_loader
+def get_template_vars(config):
+    loader_config = config['file_templatevarloader']
 
-    vars = load_vars_from_files(loader_config['var_paths'])
-    add_personnel_info(vars, loader_config['personnel_groups'], loader_config['personnel_info_groups'])
+    template_vars = load_template_vars_from_files(loader_config['template_var_paths'])
+    add_personnel_info(template_vars, loader_config['personnel_groups'], loader_config['personnel_info_groups'])
 
-    return vars
+    return template_vars

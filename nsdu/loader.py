@@ -194,17 +194,17 @@ class PersistentLoaderManager(LoaderManager):
 
 
 # pylint: disable=maybe-no-member
-class VarLoaderManager(LoaderManager):
-    """Manager for variable loaders.
+class TemplateVarLoaderManager(LoaderManager):
+    """Manager for template variable loaders.
     """
 
     def __init__(self, loader_config):
-        super().__init__(info.VAR_LOADER_PROJ, loader_config)
+        super().__init__(info.TEMPLATE_VAR_LOADER_PROJ, loader_config)
 
-    def get_all_vars(self):
-        vars_list = self.manager.hook.get_vars(config=self.loader_config)
-        merged_vars_dict = dict(collections.ChainMap(*vars_list))
-        return merged_vars_dict
+    def get_all_template_vars(self):
+        template_vars = self.manager.hook.get_template_vars(config=self.loader_config)
+        merged_template_vars = dict(collections.ChainMap(*template_vars))
+        return merged_template_vars
 
 
 class DispatchLoaderManager(PersistentLoaderManager):
