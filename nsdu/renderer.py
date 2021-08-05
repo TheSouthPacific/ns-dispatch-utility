@@ -101,13 +101,13 @@ class DispatchRenderer():
         dispatch_loader: Dispatch loader
     """
 
-    def __init__(self, template_load_func, simple_bb_config,
+    def __init__(self, template_load_func, simple_formatter_config,
                  complex_formatter_source_path, template_filter_paths, vars):
         self.template_renderer = TemplateRenderer(template_load_func)
         if template_filter_paths is not None:
             load_filters_from_source(self.template_renderer, template_filter_paths)
 
-        self.bb_parser = bb_parser.BBParser(simple_bb_config, complex_formatter_source_path)
+        self.bb_parser = bb_parser.BBParser(simple_formatter_config, complex_formatter_source_path)
 
         # Context all dispatches will have
         self.global_context = vars
