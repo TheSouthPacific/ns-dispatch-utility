@@ -99,5 +99,3 @@ class TestDispatchUpdater():
         updater.remove_dispatch('12345')
 
         dispatch_api.remove_dispatch.assert_called_with('12345')
-
-
