@@ -102,10 +102,11 @@ class TestNsduDispatch():
         with pytest.raises(exceptions.DispatchConfigError):
             app.update_a_dispatch('foo')
 
-    @pytest.mark.parametrize("api_exceptions", [exceptions.UnknownDispatchError,
-                                                exceptions.NotOwnerDispatchError,
-                                                exceptions.NonexistentCategoryError('','')])
-    def test_update_a_dispatch_with_api_exceptions(self, api_exceptions, caplog):
+    @pytest.mark.parametrize("api_exceptions, result",
+                             [(exceptions.UnknownDispatchError, 'unknown-dispatch-error'),
+                              (exceptions.NotOwnerDispatchError, 'not-owner-dispatch-error'),
+                              (exceptions.NonexistentCategoryError('',''), 'invalid-category-options')])
+    def test_update_a_dispatch_with_api_exceptions(self, api_exceptions, result, caplog):
         dispatch_loader_manager = mock.Mock()
         dispatch_updater = mock.Mock(edit_dispatch=mock.Mock(side_effect=api_exceptions))
         dispatch_info = {'foo': {'action': 'edit',
@@ -118,6 +119,7 @@ class TestNsduDispatch():
         app.update_a_dispatch('foo')
 
         assert caplog.records[-1].levelname == 'ERROR'
+        dispatch_loader_manager.after_update.assert_called_with('foo', result)
 
     def test_update_dispatches_with_all_dispatches_and_existent_dispatches(self):
         dispatch_loader_manager = mock.Mock()

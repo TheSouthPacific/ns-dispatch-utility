@@ -197,7 +197,7 @@ def get_dispatch_template(loader, name):
 
 @loader_api.dispatch_loader
 def add_dispatch_id(loader, name, dispatch_id):
-    return loader.add_new_dispatch_id(name, dispatch_id)
+    loader.add_new_dispatch_id(name, dispatch_id)
 
 
 @loader_api.dispatch_loader

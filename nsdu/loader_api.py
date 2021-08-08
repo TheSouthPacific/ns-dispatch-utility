@@ -54,6 +54,16 @@ def get_dispatch_template(loader, name):
         str: Dispatch content text
     """
 
+@dispatch_loader_specs(firstresult=True)
+def after_update(loader, name, result):
+    """Run after a dispatch is updated.
+
+    Args:
+        loader: Loader
+        name (str): Dispatch name
+        result (str): Result message
+    """
+
 
 @dispatch_loader_specs(firstresult=True)
 def add_dispatch_id(loader, name, dispatch_id):

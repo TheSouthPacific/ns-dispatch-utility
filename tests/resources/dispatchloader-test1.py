@@ -8,6 +8,8 @@ from nsdu import loader_api
 class DispatchLoaderTest1():
     def __init__(self, config):
         self.config = config
+        self.dispatch_id = {}
+        self.result = ""
 
     def get_dispatch_config(self):
         return {'foo1': 'bar1', 'foo2': 'bar2'}
@@ -15,11 +17,14 @@ class DispatchLoaderTest1():
     def get_dispatch_template(self, name):
         return 'Dispatch content of {}'.format(name)
 
-    def add_dispatch_id(self, name, id):
-        return
+    def add_dispatch_id(self, name, dispatch_id):
+        self.dispatch_id[name] = dispatch_id
+
+    def on_success(self, name, result):
+        self.result = result
 
     def cleanup_loader(self):
-        return
+        pass
 
 
 @loader_api.dispatch_loader
@@ -38,9 +43,13 @@ def get_dispatch_template(loader, name):
 
 
 @loader_api.dispatch_loader
+def after_update(loader, name, result):
+    loader.on_success(name, result)
+
+
+@loader_api.dispatch_loader
 def add_dispatch_id(loader, name, dispatch_id):
     loader.add_dispatch_id(name, dispatch_id)
-    return True
 
 
 @loader_api.dispatch_loader

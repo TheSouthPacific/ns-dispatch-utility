@@ -234,7 +234,6 @@ class TestDispatchLoaderManager():
         manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
         r = manager.get_dispatch_config()
-
         manager.cleanup_loader()
 
         assert r == {'foo1': 'bar1', 'foo2': 'bar2'}
@@ -244,20 +243,27 @@ class TestDispatchLoaderManager():
         manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
         r = manager.get_dispatch_template('test')
-
         manager.cleanup_loader()
 
         assert r == 'Dispatch content of test'
+
+    def test_after_update(self):
+        manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
+        manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
+
+        manager.after_update('test', 'success')
+        manager.cleanup_loader()
+
+        assert manager._loader.result == 'success'
 
     def test_add_dispatch_id(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
         manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
-        r = manager.add_dispatch_id('test', '123456')
-
+        manager.add_dispatch_id('test', '123456')
         manager.cleanup_loader()
 
-        assert r
+        assert manager._loader.dispatch_id == {'test': '123456'}
 
 
 VAR_LOADER_NAMES = ['templatevarloader-test1.py', 'templatevarloader-test2.py']
@@ -300,7 +306,6 @@ class TestCredLoaderManager():
         manager.load_loader(load_module(LOADER_DIR_PATH / CRED_LOADER_NAME))
 
         r = manager.get_creds()
-
         manager.cleanup_loader()
 
         assert r == {'nation1': '123456'}
@@ -310,7 +315,6 @@ class TestCredLoaderManager():
         manager.load_loader(load_module(LOADER_DIR_PATH / CRED_LOADER_NAME))
 
         r = manager.add_cred('nation1', '123456')
-
         manager.cleanup_loader()
 
         assert r
@@ -320,7 +324,6 @@ class TestCredLoaderManager():
         manager.load_loader(load_module(LOADER_DIR_PATH / CRED_LOADER_NAME))
 
         r = manager.remove_cred('nation1')
-
         manager.cleanup_loader()
 
         assert r
