@@ -43,26 +43,47 @@ def load_template_vars_from_files(paths):
     return loaded_vars
 
 
-def add_personnel_info(vars, personnel_groups, personnel_info_groups):
+def replace_name_with_personnel_info(name, personnel_info):
+    try:
+        name = personnel_info[name]
+    except KeyError:
+        raise exceptions.LoaderConfigError('Info for personnel "{}" not found'.format(name))
+
+    return name
+
+
+def replace_name_list_with_personnel_info(name_list, personnel_info):
+    for i, name in enumerate(name_list):
+        name_list[i] = replace_name_with_personnel_info(name, personnel_info)
+
+    return name_list
+
+
+def merge_personnel_info_groups(template_vars, personnel_info_groups):
     personnel_info = {}
     for group in personnel_info_groups:
         try:
-            personnel_info.update(copy.deepcopy(vars[group]))
+            personnel_info.update(copy.deepcopy(template_vars[group]))
         except KeyError:
             raise exceptions.LoaderConfigError('Personnel info var group "{}" not found'.format(group))
 
     for name, info in personnel_info.items():
         info['name'] = name
 
+    return personnel_info
+
+
+def add_personnel_info(template_vars, personnel_groups, personnel_info_groups):
+    personnel_info = merge_personnel_info_groups(template_vars, personnel_info_groups)
+
     for group in personnel_groups:
         try:
-            personnel = vars[group]
-            for position in personnel.keys():
-                try:
-                    personnel_name = personnel[position]
-                    vars[group][position] = personnel_info[personnel_name]
-                except KeyError:
-                    raise exceptions.LoaderConfigError('Info for personnel "{}" not found'.format(personnel_name))
+            personnel = template_vars[group]
+            for position, names in personnel.items():
+                if isinstance(names, list):
+                    personnel[position] = replace_name_list_with_personnel_info(names, personnel_info)
+                else:
+                    personnel[position] = replace_name_with_personnel_info(names, personnel_info)
         except KeyError:
             raise exceptions.LoaderConfigError('Personnel var group "{}" not found'.format(group))
 
