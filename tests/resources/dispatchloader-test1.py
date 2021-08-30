@@ -21,7 +21,7 @@ class DispatchLoaderTest1():
         self.dispatch_id[name] = dispatch_id
 
     def on_success(self, name, action, result):
-        self.result = result
+        self.result = {'name': name, 'action': action, 'result': result}
 
     def cleanup_loader(self):
         pass
