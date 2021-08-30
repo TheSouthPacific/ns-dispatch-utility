@@ -31,6 +31,10 @@ class LoaderConfigError(LoaderError):
     """
 
 
+class CredNotFound(LoaderError):
+    """Login credential not found. For cred loader.
+    """
+
 class DispatchApiError(NSDUError):
     """Dispatch API error.
     """

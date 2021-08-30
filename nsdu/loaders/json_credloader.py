@@ -5,6 +5,7 @@ import collections
 import json
 import logging
 
+from nsdu import exceptions
 from nsdu import info
 from nsdu import loader_api
 
@@ -59,6 +60,8 @@ class JSONCredLoader(collections.UserDict):
             name (str): Nation name
         """
 
+        if name not in self.data:
+            raise exceptions.CredNotFound
         del self.data[name]
         self.saved = False
 

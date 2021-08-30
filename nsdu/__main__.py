@@ -114,45 +114,6 @@ class NsduDispatch():
         self.dispatch_loader_manager.cleanup_loader()
 
 
-class NsduCred():
-    """NSDU credential utility.
-
-    Args:
-        dispatch_api (nsdu.api_adapter.DispatchApi): Dispatch API
-        cred_loader_manager (nsdu.loader.CredLoaderManager): Cred loader manager
-    """
-
-    def __init__(self, cred_loader_manager, dispatch_api):
-        self.dispatch_api = dispatch_api
-        self.cred_loader_manager = cred_loader_manager
-
-    def add_nation_cred(self, nation_name, password):
-        """Add new credentials.
-
-        Args:
-            nation_name (str): Nation name
-            password (str): Password
-        """
-
-        x_autologin = self.dispatch_api.login(nation_name, password=password)
-        self.cred_loader_manager.add_cred(nation_name, x_autologin)
-
-    def remove_nation_cred(self, nation_name):
-        """Remove credentials.
-
-        Args:
-            nation_name (str): Nation name
-        """
-
-        self.cred_loader_manager.remove_cred(nation_name)
-
-    def close(self):
-        """Save cred changes and close.
-        """
-
-        self.cred_loader_manager.cleanup_loader()
-
-
 def load_nsdu_dispatch_utility_from_config(config):
     """Build NSDU dispatch uility object from config.
 
@@ -209,6 +170,45 @@ def load_nsdu_dispatch_utility_from_config(config):
                         dispatch_config, dispatch_info, creds)
 
 
+class NsduCred():
+    """NSDU credential utility.
+
+    Args:
+        dispatch_api (nsdu.api_adapter.DispatchApi): Dispatch API
+        cred_loader_manager (nsdu.loader.CredLoaderManager): Cred loader manager
+    """
+
+    def __init__(self, cred_loader_manager, dispatch_api):
+        self.dispatch_api = dispatch_api
+        self.cred_loader_manager = cred_loader_manager
+
+    def add_nation_cred(self, nation_name, password):
+        """Add new credentials.
+
+        Args:
+            nation_name (str): Nation name
+            password (str): Password
+        """
+
+        x_autologin = self.dispatch_api.login(nation_name, password=password)
+        self.cred_loader_manager.add_cred(nation_name, x_autologin)
+
+    def remove_nation_cred(self, nation_name):
+        """Remove credentials.
+
+        Args:
+            nation_name (str): Nation name
+        """
+
+        self.cred_loader_manager.remove_cred(nation_name)
+
+    def close(self):
+        """Save cred changes and close.
+        """
+
+        self.cred_loader_manager.cleanup_loader()
+
+
 def load_nsdu_cred_utility_from_config(config):
     """Build NSDU credential uility object from config.
 
@@ -246,15 +246,26 @@ def run(config, inputs):
 
     if inputs.subparser_name == 'cred':
         app = load_nsdu_cred_utility_from_config(config)
+        failure = False
         if hasattr(inputs, 'add') and inputs.add is not None:
             if len(inputs.add) % 2 != 0:
                 print('There is no password for the last name.')
                 return
             for i in range(0, len(inputs.add), 2):
                 app.add_nation_cred(inputs.add[i], inputs.add[i+1])
+
         elif hasattr(inputs, 'remove') and inputs.remove is not None:
             for nation_name in inputs.remove:
-                app.remove_nation_cred(nation_name)
+                try:
+                    app.remove_nation_cred(nation_name)
+                except exceptions.CredNotFound:
+                    logger.error('Nation "%s" not found.', nation_name)
+                    failure = True
+                    break
+
+        if not failure:
+            logger.info('Credential operations succeeded.')
+
     elif inputs.subparser_name == 'update':
         app = load_nsdu_dispatch_utility_from_config(config)
         app.update_dispatches(inputs.dispatches)

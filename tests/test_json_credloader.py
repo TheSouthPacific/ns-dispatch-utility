@@ -7,6 +7,7 @@ import json
 import pytest
 import toml
 
+from nsdu import exceptions
 from nsdu import info
 from nsdu.loaders import json_credloader
 
@@ -79,3 +80,10 @@ class TestJSONLoader():
             r = json.load(f)
 
         assert 'nation2' not in r
+
+    def test_remove_non_existent_cred(self, creds):
+        config = {'json_credloader': {'cred_path': creds}}
+        loader = json_credloader.init_cred_loader(config)
+
+        with pytest.raises(exceptions.CredNotFound):
+            json_credloader.remove_cred(loader, 'garbage')
