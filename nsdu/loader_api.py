@@ -55,12 +55,14 @@ def get_dispatch_template(loader, name):
     """
 
 @dispatch_loader_specs(firstresult=True)
-def after_update(loader, name, result):
-    """Run after a dispatch is updated.
+def after_update(loader, name, action, result):
+    """Run after a dispatch is updated to report
+    result of an operation.
 
     Args:
         loader: Loader
         name (str): Dispatch name
+        action (str): Action
         result (str): Result message
     """
 

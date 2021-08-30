@@ -69,16 +69,16 @@ class NsduDispatch():
                 logger.debug('Removing dispatch "%s" with id "%s".', name, dispatch_id)
                 self.dispatch_updater.remove_dispatch(dispatch_id)
                 logger.info('Removed dispatch "%s".', name)
-            self.dispatch_loader_manager.after_update(name, 'success')
+            self.dispatch_loader_manager.after_update(name, action, 'success')
         except exceptions.UnknownDispatchError:
             logger.error('Could not find dispatch "%s" with id "%s".', name, dispatch_id)
-            self.dispatch_loader_manager.after_update(name, 'unknown-dispatch-error')
+            self.dispatch_loader_manager.after_update(name, action, 'unknown-dispatch-error')
         except exceptions.NotOwnerDispatchError:
             logger.error('Dispatch "%s" is not owned by this nation.', name)
-            self.dispatch_loader_manager.after_update(name, 'not-owner-dispatch-error')
+            self.dispatch_loader_manager.after_update(name, action, 'not-owner-dispatch-error')
         except exceptions.NonexistentCategoryError as err:
             logger.error('%s "%s" of dispatch "%s" is invalid.', err.category_type, err.category_value, name)
-            self.dispatch_loader_manager.after_update(name, 'invalid-category-options')
+            self.dispatch_loader_manager.after_update(name, action, 'invalid-category-options')
 
     def update_dispatches(self, names):
         """Update dispatches. Empty list means update all.

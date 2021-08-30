@@ -20,7 +20,7 @@ class DispatchLoaderTest1():
     def add_dispatch_id(self, name, dispatch_id):
         self.dispatch_id[name] = dispatch_id
 
-    def on_success(self, name, result):
+    def on_success(self, name, action, result):
         self.result = result
 
     def cleanup_loader(self):
@@ -43,8 +43,8 @@ def get_dispatch_template(loader, name):
 
 
 @loader_api.dispatch_loader
-def after_update(loader, name, result):
-    loader.on_success(name, result)
+def after_update(loader, name, action, result):
+    loader.on_success(name, action, result)
 
 
 @loader_api.dispatch_loader

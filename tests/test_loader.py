@@ -251,7 +251,7 @@ class TestDispatchLoaderManager():
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
         manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
-        manager.after_update('test', 'success')
+        manager.after_update('test', 'edit', 'success')
         manager.cleanup_loader()
 
         assert manager._loader.result == 'success'

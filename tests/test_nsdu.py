@@ -119,7 +119,7 @@ class TestNsduDispatch():
         app.update_a_dispatch('foo')
 
         assert caplog.records[-1].levelname == 'ERROR'
-        dispatch_loader_manager.after_update.assert_called_with('foo', result)
+        dispatch_loader_manager.after_update.assert_called_with('foo', 'edit', result)
 
     def test_update_dispatches_with_all_dispatches_and_existent_dispatches(self):
         dispatch_loader_manager = mock.Mock()
