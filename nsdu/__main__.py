@@ -219,8 +219,20 @@ def load_nsdu_cred_utility_from_config(config):
         Built object
     """
 
-    dispatch_api = api_adapter.DispatchApi(config['general']['user_agent'])
     cred_loader_manager = loader.CredLoaderManager(config['loader_config'])
+
+    custom_loader_dir_path = config['general'].get('custom_loader_dir_path', None)
+    try:
+        entry_points = import_metadata.entry_points()[info.LOADER_ENTRY_POINT_NAME]
+    except KeyError:
+        entry_points = []
+    singleloader_builder = loader.SingleLoaderManagerBuilder(info.LOADER_DIR_PATH,
+                                                             custom_loader_dir_path,
+                                                             entry_points)
+    singleloader_builder.load_loader(cred_loader_manager, config['plugins']['cred_loader'])
+
+    dispatch_api = api_adapter.DispatchApi(config['general']['user_agent'])
+
     return NsduCred(cred_loader_manager, dispatch_api)
 
 
