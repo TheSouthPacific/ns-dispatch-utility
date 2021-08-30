@@ -308,22 +308,22 @@ class TestCredLoaderManager():
         r = manager.get_creds()
         manager.cleanup_loader()
 
-        assert r == {'nation1': '123456'}
+        assert r == {}
 
     def test_add_cred(self):
         manager = loader.CredLoaderManager(CRED_LOADER_CONFIG)
         manager.load_loader(load_module(LOADER_DIR_PATH / CRED_LOADER_NAME))
-
-        r = manager.add_cred('nation1', '123456')
+        manager.add_cred('Nation1', '123456')
         manager.cleanup_loader()
 
-        assert r
+        assert manager.get_creds() == {'nation1': '123456'}
 
     def test_remove_cred(self):
         manager = loader.CredLoaderManager(CRED_LOADER_CONFIG)
         manager.load_loader(load_module(LOADER_DIR_PATH / CRED_LOADER_NAME))
+        manager.add_cred('Nation1', '123456')
 
-        r = manager.remove_cred('nation1')
+        manager.remove_cred('nation1')
         manager.cleanup_loader()
 
-        assert r
+        assert manager.get_creds() == {}

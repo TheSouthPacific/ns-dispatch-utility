@@ -8,18 +8,19 @@ from nsdu import loader_api
 class CredLoaderTest1():
     def __init__(self, config):
         self.config = config
+        self.creds = {}
 
     def get_creds(self):
-        return {'nation1': '123456'}
+        return self.creds
 
     def add_cred(self, name, x_autologin):
-        return True
+        self.creds[name] = x_autologin
 
     def remove_cred(self, name):
-        return True
+        del self.creds[name]
 
     def cleanup(self):
-        return True
+        pass
 
 
 @loader_api.cred_loader

@@ -138,3 +138,16 @@ def load_module(path):
         return module
 
     raise FileNotFoundError
+
+
+def canonical_nation_name(name):
+    """Canonicalize nation name into lower case form.
+
+    Args:
+        name (str): Name
+
+    Returns:
+        str: Lower case nation name
+    """
+
+    return name.lower()

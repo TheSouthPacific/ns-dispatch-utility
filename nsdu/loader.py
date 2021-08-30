@@ -255,8 +255,8 @@ class CredLoaderManager(PersistentLoaderManager):
         return self.manager.hook.get_creds(loader=self._loader)
 
     def add_cred(self, name, x_autologin):
-        return self.manager.hook.add_cred(loader=self._loader,
-                                          name=name, x_autologin=x_autologin)
+        self.manager.hook.add_cred(loader=self._loader, name=utils.canonical_nation_name(name),
+                                          x_autologin=x_autologin)
 
     def remove_cred(self, name):
-        return self.manager.hook.remove_cred(loader=self._loader, name=name)
+        self.manager.hook.remove_cred(loader=self._loader, name=utils.canonical_nation_name(name))
