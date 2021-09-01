@@ -63,7 +63,7 @@ class LoaderManagerBuilder():
 
 
 class SingleLoaderManagerBuilder(LoaderManagerBuilder):
-    """Build loader manager that managers one loader only.
+    """Build loader managers that manage one loader.
     """
 
     def load_loader(self, manager, name):
@@ -99,7 +99,7 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
 
 
 class MultiLoadersManagerBuilder(LoaderManagerBuilder):
-    """Build loader manager that managers many loaders
+    """Build loader managers that manage many loaders
     """
 
     def load_loader(self, manager, names):
