@@ -35,6 +35,12 @@ class CredNotFound(LoaderError):
     """Login credential not found. For cred loader.
     """
 
+
+class DispatchTemplateNotFound(LoaderError):
+    """Dispatch template not found.
+    """
+
+
 class DispatchApiError(NSDUError):
     """Dispatch API error.
     """

@@ -12,69 +12,70 @@ from nsdu import renderer
 
 
 class TestDispatchTemplateLoader():
-    def test_with_existent_template(self):
+    def test_exising_template_returns_template_text(self):
         template_load_func = mock.Mock(return_value='Test text')
-        loader = renderer.JinjaTemplateLoader(template_load_func)
+        obj = renderer.JinjaTemplateLoader(template_load_func)
 
-        r = loader.get_source(mock.Mock(), 'Test')
+        r = obj.get_source(mock.Mock(), 'Test')
         assert r[0] == 'Test text'
 
-    def test_with_non_existent_template(self):
-        template_load_func = mock.Mock(return_value=None)
-        loader = renderer.JinjaTemplateLoader(template_load_func)
+    def test_non_existent_template_raises_exception(self):
+        template_load_func = mock.Mock(side_effect=exceptions.DispatchTemplateNotFound)
+        obj = renderer.JinjaTemplateLoader(template_load_func)
 
-        r = loader.get_source(mock.Mock(), 'Test')
-        assert r[0] == info.DEFAULT_TEMPLATE
+        with pytest.raises(exceptions.DispatchTemplateNotFound):
+            obj.get_source(mock.Mock(), 'Test')
 
 
 class TestTemplateRenderer():
-    def test_render_with_non_existent_template(self):
-        template_load_func = mock.Mock(return_value=None)
-        ins = renderer.TemplateRenderer(template_load_func)
+    def test_render_non_existent_template_raises_exception(self):
+        template_load_func = mock.Mock(side_effect=exceptions.DispatchTemplateNotFound)
+        obj = renderer.TemplateRenderer(template_load_func)
 
-        assert ins.render('foo', {}) == info.DEFAULT_TEMPLATE
+        with pytest.raises(exceptions.DispatchTemplateNotFound):
+            obj.render('foo', {})
 
-    def test_render_with_existent_template(self):
-        template = '{% for i in j %}{{ i }}{% endfor %}'
+    def test_render_existent_template_returns_rendered_text(self):
+        template = '{{ i }}'
         template_load_func = mock.Mock(return_value=template)
-        ins = renderer.TemplateRenderer(template_load_func)
+        obj = renderer.TemplateRenderer(template_load_func)
 
-        r = ins.render('foo', {'j': [1, 2]})
+        r = obj.render('foo', {'i': '1'})
 
-        assert r == '12'
+        assert r == '1'
 
-    def test_load_filters_and_render(self):
-        template = '{% for i in j %}{{ i|foo_filter }}{% endfor %}'
+    def test_load_filters_filters_are_loaded(self):
+        template = '{{ i|foo_filter }}'
         template_load_func = mock.Mock(return_value=template)
-        ins = renderer.TemplateRenderer(template_load_func)
+        obj = renderer.TemplateRenderer(template_load_func)
         def foo_filter(a):
             return '[{}]'.format(a)
 
-        ins.load_filters({'foo_filter': foo_filter})
-        r = ins.render('foo', {'j': [1, 2]})
+        obj.load_filters({'foo_filter': foo_filter})
+        r = obj.render('foo', {'i': '1'})
 
-        assert r == '[1][2]'
+        assert r == '[1]'
 
 
 class TestLoadFiltersFromSource():
-    def test_with_existent_files(self):
-        template = '{% for i in j %}{{ i|filter1 }}{{ i|filter2(0)}}{{ i|filter3 }}{% endfor %}'
+    def test_files_exist_filters_are_loaded(self):
+        template = '{{ i|filter1 }}'
         template_load_func = mock.Mock(return_value=template)
-        ins = renderer.TemplateRenderer(template_load_func)
+        obj = renderer.TemplateRenderer(template_load_func)
 
-        renderer.load_filters_from_source(ins, ['tests/resources/filters-1.py', 'tests/resources/filters-2.py'])
-        r = ins.render('foo', {'j': [1,2 ]})
+        renderer.load_filters_from_source(obj, ['tests/resources/filters-1.py'])
+        r = obj.render('foo', {'i': 1})
 
-        assert r == '[1]1and0<1>[2]2and0<2>'
+        assert r == '[1]'
 
-    def test_with_a_non_existent_file(self):
-        ins = renderer.TemplateRenderer(mock.Mock())
+    def test_files_not_exist_raises_exception(self):
+        obj = renderer.TemplateRenderer(mock.Mock())
 
         with pytest.raises(exceptions.ConfigError):
-            renderer.load_filters_from_source(ins, ['tests/resources/filter-1.py', 'non-existent.py'])
+            renderer.load_filters_from_source(obj, ['non-existent.py'])
 
 
-class TestDispatchRenderer():
+class TestIntegrationDispatchRenderer():
     def test_render(self):
         template = ('{% for i in j %}[complex]{{ i|filter1 }}[/complex]'
                     '[complexctx][complex]{{ i|filter2(0)}}[/complex][/complexctx]'

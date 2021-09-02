@@ -24,8 +24,6 @@ class JinjaTemplateLoader(jinja2.BaseLoader):
 
     def get_source(self, environment, template):
         text = self.template_load_func(template)
-        if text is None:
-            text = info.DEFAULT_TEMPLATE
 
         return text, template, lambda: True
 
