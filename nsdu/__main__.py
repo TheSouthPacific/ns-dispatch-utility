@@ -96,6 +96,7 @@ class NsduDispatch():
 
         for owner_nation, dispatch_config in self.dispatch_config.items():
             try:
+                owner_nation = utils.canonical_nation_name(owner_nation)
                 self.dispatch_updater.login_owner_nation(owner_nation, autologin=self.creds[owner_nation])
                 logger.info('Logged in nation "%s".', owner_nation)
             except exceptions.NationLoginError:
