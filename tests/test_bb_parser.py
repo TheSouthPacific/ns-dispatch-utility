@@ -12,44 +12,38 @@ from nsdu import exceptions
 
 
 class TestBBRegistry():
-    def test_register_formatter_class(self):
-        @BBCode.register('test', john=True)
+    def test_formatter_class_is_registered(self):
+        @BBCode.register('test', same_tag_closes=True)
         class Test():
             a = 1
 
         r = bb_parser.BBRegistry().complex_formatters[0]
 
-        assert r['tag_name'] == 'test' and r['john'] == True
+        assert r['tag_name'] == 'test' and r['same_tag_closes'] == True
         assert r['obj'].a == 1
 
-    def test_init_complex_formatters(self):
+    def test_init_complex_formatters_instances_exist(self):
         ins = bb_parser.BBRegistry
 
         class Formatter1():
             pass
 
-        class Formatter2():
-            pass
-
-        ins.complex_formatters = [{'tag_name': 'test1', 'obj': Formatter1, 'john': True},
-                                  {'tag_name': 'test2', 'obj': Formatter2, 'john': False}]
+        ins.complex_formatters = [{'tag_name': 'test1', 'obj': Formatter1, 'same_tag_closes': True}]
 
         r = ins.init_complex_formatters()
 
         assert r[0]['obj'].__class__ == Formatter1
-        assert r[1]['obj'].__class__ == Formatter2
 
 
 class TestBuildSimpleParserFromConfig():
-    def test(self):
+    def test_formatters_loaded(self):
         config = {'tag1': {'format_string': '[r1]%(value)s[/r1]',
-                           'same_tag_closes': True},
-                  'tag2': {'format_string': '[r2]%(value)s[/r2]'}}
+                           'same_tag_closes': True}}
 
         parser = bb_parser.build_simple_parser_from_config(config)
-        r = parser.format('[tag1][tag2]madoka[/tag2][tag1]homura')
+        r = parser.format('[tag1]madoka')
 
-        assert r == '[r1][r2]madoka[/r2][/r1][r1]homura[/r1]'
+        assert r == '[r1]madoka[/r1]'
 
 
 class TestBuildComplexParserFromSource():
@@ -65,19 +59,19 @@ class TestBuildComplexParserFromSource():
             def format(self, tag_name, value, options, parent, context):
                 return '[r2]{}[/r2]'.format(value)
 
-    def test_with_non_existent_source_file(self):
+    def test_source_file_not_exists_raises_exception(self):
         with pytest.raises(exceptions.ConfigError):
             bb_parser.build_complex_parser_from_source(pathlib.Path('non_existent.py'))
 
-    def test_with_existent_source_file(self, mock_bb_registry):
+    def test_source_file_exists_formatters_loaded(self, mock_bb_registry):
         parser = bb_parser.build_complex_parser_from_source(pathlib.Path('tests/test_bb_parser.py'))
-        r = parser.format('[tag1]sayaka[/tag1][tag2]mami[/tag2]')
+        r = parser.format('[tag1]sayaka[/tag1]')
 
-        assert r == '[r1]sayaka[/r1][r2]mami[/r2]'
+        assert r == '[r1]sayaka[/r1]'
 
 
-class TestBBParserIntegration():
-    def test_format_with_simple_and_complex_formatters(self):
+class TestIntegrationBBParser():
+    def test_simple_and_complex_formatters_returns_formatted_text(self):
         simple_formatter_config = {'simple1': {'format_string': '[simple1r]%(value)s[/simple1r]'},
                                    'simple2': {'format_string': '[simple2r]%(value)s[/simple2r]'},
                                    'simple3': {'format_string': '[simple3r]%(value)s[/simple3r]',
@@ -94,7 +88,7 @@ class TestBBParserIntegration():
                      '[simple1r]Complex[/simple1r][complexctxr=bar][complex]Complex context[/complex][/complexctxr]'
                      '[complexoptr=test]option[/complexoptr]')
 
-    def test_format_with_simple_formatters_and_no_complex_formatters(self):
+    def test_simple_formatters_and_no_complex_formatters_returns_formatted_text(self):
         simple_formatter_config = {'simple1': {'format_string': '[simple1r]%(value)s[/simple1r]'},
                                    'simple2': {'format_string': '[simple2r]%(value)s[/simple2r]'},
                                    'simple3': {'format_string': '[simple3r]%(value)s[/simple3r]',
@@ -110,7 +104,7 @@ class TestBBParserIntegration():
                      '[complex]Complex[/complex][complexctx][complex]Complex context[/complex][/complexctx]'
                      '[complexopt opt=test]option[/complexopt]')
 
-    def test_format_with_complex_formatters_and_no_simple_formatters(self):
+    def test_complex_formatters_and_no_simple_formatters_returns_formatted_text(self):
         complex_formatter_source_path = 'tests/resources/bb_complex_formatters.py'
         ins = bb_parser.BBParser(None, complex_formatter_source_path)
         text = ('[simple1]Simple[/simple1][simple2]Simple [simple3]nested[/simple3][/simple2]'
