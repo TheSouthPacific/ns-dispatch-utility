@@ -150,4 +150,4 @@ def canonical_nation_name(name):
         str: Lower case nation name
     """
 
-    return name.lower()
+    return name.lower().replace('_', ' ')

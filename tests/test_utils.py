@@ -73,3 +73,11 @@ class TestGetConfigFromDefault():
 
         config_path = tmp_path / info.CONFIG_NAME
         assert config_path.exists()
+
+
+class TestCanonicalNationName():
+    def test_uppercase_letters_converts_to_all_lower_case_letters(self):
+        assert utils.canonical_nation_name('Testopia opia') == 'testopia opia'
+
+    def test_underscores_removed(self):
+        assert utils.canonical_nation_name('testopia_opia') == 'testopia opia'
