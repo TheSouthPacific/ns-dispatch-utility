@@ -28,13 +28,13 @@ def get_category_number(category, subcategory):
 
     if category.isalpha() and subcategory.isalpha():
         try:
-            category_info = info.CATEGORIES[category]
+            category_info = info.CATEGORIES[category.lower()]
             category_num = category_info['num']
         except KeyError as err:
             raise exceptions.NonexistentCategoryError('category', category) from err
 
         try:
-            subcategory_num = category_info['subcategories'][subcategory]
+            subcategory_num = category_info['subcategories'][subcategory.lower()]
         except KeyError as err:
             raise exceptions.NonexistentCategoryError('subcategory', subcategory) from err
     else:
