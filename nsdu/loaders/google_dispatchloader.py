@@ -26,7 +26,7 @@ FAILURE_MESSAGES = {'create': 'Failed to create on {time}',
                     'edit': 'Failed to edit on {time}',
                     'remove': 'Failed to remove on {time}'}
 FAILURE_DETAILS = '\nError: {details}'
-RESULT_TIME_FORMAT = '%d/%m/%Y %H:%M:%S %Z'
+RESULT_TIME_FORMAT = '%Y/%m/%d %H:%M:%S %Z'
 
 
 class GoogleSpreadsheetApiAdapter():
@@ -123,7 +123,8 @@ class GoogleSpreadsheetApiAdapter():
 
 
 SuccessResult = collections.namedtuple('SuccessResult', ['name', 'action'])
-FailureResult = collections.namedtuple('SuccessResult', ['name', 'action', 'details'])
+FailureResult = collections.namedtuple('FailureResult', ['name', 'action', 'details'])
+Message = collections.namedtuple('Message', ['is_failure', 'text'])
 class ResultReporter():
     """Result report manager.
     """
@@ -196,10 +197,12 @@ class ResultReporter():
         """
 
         if isinstance(self.results[name], SuccessResult):
-            return ResultReporter.format_success_message(self.results[name].action)
+            message_text = ResultReporter.format_success_message(self.results[name].action)
+            return Message(is_failure=False, text=message_text)
         elif isinstance(self.results[name], FailureResult):
-            return ResultReporter.format_failure_message(self.results[name].action,
-                                                         self.results[name].details)
+            message_text = ResultReporter.format_failure_message(self.results[name].action,
+                                                                 self.results[name].details)
+            return Message(is_failure=True, text=message_text)
 
 
 class CategorySetups():
@@ -364,7 +367,170 @@ def extract_name_from_hyperlink(cell_value):
     return r.group(2)
 
 
-class DispatchDataSpreadsheetConverter():
+def get_hyperlink(name, dispatch_id):
+    return HYPERLINK.format(name=name, dispatch_id=dispatch_id)
+
+
+class RangeDisaptchDataValues():
+    """Handles dispatch data of a sheet range.
+
+    Args:
+        row_values (list): Row values
+        result_reporter (ResultReporter): Result reporter instance
+    """
+
+    def __init__(self, row_values, result_reporter):
+        self.row_values = row_values
+        self.result_reporter = result_reporter
+
+    def extract_dispatch_data(self, owner_nations, category_setups, spreadsheet_id):
+        """Extract dispatch data from row values.
+
+        Args:
+            owner_nations (OwnerNations): Owner nation instance
+            category_setups (CategorySetups): Category setup instance
+            spreadsheet_id (str): Spreadsheet Id of this range
+
+        Returns:
+            dict: Extracted dispatch data keyed by dispatch name
+        """
+
+        dispatch_data = {}
+        for row in self.row_values:
+            if len(row) < 6:
+                continue
+
+            if not row[0]:
+                continue
+            name = extract_name_from_hyperlink(row[0])
+
+            action = row[1]
+            if not action:
+                continue
+            if action not in ('create', 'edit', 'remove'):
+                self.result_reporter.report_failure(name, action, 'Invalid action')
+                continue
+
+            try:
+                owner_nation = owner_nations.get_owner_nation_name(row[2], spreadsheet_id)
+            except KeyError:
+                self.result_reporter.report_failure(name, action, 'This owner nation does not exist.')
+                continue
+            except ValueError:
+                self.result_reporter.report_failure(name, action, 'This spreadsheet does not allow this owner nation.')
+                continue
+
+            try:
+                category, subcategory = category_setups.get_category_subcategory_name(row[3])
+            except KeyError:
+                self.result_reporter.report_failure(name, action, 'This category setup does not exist.')
+                continue
+
+            data = {'action': action,
+                    'owner_nation': owner_nation,
+                    'category': category,
+                    'subcategory': subcategory,
+                    'title': row[4],
+                    'template': row[5]}
+
+            dispatch_id = extract_dispatch_id_from_hyperlink(row[0])
+            if dispatch_id:
+                data['ns_id'] = dispatch_id
+
+            dispatch_data[name] = data
+
+        return dispatch_data
+
+    def get_new_values(self, new_dispatch_data):
+        """Get new row values from new dispatch data.
+
+        Args:
+            new_dispatch_data (dict): New dispatch data
+
+        Returns:
+            list: New row values.
+        """
+
+        new_row_values = copy.deepcopy(self.row_values)
+        for row in new_row_values:
+            # SKip rows with empty title or template cell
+            if len(row) < 6:
+                continue
+
+            # Skip row with empty action
+            if not row[1]:
+                continue
+
+            name = extract_name_from_hyperlink(row[0])
+
+            user_message = self.result_reporter.get_message(name)
+            try:
+                row[6] = user_message.text
+            except IndexError:
+                row.append(user_message.text)
+
+            if user_message.is_failure:
+                continue
+
+            if new_dispatch_data[name]['action'] == 'remove':
+                row[0] = name
+                row[1] = ''
+            elif new_dispatch_data[name]['action'] == 'create':
+                row[0] = get_hyperlink(name, new_dispatch_data[name]['ns_id'])
+                row[1] = 'edit'
+
+        return new_row_values
+
+
+class SpreadsheetDispatchDataValues():
+    """Handles dispatch data of a spreadsheet.
+
+    Args:
+        sheet_ranges (list): Ranges of this spreadsheet
+        result_reporter (ResultReporter): Result reporter instance
+    """
+
+    def __init__(self, sheet_ranges, result_reporter):
+        self.values_of_ranges = {}
+        for sheet_range, range_values in sheet_ranges:
+            self.values_of_ranges[sheet_range] = RangeDisaptchDataValues(range_values, result_reporter)
+        self.result_reporter = result_reporter
+
+    def extract_dispatch_data(self, owner_nations, category_setups, spreadsheet_id):
+        """Extract dispatch data from configured ranges in this spreadsheet.
+
+        Args:
+            owner_nations (OwnerNations): Owner nation instance
+            category_setups (CategorySetups): Category setup instance
+            spreadsheet_id (str): Id of this spreadsheet
+
+        Returns:
+            dict: Extracted dispatch data keyed by dispatch name
+        """
+
+        all_dispatch_data = {}
+        for range_data_values in self.values_of_ranges.values():
+            dispatch_data = range_data_values.extract_dispatch_data(owner_nations, category_setups, spreadsheet_id)
+            all_dispatch_data.update(dispatch_data)
+
+    def get_new_values(self, new_dispatch_data):
+        """Get new spreadsheet values from new dispatch data.
+
+        Args:
+            new_dispatch_data (dict): New dispatch data
+
+        Returns:
+            dict: New spreadsheet values
+        """
+
+        new_spreadsheet_values = {}
+        for sheet_range, range_data_values in self.values_of_ranges.items():
+            new_spreadsheet_values[sheet_range] = range_data_values.get_new_values(new_dispatch_data)
+
+        return new_spreadsheet_values
+
+
+class SpreadsheetDispatchDataConverter():
     """Converting spreadsheets into dispatch data and backward.
 
     Args:
@@ -373,7 +539,10 @@ class DispatchDataSpreadsheetConverter():
     """
 
     def __init__(self, spreadsheets, result_reporter):
-        self.spreadsheets = spreadsheets
+        self.spreadsheets = {}
+        for spreadsheet_id, sheet_ranges in spreadsheets.items():
+            self.spreadsheets[spreadsheet_id] = SpreadsheetDispatchDataValues(sheet_ranges, result_reporter)
+
         self.result_reporter = result_reporter
 
     def extract_dispatch_data(self, owner_nations, category_setups):
@@ -387,53 +556,15 @@ class DispatchDataSpreadsheetConverter():
             dict: Dispatch data keyed by dispatch name
         """
 
-        dispatch_data = {}
-        for spreadsheet_id, spreadsheet_values in self.spreadsheets.items():
-            for range_data in spreadsheet_values.values():
-                for row in range_data:
-                    name = extract_name_from_hyperlink(row[0])
+        all_dispatch_data = {}
+        for spreadsheet_id, spreadsheet_data in self.spreadsheets.items():
+            dispatch_data = spreadsheet_data.extract_dispatch_data(owner_nations, category_setups, spreadsheet_id)
+            all_dispatch_data.update(dispatch_data)
 
-                    # Skip row with empty action cell
-                    action = row[1]
-                    if not action:
-                        continue
-                    if action not in ('create', 'edit', 'remove'):
-                        self.result_reporter.report_failure(name, action, 'Invalid action')
-                        continue
+        return all_dispatch_data
 
-                    try:
-                        owner_nation = owner_nations.get_owner_nation_name(row[2], spreadsheet_id)
-                    except KeyError:
-                        self.result_reporter.report_failure(name, action, 'This owner nation does not exist.')
-                        continue
-                    except ValueError:
-                        self.result_reporter.report_failure(name, action, 'This spreadsheet does not allow this owner nation.')
-                        continue
-
-                    try:
-                        category, subcategory = category_setups.get_category_subcategory_name(row[3])
-                    except KeyError:
-                        self.result_reporter.report_failure(name, action, 'This category setup does not exist.')
-                        continue
-
-                    data = {'action': action,
-                            'owner_nation': owner_nation,
-                            'category': category,
-                            'subcategory': subcategory,
-                            'title': row[4],
-                            'template': row[5]}
-
-                    dispatch_id = extract_dispatch_id_from_hyperlink(row[0])
-                    if dispatch_id:
-                        data['ns_id'] = dispatch_id
-
-                    dispatch_data[name] = data
-                    row[0] = name
-
-        return dispatch_data
-
-    def generate_new_spreadsheets(self, new_dispatch_data):
-        """Generate new spreadsheets with new data.
+    def get_new_values(self, new_dispatch_data):
+        """Get new values of spreadsheets from new data.
 
         Args:
             new_dispatch_data (dict): New dispatch data, keyed by dispatch name
@@ -442,23 +573,11 @@ class DispatchDataSpreadsheetConverter():
             dict: New spreadsheets keyed by spreadsheet id
         """
 
-        new_spreadsheet_data = copy.deepcopy(self.spreadsheets)
-        for spreadsheet_values in new_spreadsheet_data.values():
-            for range_data in spreadsheet_values.values():
-                for row in range_data:
-                    name = row[0]
-                    if name not in new_dispatch_data:
-                        continue
+        new_spreadsheets = {}
+        for spreadsheet_id, spreadsheet_data in self.spreadsheets.items():
+            new_spreadsheets[spreadsheet_id] = spreadsheet_data.get_new_values(new_dispatch_data)
 
-                    if new_dispatch_data[name]['action'] == 'create':
-                        row[1] = 'edit'
-                    if new_dispatch_data[name]['action'] == 'remove':
-                        row[1] = ''
-
-                    row[0] = HYPERLINK.format(name=name, dispatch_id=new_dispatch_data[name]['ns_id'])
-                    row[6] = self.result_reporter.get_message(name)
-
-        return new_spreadsheet_data
+        return new_spreadsheets
 
 
 class DispatchData():
@@ -525,7 +644,7 @@ class GoogleDispatchLoader():
         category_setups_config (dict): Category setup spreadsheet config
     """
 
-    def __init__(self, spreadsheet_api, dispatch_spreadsheet_config,
+    def __init__(self, spreadsheet_api, dispatch_spreadsheet_config, utility_template_config,
                  owner_nation_config, category_setups_config):
         self.spreadsheet_api = spreadsheet_api
 
@@ -537,18 +656,25 @@ class GoogleDispatchLoader():
                                                                      category_setups_config['range'])
         category_setups = CategorySetups.load_from_rows(category_setup_rows)
 
-        dispatch_spreadsheets = {}
-        for spreadsheet in dispatch_spreadsheet_config:
-            dispatch_spreadsheet = self.spreadsheet_api.get_rows_in_many_ranges(dispatch_spreadsheet_config['spreadsheet_id'],
-                                                                                dispatch_spreadsheet_config['ranges'])
+
+        utility_template_spreadsheets = {}
+        for spreadsheet in utility_template_config:
+            utility_template_spreadsheet = self.spreadsheet_api.get_rows_in_many_ranges(spreadsheet['spreadsheet_id'],
+                                                                                        spreadsheet['ranges'])
             spreadsheet_id = spreadsheet['spreadsheet_id']
-            dispatch_spreadsheets[spreadsheet_id] = dispatch_spreadsheet
+            utility_template_spreadsheets[spreadsheet_id] = utility_template_spreadsheet
+        self.utility_templates = load_utility_templates_from_spreadsheets(utility_template_spreadsheets)
 
         self.result_reporter = ResultReporter()
 
-        self.converter = DispatchDataSpreadsheetConverter(dispatch_spreadsheets, self.result_reporter)
+        dispatch_spreadsheets = {}
+        for spreadsheet in dispatch_spreadsheet_config:
+            dispatch_spreadsheet = self.spreadsheet_api.get_rows_in_many_ranges(spreadsheet['spreadsheet_id'],
+                                                                                spreadsheet['ranges'])
+            spreadsheet_id = spreadsheet['spreadsheet_id']
+            dispatch_spreadsheets[spreadsheet_id] = dispatch_spreadsheet
+        self.converter = SpreadsheetDispatchDataConverter(dispatch_spreadsheets, self.result_reporter)
         extracted_data = self.converter.extract_dispatch_data(owner_nations, category_setups)
-
         self.dispatch_data = DispatchData(extracted_data)
 
     def get_dispatch_config(self):
@@ -580,7 +706,9 @@ class GoogleDispatchLoader():
             str: Template text
         """
 
-        self.dispatch_data.get_dispatch_template(name)
+        if name in self.utility_templates:
+            return self.utility_templates[name]
+        return self.dispatch_data.get_dispatch_template(name)
 
     def report_result(self, name, action, result):
         """Report operation result from NSDU.
@@ -600,23 +728,23 @@ class GoogleDispatchLoader():
         """Update spreadsheets.
         """
 
-        new_spreadsheet_data = self.converter.generate_new_spreadsheets(self.dispatch_data.dispatch_data)
-        for spreadsheet_id, spreadsheet_data in new_spreadsheet_data.items():
-            self.spreadsheet_api.batch_update_data(spreadsheet_id, spreadsheet_data)
+        new_spreadsheet_values = self.converter.get_new_values(self.dispatch_data.dispatch_data)
+        for spreadsheet_id, values in new_spreadsheet_values.items():
+            self.spreadsheet_api.update_rows_in_many_ranges(spreadsheet_id, values)
 
 
 @loader_api.dispatch_loader
-def init_dispatch_loader(loader_config):
-    config = loader_config['google_dispatchloader']
+def init_dispatch_loader(config):
+    config = config['google_dispatchloader']
 
-    google_api_creds = service_account.Credentials.from_service_account_file(config['cred_path'], scopes=SCOPES)
+    google_api_creds = service_account.Credentials.from_service_account_file(config['google_cred_path'], scopes=SCOPES)
     # pylint: disable=maybe-no-member
     google_api = discovery.build('sheets', 'v4', credentials=google_api_creds).spreadsheets().values()
     spreadsheet_api = GoogleSpreadsheetApiAdapter(google_api)
 
-    return GoogleDispatchLoader(spreadsheet_api, config['dispatch_spreadsheets'],
-                                config['owner_nation_spreadsheet'],
-                                config['category_setup_spreadsheet'])
+    return GoogleDispatchLoader(spreadsheet_api, config['dispatch_spreadsheets'], config['utility_template_spreadsheets'],
+                                config['owner_nation_sheet'],
+                                config['category_setup_sheet'])
 
 
 @loader_api.dispatch_loader
@@ -636,9 +764,9 @@ def after_update(loader, name, action, result):
 
 @loader_api.dispatch_loader
 def add_dispatch_id(loader, name, dispatch_id):
-    loader.add_new_dispatch_id(name, dispatch_id)
+    loader.add_dispatch_id(name, dispatch_id)
 
 
 @loader_api.dispatch_loader
 def cleanup_dispatch_loader(loader):
-    loader.save_dispatch_config()
+    loader.update_spreadsheets()

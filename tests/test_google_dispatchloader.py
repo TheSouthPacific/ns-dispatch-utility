@@ -68,6 +68,51 @@ class TestGoogleSpreadsheetApiAdapter():
         google_api.batchUpdate.assert_called_with(spreadsheetId='foobar', body=expected_body)
 
 
+class TestResultReporter():
+    def test_format_success_message_returns_formatted_messages(self):
+        r = google_dispatchloader.ResultReporter.format_success_message('create')
+
+        assert 'Created on' in r
+
+    def test_format_failure_message_returns_formatted_messages(self):
+        r = google_dispatchloader.ResultReporter.format_failure_message('create', 'Some details')
+
+        assert 'Failed to create' in r and '\nError: Some details' in r
+
+    def test_report_success_adds_success_report(self):
+        reporter = google_dispatchloader.ResultReporter()
+
+        reporter.report_success('foo', 'create')
+
+        assert reporter.results['foo'].action == 'create'
+
+    def test_report_failure_adds_failure_report(self):
+        reporter = google_dispatchloader.ResultReporter()
+
+        reporter.report_failure('foo', 'create', 'Some details')
+        r = reporter.results['foo']
+
+        assert r.action == 'create' and r.details == 'Some details'
+
+    def test_get_message_of_successful_result_returns_formatted_message(self):
+        reporter = google_dispatchloader.ResultReporter()
+        reporter.report_success('foo', 'create')
+
+        r1 = reporter.get_message('foo')
+
+        assert 'Created on' in r1.text
+        assert not r1.is_failure
+
+    def test_get_message_of_failure_result_returns_formatted_message(self):
+        reporter = google_dispatchloader.ResultReporter()
+        reporter.report_failure('foo', 'edit', 'Some details')
+
+        r1 = reporter.get_message('foo')
+
+        assert 'Failed to edit' in r1.text and 'Some details' in r1.text
+        assert r1.is_failure
+
+
 class TestCategorySetups():
     def test_get_category_subcategory_names_returns_name(self):
         rows = [[1, 'Meta', 'Gameplay']]
@@ -145,56 +190,6 @@ class TestExtractDispatchIdFromHyperlink():
         cell_value = 'foobar'
 
         assert google_dispatchloader.extract_dispatch_id_from_hyperlink(cell_value) == None
-
-
-class TestResultReporter():
-    @pytest.mark.parametrize('action,expected', [('create', 'Created on'),
-                                                 ('edit', 'Edited on'),
-                                                 ('remove', 'Removed on')])
-    def test_format_success_message_returns_formatted_messages(self, action, expected):
-        r = google_dispatchloader.ResultReporter.format_success_message(action)
-
-        assert expected in r
-
-    @pytest.mark.parametrize('action,expected', [('create', 'Failed to create on'),
-                                                 ('edit', 'Failed to edit on'),
-                                                 ('remove', 'Failed to remove on')])
-    def test_format_failure_message_returns_formatted_messages(self, action, expected):
-        details = 'Some details'
-        r = google_dispatchloader.ResultReporter.format_failure_message(action, details)
-
-        assert expected in r and '\nError: Some details' in r
-
-    def test_report_success_adds_success_report(self):
-        reporter = google_dispatchloader.ResultReporter()
-
-        reporter.report_success('foo', 'create')
-
-        assert reporter.results['foo'].action == 'create'
-
-    def test_report_failure_adds_failure_report(self):
-        reporter = google_dispatchloader.ResultReporter()
-
-        reporter.report_failure('foo', 'create', 'Some details')
-        r = reporter.results['foo']
-
-        assert r.action == 'create' and r.details == 'Some details'
-
-    def test_get_message_of_successful_result_returns_formatted_message(self):
-        reporter = google_dispatchloader.ResultReporter()
-        reporter.report_success('foo', 'create')
-
-        r1 = reporter.get_message('foo')
-
-        assert 'Created on' in r1
-
-    def test_get_message_of_failure_result_returns_formatted_message(self):
-        reporter = google_dispatchloader.ResultReporter()
-        reporter.report_failure('foo', 'edit', 'Some details')
-
-        r1 = reporter.get_message('foo')
-
-        assert 'Failed to edit' in r1 and 'Some details' in r1
 
 
 class TestLoadUtilityTemplatesFromSpreadsheets():
@@ -294,7 +289,7 @@ class TestDispatchData():
         assert obj.dispatch_data['name1']['ns_id'] == '54321'
 
 
-class TestDispatchDataSpreadsheetConverter():
+class TestRangeDisaptchDataValues():
     @pytest.fixture
     def owner_nations(self):
         return google_dispatchloader.OwnerNations({1: 'testopia'}, {1: ['abcd1234']})
@@ -303,14 +298,13 @@ class TestDispatchDataSpreadsheetConverter():
     def category_setups(self):
         return google_dispatchloader.CategorySetups({1: 'meta'}, {1: 'reference'})
 
-    def test_extract_dispatch_data_returns_data_of_valid_action_dispatch(self, owner_nations, category_setups):
+    def test_extract_dispatch_data_valid_action_returns_data(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        values = ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
-                  'edit', 1, 1, 'Title 1', 'Text 1', '']
-        spreadsheets = {'abcd1234': {'Sheet1!A1:G': [values]}}
-        obj = google_dispatchloader.DispatchDataSpreadsheetConverter(spreadsheets, result_reporter)
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                       'edit', 1, 1, 'Title 1', 'Text 1', '']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups)
+        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
 
         assert r == {'name1': {'owner_nation': 'testopia',
                                'ns_id': '1234',
@@ -322,11 +316,10 @@ class TestDispatchDataSpreadsheetConverter():
 
     def test_extract_dispatch_data_returns_data_of_no_id_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        values = ['name1', 'create', 1, 1, 'Title 1', 'Text 1', '']
-        spreadsheets = {'abcd1234': {'Sheet1!A1:G': [values]}}
-        obj = google_dispatchloader.DispatchDataSpreadsheetConverter(spreadsheets, result_reporter)
+        row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', '']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups)
+        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
 
         assert r == {'name1': {'owner_nation': 'testopia',
                                'action': 'create',
@@ -337,67 +330,83 @@ class TestDispatchDataSpreadsheetConverter():
 
     def test_extract_dispatch_data_skips_over_invalid_action_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        values = ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
-                  'invalid action', 1, 1, 'Title 1', 'Text 1', '']
-        spreadsheets = {'abcd1234': {'Sheet1!A1:G': [values]}}
-        obj = google_dispatchloader.DispatchDataSpreadsheetConverter(spreadsheets, result_reporter)
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                   'invalid action', 1, 1, 'Title 1', 'Text 1', '']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups)
+        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
         result_reporter.report_failure.assert_called()
 
     def test_extract_dispatch_data_skips_over_empty_action_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        values = ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
-                  '', 1, 1, 'Title 1', 'Text 1', '']
-        spreadsheets = {'abcd1234': {'Sheet1!A1:G': [values]}}
-        obj = google_dispatchloader.DispatchDataSpreadsheetConverter(spreadsheets, result_reporter)
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                       '', 1, 1, 'Title 1', 'Text 1', '']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups)
+        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
 
     def test_extract_dispatch_data_skips_over_non_existent_owner_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        values = ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
-                  'edit', 20, 1, 'Title 1', 'Text 1', '']
-        spreadsheets = {'abcd1234': {'Sheet1!A1:G': [values]}}
-        obj = google_dispatchloader.DispatchDataSpreadsheetConverter(spreadsheets, result_reporter)
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                       'edit', 20, 1, 'Title 1', 'Text 1', '']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups)
+        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
         result_reporter.report_failure.assert_called()
 
     def test_extract_dispatch_data_skips_over_unpermitted_owner_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        values = ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
-                  'edit', 1, 1, 'Title 1', 'Text 1', '']
-        spreadsheets = {'xyzt1234': {'Sheet1!A1:G': [values]}}
-        obj = google_dispatchloader.DispatchDataSpreadsheetConverter(spreadsheets, result_reporter)
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                       'edit', 1, 1, 'Title 1', 'Text 1', '']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups)
+        r = obj.extract_dispatch_data(owner_nations, category_setups, 'xyzt1234')
 
         assert r == {}
         result_reporter.report_failure.assert_called()
 
     def test_extract_dispatch_data_skips_over_non_existent_category_setup_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        values = ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
-                  'edit', 1, 20, 'Title 1', 'Text 1', '']
-        spreadsheets = {'abcd1234': {'Sheet1!A1:G': [values]}}
-        obj = google_dispatchloader.DispatchDataSpreadsheetConverter(spreadsheets, result_reporter)
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                       'edit', 1, 20, 'Title 1', 'Text 1', '']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups)
+        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
         result_reporter.report_failure.assert_called()
 
-    def test_generate_new_spreadsheets_with_newly_created_dispatch(self):
-        result_reporter = mock.Mock(get_message=mock.Mock(return_value='Test message'))
-        values = ['name1', 'create', 1, 1, 'Title 1', 'Text 1', '']
-        spreadsheets = {'abcd1234': {'Sheet1!A1:G': [values]}}
+    def test_get_new_values_of_edited_dispatch(self):
+        message = google_dispatchloader.Message(is_failure=False, text='Test message')
+        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                       'edit', 1, 1, 'Title 1', 'Text 1', 'Old message']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        new_dispatch_data = {'name1': {'owner_nation': 'testopia',
+                                       'ns_id': '1234',
+                                       'action': 'edit',
+                                       'title': 'Title 1',
+                                       'template': 'Text 1',
+                                       'category': 'meta',
+                                       'subcategory': 'reference'}}
+
+        r = obj.get_new_values(new_dispatch_data)
+
+        expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                     'edit', 1, 1, 'Title 1', 'Text 1', 'Test message']]
+        assert r == expected
+
+    def test_get_new_values_of_created_dispatch_changes_action_to_edit(self):
+        message = google_dispatchloader.Message(is_failure=False, text='Test message')
+        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
         new_dispatch_data = {'name1': {'owner_nation': 'testopia',
                                        'ns_id': '1234',
                                        'action': 'create',
@@ -405,11 +414,50 @@ class TestDispatchDataSpreadsheetConverter():
                                        'template': 'Text 1',
                                        'category': 'meta',
                                        'subcategory': 'reference'}}
-        obj = google_dispatchloader.DispatchDataSpreadsheetConverter(spreadsheets, result_reporter)
 
-        r = obj.generate_new_spreadsheets(new_dispatch_data)
+        r = obj.get_new_values(new_dispatch_data)
 
-        expected_values = ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
-                           'edit', 1, 1, 'Title 1', 'Text 1', 'Test message']
-        expected = {'abcd1234': {'Sheet1!A1:G': [expected_values]}}
+        expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                     'edit', 1, 1, 'Title 1', 'Text 1', 'Test message']]
+        assert r == expected
+
+    def test_get_new_values_of_removed_dispatch_changes_action_to_empty_removes_hyperlink(self):
+        message = google_dispatchloader.Message(is_failure=False, text='Test message')
+        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        new_dispatch_data = {'name1': {'owner_nation': 'testopia',
+                                       'ns_id': '1234',
+                                       'action': 'remove',
+                                       'title': 'Title 1',
+                                       'template': 'Text 1',
+                                       'category': 'meta',
+                                       'subcategory': 'reference'}}
+
+        r = obj.get_new_values(new_dispatch_data)
+
+        expected = [['name1', '', 1, 1, 'Title 1', 'Text 1', 'Test message']]
+        assert r == expected
+
+    def test_get_new_values_keeps_empty_action_rows_untouched(self):
+        result_reporter = mock.Mock()
+        row_values = [['name1', '', 1, 1, 'Title 1', 'Text 1', 'Old message']]
+        new_dispatch_data = {}
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+
+        r = obj.get_new_values(new_dispatch_data)
+
+        expected = [['name1', '', 1, 1, 'Title 1', 'Text 1', 'Old message']]
+        assert r == expected
+
+    def test_get_new_values_when_errors_happen_adds_message(self):
+        message = google_dispatchloader.Message(is_failure=True, text='Error message')
+        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
+        new_dispatch_data = {}
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+
+        r = obj.get_new_values(new_dispatch_data)
+
+        expected = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Error message']]
         assert r == expected
