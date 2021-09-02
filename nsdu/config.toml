@@ -38,3 +38,12 @@ personnel_info_groups = ['reference']
 
 [loader_config.json_credloader]
 # cred_path = '~/ns_dispatches/nations.json'
+
+[loader_config.google_dispatchloader]
+google_cred_path = '~/ns_dispatches/google_creds.json'
+owner_nation_sheet = {spreadsheet_id = '1234abcdefgh', range='Owner!A3:C'}
+category_setup_sheet = {spreadsheet_id = '1234abcdefgh', range='CategorySetup!A3:B'}
+utility_template_spreadsheets = [{spreadsheet_id = '1234abcdefgh', range='Layout!A3:B'},
+                                 {spreadsheet_id = '1234abcdefgh', range='Macros!A3:B'}]
+dispatch_spreadsheets = [{spreadsheet_id = '1234abcdefgh', ranges = ['Set1!A3:E', 'Set2!A3:E']},
+                         {spreadsheet_id = '5678xyzjklmn', ranges = ['Set3!A3:E', 'Set4!A3:E']}]
