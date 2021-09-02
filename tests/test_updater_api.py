@@ -10,19 +10,24 @@ from nsdu import updater_api
 
 
 class TestGetCategoryNumber():
-    def test_get_category_number_with_all_alpha_params(self):
+    def test_all_alpha_inputs_returns_correct_numbers(self):
         cat_num, subcat_num = updater_api.get_category_number('factbook', 'overview')
 
         assert cat_num == '1' and subcat_num == '100'
 
-    def test_get_category_number_with_no_alpha_param(self):
+    def test_all_alpha_inputs_with_uppercase_letters_returns_correct_numbers(self):
+        cat_num, subcat_num = updater_api.get_category_number('Factbook', 'Overview')
+
+        assert cat_num == '1' and subcat_num == '100'
+
+    def test_no_alpha_inputs_returns_inputs(self):
         cat_num, subcat_num = updater_api.get_category_number('1', '100')
 
         assert cat_num == '1' and subcat_num == '100'
 
 
 class TestDispatchUpdater():
-    def test_login_owner_nation_with_autologin_code(self):
+    def test_login_owner_nation_calls_dispatch_api_with_autologin_code(self):
         updater = updater_api.DispatchUpdater(user_agent='foo',
                                               template_filter_paths=[],
                                               simple_formatter_config=None,
@@ -36,7 +41,7 @@ class TestDispatchUpdater():
 
         dispatch_api.login.assert_called_with('testopia', password=None, autologin='hunterprime')
 
-    def test_login_owner_nation_with_password(self):
+    def test_login_owner_nation_calls_dispatch_api_with_password(self):
         updater = updater_api.DispatchUpdater(user_agent='foo',
                                               template_filter_paths=[],
                                               simple_formatter_config=None,
@@ -50,7 +55,7 @@ class TestDispatchUpdater():
 
         dispatch_api.login.assert_called_with('testopia', password='hunterprime', autologin=None)
 
-    def test_create_dispatch(self):
+    def test_create_dispatch_calls_dispatch_api(self):
         updater = updater_api.DispatchUpdater(user_agent='foo',
                                               template_filter_paths=[],
                                               simple_formatter_config=None,
@@ -68,7 +73,7 @@ class TestDispatchUpdater():
                                                         subcategory='835')
         assert new_dispatch_id == '12345'
 
-    def test_edit_dispatch(self):
+    def test_edit_dispatch_calls_dispatch_api(self):
         updater = updater_api.DispatchUpdater(user_agent='foo',
                                               template_filter_paths=[],
                                               simple_formatter_config=None,
@@ -86,7 +91,7 @@ class TestDispatchUpdater():
                                                       category='8',
                                                       subcategory='835')
 
-    def test_remove_dispatch(self):
+    def test_remove_dispatch_calls_dispatch_api(self):
         updater = updater_api.DispatchUpdater(user_agent='foo',
                                               template_filter_paths=[],
                                               simple_formatter_config=None,
