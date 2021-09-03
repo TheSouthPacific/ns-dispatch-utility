@@ -458,7 +458,7 @@ class RangeDisaptchDataValues():
                 continue
 
             # Skip row with empty action
-            if not row[1]:
+            if not row[0] or not row[1]:
                 continue
 
             name = extract_name_from_hyperlink(row[0])
@@ -492,7 +492,7 @@ class SpreadsheetDispatchDataValues():
 
     def __init__(self, sheet_ranges, result_reporter):
         self.values_of_ranges = {}
-        for sheet_range, range_values in sheet_ranges:
+        for sheet_range, range_values in sheet_ranges.items():
             self.values_of_ranges[sheet_range] = RangeDisaptchDataValues(range_values, result_reporter)
         self.result_reporter = result_reporter
 
@@ -512,6 +512,8 @@ class SpreadsheetDispatchDataValues():
         for range_data_values in self.values_of_ranges.values():
             dispatch_data = range_data_values.extract_dispatch_data(owner_nations, category_setups, spreadsheet_id)
             all_dispatch_data.update(dispatch_data)
+
+        return all_dispatch_data
 
     def get_new_values(self, new_dispatch_data):
         """Get new spreadsheet values from new dispatch data.
