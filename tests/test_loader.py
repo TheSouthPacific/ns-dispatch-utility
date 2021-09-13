@@ -251,10 +251,12 @@ class TestDispatchLoaderManager():
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
         manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
-        manager.after_update('test', 'edit', 'success')
+        update_time = mock.Mock()
+        manager.after_update('test', 'edit', 'success', update_time)
         manager.cleanup_loader()
 
-        assert manager._loader.result == {'name': 'test', 'action': 'edit', 'result': 'success'}
+        assert manager._loader.result == {'name': 'test', 'action': 'edit',
+                                          'result': 'success', 'update_time': update_time}
 
     def test_add_dispatch_id(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)

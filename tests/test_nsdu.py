@@ -102,11 +102,26 @@ class TestNsduDispatch():
         with pytest.raises(exceptions.DispatchConfigError):
             app.update_a_dispatch('foo')
 
-    @pytest.mark.parametrize("api_exceptions, result",
+    def test_update_a_dispatch_with_no_exception_reports_success(self, caplog):
+        dispatch_loader_manager = mock.Mock()
+        dispatch_updater = mock.Mock()
+        dispatch_info = {'foo': {'action': 'edit',
+                                 'ns_id': '12345',
+                                 'title': 'Test title',
+                                 'category': '1',
+                                 'subcategory': '100'}}
+        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
+
+        app.update_a_dispatch('foo')
+
+        result = dispatch_loader_manager.after_update.call_args[0][2]
+        assert result == 'success'
+
+    @pytest.mark.parametrize("api_exceptions,expected_result",
                              [(exceptions.UnknownDispatchError, 'unknown-dispatch-error'),
                               (exceptions.NotOwnerDispatchError, 'not-owner-dispatch-error'),
                               (exceptions.NonexistentCategoryError('',''), 'invalid-category-options')])
-    def test_update_a_dispatch_with_exceptions_reports_errors(self, api_exceptions, result, caplog):
+    def test_update_a_dispatch_with_exceptions_reports_failure(self, api_exceptions, expected_result, caplog):
         dispatch_loader_manager = mock.Mock()
         dispatch_updater = mock.Mock(edit_dispatch=mock.Mock(side_effect=api_exceptions))
         dispatch_info = {'foo': {'action': 'edit',
@@ -118,8 +133,8 @@ class TestNsduDispatch():
 
         app.update_a_dispatch('foo')
 
-        assert caplog.records[-1].levelname == 'ERROR'
-        dispatch_loader_manager.after_update.assert_called_with('foo', 'edit', result)
+        result = dispatch_loader_manager.after_update.call_args[0][2]
+        assert result == expected_result
 
     def test_update_existing_dispatches_calls_dispatch_updater(self):
         dispatch_loader_manager = mock.Mock()
