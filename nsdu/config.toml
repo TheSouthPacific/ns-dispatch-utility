@@ -1,5 +1,5 @@
 [general]
-user_agent = 'United States of Vietnam'
+user_agent = 'NSDU application run by <your main nation name>'
 
 # Path to directory containing source files of your own loaders
 # custom_loader_dir_path = '~/my_nsdu_loaders'
