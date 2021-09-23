@@ -9,9 +9,7 @@ from nsdu.loaders import google_dispatchloader
 
 class TestGoogleSpreadsheetApiAdapter():
     def test_get_rows_in_range_returns_row_values(self):
-        resp = {'range': 'Foo!A1:A',
-                'majorDimension': 'ROWS',
-                'values': [[1]]}
+        resp = {'range': 'Foo!A1:A', 'majorDimension': 'ROWS', 'values': [[1]]}
         request = mock.Mock(execute=mock.Mock(return_value=resp))
         google_api = mock.Mock(get=mock.Mock(return_value=request))
         api = google_dispatchloader.GoogleSpreadsheetApiAdapter(google_api)
@@ -19,8 +17,7 @@ class TestGoogleSpreadsheetApiAdapter():
         assert api.get_rows_in_range('foobar', 'Foo!A1:A') == [[1]]
 
     def test_get_rows_in_empty_range_returns_empty_list(self):
-        resp = {'range': 'Foo!A1:A',
-                'majorDimension': 'ROWS'}
+        resp = {'range': 'Foo!A1:A', 'majorDimension': 'ROWS'}
         request = mock.Mock(execute=mock.Mock(return_value=resp))
         google_api = mock.Mock(get=mock.Mock(return_value=request))
         api = google_dispatchloader.GoogleSpreadsheetApiAdapter(google_api)
@@ -28,11 +25,9 @@ class TestGoogleSpreadsheetApiAdapter():
         assert api.get_rows_in_range('foobar', 'Foo!A1:A') == []
 
     def test_get_rows_in_ranges_returns_row_values(self):
-        range1 = {'range': 'Foo!A1:F',
-                  'majorDimension': 'ROWS',
-                  'values': [[1]]}
+        sheet_range = {'range': 'Foo!A1:F', 'majorDimension': 'ROWS', 'values': [[1]]}
         resp = {'spreadsheetId': 'foobar',
-                'valueRanges': [range1]}
+                'valueRanges': [sheet_range]}
         request = mock.Mock(execute=mock.Mock(return_value=resp))
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
         api = google_dispatchloader.GoogleSpreadsheetApiAdapter(google_api)
@@ -41,10 +36,9 @@ class TestGoogleSpreadsheetApiAdapter():
         assert r == {'Foo!A1:F': [[1]]}
 
     def test_get_rows_in_empty_ranges_returns_empty_list(self):
-        range1 = {'range': 'Foo!A1:F',
-                  'majorDimension': 'ROWS'}
+        sheet_range = {'range': 'Foo!A1:F', 'majorDimension': 'ROWS'}
         resp = {'spreadsheetId': 'foobar',
-                'valueRanges': [range1]}
+                'valueRanges': [sheet_range]}
         request = mock.Mock(execute=mock.Mock(return_value=resp))
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
         api = google_dispatchloader.GoogleSpreadsheetApiAdapter(google_api)
@@ -53,19 +47,40 @@ class TestGoogleSpreadsheetApiAdapter():
 
         assert r['Foo!A1:F'] == []
 
-    def test_update_rows_in_many_ranges_google_api_called(self):
+    def test_get_rows_in_many_spreadsheets_returns_row_values(self):
+        spreadsheets = [{'spreadsheet_id': '1234abcd', 'ranges': ['Foo!A1:F']}]
+        sheet_range = {'range': 'Foo!A1:F', 'majorDimension': 'ROWS', 'values': [[1]]}
+        resp = {'spreadsheetId': '1234abcd',
+                'valueRanges': [sheet_range]}
+        request = mock.Mock(execute=mock.Mock(return_value=resp))
+        google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
+        api = google_dispatchloader.GoogleSpreadsheetApiAdapter(google_api)
+
+        r = api.get_rows_in_many_spreadsheets(spreadsheets)
+
+        assert r == {'1234abcd': {'Foo!A1:F': [[1]]}}
+
+    def test_update_rows_in_many_ranges_calls_google_api(self):
         new_data = {'Foo!A1:F': [[1]]}
         google_api = mock.Mock(batchUpdate=mock.Mock(return_value=mock.Mock()))
         api = google_dispatchloader.GoogleSpreadsheetApiAdapter(google_api)
 
         api.update_rows_in_many_ranges('foobar', new_data)
 
-        new_range1 = {'range': 'Foo!A1:F',
-                      'majorDimension': 'ROWS',
-                      'values': [[1]]}
-        expected_body = {'valueInputOption': 'USER_ENTERED',
-                         'data': [new_range1]}
+        new_data = {'range': 'Foo!A1:F', 'majorDimension': 'ROWS', 'values': [[1]]}
+        expected_body = {'valueInputOption': 'USER_ENTERED', 'data': [new_data]}
         google_api.batchUpdate.assert_called_with(spreadsheetId='foobar', body=expected_body)
+
+    def test_update_rows_in_many_spreadsheets_calls_google_api(self):
+        new_data = {'1234abcd': {'Foo!A1:F': [[1]]}}
+        google_api = mock.Mock(batchUpdate=mock.Mock(return_value=mock.Mock()))
+        api = google_dispatchloader.GoogleSpreadsheetApiAdapter(google_api)
+
+        api.update_rows_in_many_spreadsheets(new_data)
+
+        new_data = {'range': 'Foo!A1:F', 'majorDimension': 'ROWS', 'values': [[1]]}
+        expected_body = {'valueInputOption': 'USER_ENTERED', 'data': [new_data]}
+        google_api.batchUpdate.assert_called_with(spreadsheetId='1234abcd', body=expected_body)
 
 
 class TestResultReporter():
@@ -633,3 +648,8 @@ class TestSpreadsheetDispatchDataConverter():
         range2_expected = [['name2', '', 1, 1, 'Title 2', 'Text 2', 'Test message']]
         assert r == {'abcd1234': {'Sheet1!A3:F': range1_expected},
                      'xyzt1234': {'Sheet2!A3:F': range2_expected}}
+
+
+class TestGoogleDispatchLoader():
+    def test_get_dispatch_config_returns_dispatch_config(self):
+        pass

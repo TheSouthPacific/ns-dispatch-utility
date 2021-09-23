@@ -102,6 +102,24 @@ class GoogleSpreadsheetApiAdapter():
 
         return result
 
+    def get_rows_in_many_spreadsheets(self, spreadsheets):
+        """Get cell values of many spreadsheets.
+
+        Args:
+            spreadsheets (list): Dicts containing spreadsheet id and ranges
+
+        Returns:
+            dict: Row values in ranges keyed by spreadsheet id
+        """
+
+        result = {}
+        for spreadsheet in spreadsheets:
+            row_values = self.get_rows_in_many_ranges(spreadsheet['spreadsheet_id'], spreadsheet['ranges'])
+            spreadsheet_id = spreadsheet['spreadsheet_id']
+            result[spreadsheet_id] = row_values
+
+        return result
+
     def update_rows_in_many_ranges(self, spreadsheet_id, new_data):
         """Update cell values of many ranges in a spreadsheet.
 
@@ -120,6 +138,16 @@ class GoogleSpreadsheetApiAdapter():
                 'data': data}
         req = self.sheet_api.batchUpdate(spreadsheetId=spreadsheet_id, body=body)
         self.execute(req)
+
+    def update_rows_in_many_spreadsheets(self, new_data):
+        """Update cell values in many spreadsheets.
+
+        Args:
+            new_data (list): Dicts of new row values keyed by spreadsheet id
+        """
+
+        for spreadsheet_id, new_values in new_data.items():
+            self.update_rows_in_many_ranges(spreadsheet_id, new_values)
 
 
 SuccessResult = collections.namedtuple('SuccessResult', ['name', 'action'])
@@ -641,40 +669,25 @@ class GoogleDispatchLoader():
 
     Args:
         spreadsheet_api (googleapiclients): Google Spreadsheet Api
-        dispatch_spreadsheet_config (dict): Dispatch spreadsheet config
-        owner_nation_config (dict): Owner nation spreadsheet config
-        category_setups_config (dict): Category setup spreadsheet config
+        dispatch_spreadsheets (dict): Dispatch spreadsheet values
+        utility_template_spreadsheets (dict): Utility template spreadsheet values
+        owner_nation_rows (dict): Owner nation spreadsheet values
+        category_setup_rows (dict): Category setup spreadsheet values
     """
 
-    def __init__(self, spreadsheet_api, dispatch_spreadsheet_config, utility_template_config,
-                 owner_nation_config, category_setups_config):
+    def __init__(self, spreadsheet_api, dispatch_spreadsheets,
+                 utility_template_spreadsheets,
+                 owner_nation_rows,
+                 category_setup_rows):
         self.spreadsheet_api = spreadsheet_api
 
-        owner_nation_rows = self.spreadsheet_api.get_rows_in_range(owner_nation_config['spreadsheet_id'],
-                                                                   owner_nation_config['range'])
         owner_nations = OwnerNations.load_from_rows(owner_nation_rows)
-
-        category_setup_rows = self.spreadsheet_api.get_rows_in_range(category_setups_config['spreadsheet_id'],
-                                                                     category_setups_config['range'])
         category_setups = CategorySetups.load_from_rows(category_setup_rows)
 
-
-        utility_template_spreadsheets = {}
-        for spreadsheet in utility_template_config:
-            utility_template_spreadsheet = self.spreadsheet_api.get_rows_in_many_ranges(spreadsheet['spreadsheet_id'],
-                                                                                        spreadsheet['ranges'])
-            spreadsheet_id = spreadsheet['spreadsheet_id']
-            utility_template_spreadsheets[spreadsheet_id] = utility_template_spreadsheet
         self.utility_templates = load_utility_templates_from_spreadsheets(utility_template_spreadsheets)
 
         self.result_reporter = ResultReporter()
 
-        dispatch_spreadsheets = {}
-        for spreadsheet in dispatch_spreadsheet_config:
-            dispatch_spreadsheet = self.spreadsheet_api.get_rows_in_many_ranges(spreadsheet['spreadsheet_id'],
-                                                                                spreadsheet['ranges'])
-            spreadsheet_id = spreadsheet['spreadsheet_id']
-            dispatch_spreadsheets[spreadsheet_id] = dispatch_spreadsheet
         self.converter = SpreadsheetDispatchDataConverter(dispatch_spreadsheets, self.result_reporter)
         extracted_data = self.converter.extract_dispatch_data(owner_nations, category_setups)
         self.dispatch_data = DispatchData(extracted_data)
@@ -744,9 +757,17 @@ def init_dispatch_loader(config):
     google_api = discovery.build('sheets', 'v4', credentials=google_api_creds).spreadsheets().values()
     spreadsheet_api = GoogleSpreadsheetApiAdapter(google_api)
 
-    return GoogleDispatchLoader(spreadsheet_api, config['dispatch_spreadsheets'], config['utility_template_spreadsheets'],
-                                config['owner_nation_sheet'],
-                                config['category_setup_sheet'])
+    owner_nation_rows = spreadsheet_api.get_rows_in_range(config['owner_nation_sheet']['spreadsheet_id'],
+                                                          config['owner_nation_sheet']['range'])
+    category_setup_rows = spreadsheet_api.get_rows_in_range(config['category_setup_sheet']['spreadsheet_id'],
+                                                            config['category_setup_sheet']['range'])
+    utility_template_spreadsheets = spreadsheet_api.get_rows_in_many_spreadsheets(config['utility_template_spreadsheets'])
+    dispatch_spreadsheets = spreadsheet_api.get_rows_in_many_spreadsheets(config['dispatch_spreadsheets'])
+
+    return GoogleDispatchLoader(spreadsheet_api, dispatch_spreadsheets,
+                                utility_template_spreadsheets,
+                                owner_nation_rows,
+                                category_setup_rows)
 
 
 @loader_api.dispatch_loader
