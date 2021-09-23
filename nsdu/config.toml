@@ -47,3 +47,24 @@ utility_template_spreadsheets = [{spreadsheet_id = '1234abcdefgh', range='Layout
                                  {spreadsheet_id = '1234abcdefgh', range='Macros!A3:B'}]
 dispatch_spreadsheets = [{spreadsheet_id = '1234abcdefgh', ranges = ['Set1!A3:E', 'Set2!A3:E']},
                          {spreadsheet_id = '5678xyzjklmn', ranges = ['Set3!A3:E', 'Set4!A3:E']}]
+
+
+[loader_config.google_simplebbloader]
+google_cred_path = '~/ns_dispatches/google_creds.json'
+spreadsheet_id = '5678xyzjklmn'
+range = 'BBCode!A3:C'
+
+
+[loader_config.google_varloader]
+google_cred_path = '~/ns_dispatches/google_creds.json'
+personnel_groups = ['gov_officials']
+personnel_info_groups = ['personnel_info']
+
+[loader_config.google_varloader.spreadsheet1]
+spreadsheet_id = '1234abcdefgh'
+vars = [{ranges = 'Var1!A3:B', name = 'gov_officials'},
+        {ranges = 'Var2!A3:B', name = 'personnel_info'}]
+[loader_config.google_varloader.spreadsheet2]
+spreadsheet_id = '5678xyzjklmn'
+vars = [{ranges = 'Var1!A3:B', name = 'gov_officials'},
+        {ranges = 'Var2!A3:B', name = 'personnel_info'}]
