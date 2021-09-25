@@ -48,12 +48,10 @@ utility_template_spreadsheets = [{spreadsheet_id = '1234abcdefgh', range='Layout
 dispatch_spreadsheets = [{spreadsheet_id = '1234abcdefgh', ranges = ['Set1!A3:E', 'Set2!A3:E']},
                          {spreadsheet_id = '5678xyzjklmn', ranges = ['Set3!A3:E', 'Set4!A3:E']}]
 
-
 [loader_config.google_simplebbloader]
 google_cred_path = '~/ns_dispatches/google_creds.json'
 spreadsheet_id = '5678xyzjklmn'
 range = 'BBCode!A3:C'
-
 
 [loader_config.google_varloader]
 google_cred_path = '~/ns_dispatches/google_creds.json'
