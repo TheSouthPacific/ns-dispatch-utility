@@ -1,3 +1,4 @@
+from datetime import datetime
 from unittest import mock
 
 import pytest
@@ -85,46 +86,50 @@ class TestGoogleSpreadsheetApiAdapter():
 
 class TestResultReporter():
     def test_format_success_message_returns_formatted_messages(self):
-        r = google_dispatchloader.ResultReporter.format_success_message('create')
+        update_time = datetime.fromisoformat('2021-01-01T00:00:00')
+        r = google_dispatchloader.ResultReporter.format_success_message('create', update_time)
 
-        assert 'Created on' in r
+        assert r == 'Created on 2021/01/01 00:00:00 '
 
     def test_format_failure_message_returns_formatted_messages(self):
-        r = google_dispatchloader.ResultReporter.format_failure_message('create', 'Some details')
+        update_time = datetime.fromisoformat('2021-01-01T00:00:00')
+        r = google_dispatchloader.ResultReporter.format_failure_message('create', 'Some details', update_time)
 
-        assert 'Failed to create' in r and '\nError: Some details' in r
+        assert r == 'Failed to create on 2021/01/01 00:00:00 \nError: Some details'
 
     def test_report_success_adds_success_report(self):
         reporter = google_dispatchloader.ResultReporter()
 
-        reporter.report_success('foo', 'create')
+        reporter.report_success('foo', 'create', datetime.now())
 
         assert reporter.results['foo'].action == 'create'
 
     def test_report_failure_adds_failure_report(self):
         reporter = google_dispatchloader.ResultReporter()
 
-        reporter.report_failure('foo', 'create', 'Some details')
+        reporter.report_failure('foo', 'create', 'Some details', datetime.now())
         r = reporter.results['foo']
 
         assert r.action == 'create' and r.details == 'Some details'
 
     def test_get_message_of_successful_result_returns_formatted_message(self):
         reporter = google_dispatchloader.ResultReporter()
-        reporter.report_success('foo', 'create')
+        update_time = datetime.fromisoformat('2021-01-01T00:00:00')
+        reporter.report_success('foo', 'create', update_time)
 
         r1 = reporter.get_message('foo')
 
-        assert 'Created on' in r1.text
+        assert 'Created on 2021/01/01 00:00:00 ' in r1.text
         assert not r1.is_failure
 
     def test_get_message_of_failure_result_returns_formatted_message(self):
         reporter = google_dispatchloader.ResultReporter()
-        reporter.report_failure('foo', 'edit', 'Some details')
+        update_time = datetime.fromisoformat('2021-01-01T00:00:00')
+        reporter.report_failure('foo', 'edit', 'Some details', update_time)
 
         r1 = reporter.get_message('foo')
 
-        assert 'Failed to edit' in r1.text and 'Some details' in r1.text
+        assert r1.text == 'Failed to edit on 2021/01/01 00:00:00 \nError: Some details'
         assert r1.is_failure
 
 
@@ -365,7 +370,7 @@ class TestRangeDisaptchDataValues():
     def test_extract_dispatch_data_skips_over_invalid_action_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
         row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
-                   'invalid action', 1, 1, 'Title 1', 'Text 1', '']]
+                       'invalid action', 1, 1, 'Title 1', 'Text 1', '']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
         r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
@@ -651,5 +656,90 @@ class TestSpreadsheetDispatchDataConverter():
 
 
 class TestGoogleDispatchLoader():
-    def test_get_dispatch_config_returns_dispatch_config(self):
-        pass
+    def test_get_dispatch_config(self):
+        range1 = [['name1', 'create', 1, 1, 'Title 1', 'Text 1'],
+                  ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name2")',
+                   'edit', 1, 2, 'Title 2', 'Text 2', 'Edited on 2021/01/01 01:00:00 UTC']]
+        range2 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321", "name3")',
+                   'remove', 2, 1, 'Title 3', 'Text 3', 'Edited on 2021/01/01 01:00:00 UTC']]
+        dispatch_spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1},
+                                 'xyzt1234': {'Sheet2!A3:F': range2}}
+        utility_template_spreadsheets = {'abcd1234': {'Layout!A3:B': [['layout1', 'abcd']]}}
+        owner_nation_rows = [[1, 'Testopia', 'abcd1234'], [2, 'Cooltopia', 'xyzt1234']]
+        category_rows = [[1, 'Meta', 'Gameplay'], [2, 'Meta', 'Reference']]
+        obj = google_dispatchloader.GoogleDispatchLoader(mock.Mock(), dispatch_spreadsheets,
+                                                         utility_template_spreadsheets,
+                                                         owner_nation_rows,
+                                                         category_rows)
+
+        r = obj.get_dispatch_config()
+
+        assert r == {'Testopia': {'name1': {'action': 'create',
+                                            'title': 'Title 1',
+                                            'category': 'Meta',
+                                            'subcategory': 'Gameplay'},
+                                  'name2': {'action': 'edit',
+                                            'ns_id': '1234',
+                                            'title': 'Title 2',
+                                            'category': 'Meta',
+                                            'subcategory': 'Reference'}},
+                     'Cooltopia': {'name3': {'action': 'remove',
+                                             'ns_id': '4321',
+                                             'title': 'Title 3',
+                                             'category': 'Meta',
+                                             'subcategory': 'Gameplay'}}}
+
+    def test_get_dispatch_template_of_utility_template(self):
+        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                    'edit', 1, 1, 'Title 1', 'Text 1', 'Edited on 2021/01/01 01:00:00 UTC']]
+        dispatch_spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1}}
+        utility_template_spreadsheets = {'abcd1234': {'Layout!A3:B': [['layout1', 'abcd']]}}
+        owner_nation_rows = [[1, 'Testopia', 'abcd1234']]
+        category_rows = [[1, 'Meta', 'Gameplay']]
+        obj = google_dispatchloader.GoogleDispatchLoader(mock.Mock(), dispatch_spreadsheets,
+                                                         utility_template_spreadsheets,
+                                                         owner_nation_rows,
+                                                         category_rows)
+
+
+        r = obj.get_dispatch_template('layout1')
+
+        assert r == 'abcd'
+
+    def test_get_dispatch_template_of_normal_dispatch(self):
+        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                    'edit', 1, 1, 'Title 1', 'Text 1', 'Edited on 2021/01/01 01:00:00 UTC']]
+        dispatch_spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1}}
+        utility_template_spreadsheets = {'abcd1234': {'Layout!A3:B': [['layout1', 'abcd']]}}
+        owner_nation_rows = [[1, 'Testopia', 'abcd1234']]
+        category_rows = [[1, 'Meta', 'Gameplay']]
+        obj = google_dispatchloader.GoogleDispatchLoader(mock.Mock(), dispatch_spreadsheets,
+                                                         utility_template_spreadsheets,
+                                                         owner_nation_rows,
+                                                         category_rows)
+
+
+        r = obj.get_dispatch_template('name1')
+
+        assert r == 'Text 1'
+
+    def test_update_spreadsheets_after_successfully_create_new_dispatch(self):
+        range1 = [['name1', 'create', 1, 1, 'Title 1', 'Text 1']]
+        dispatch_spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1}}
+        utility_template_spreadsheets = {}
+        owner_nation_rows = [[1, 'Testopia', 'abcd1234']]
+        category_rows = [[1, 'Meta', 'Gameplay']]
+        spreadsheet_api = mock.Mock()
+        obj = google_dispatchloader.GoogleDispatchLoader(spreadsheet_api, dispatch_spreadsheets,
+                                                         utility_template_spreadsheets,
+                                                         owner_nation_rows,
+                                                         category_rows)
+
+        obj.add_dispatch_id('name1', '1234')
+        obj.report_result('name1', 'create', 'success', datetime.fromisoformat('2021-01-01T00:00:00'))
+        obj.update_spreadsheets()
+
+        new_range = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+                      'edit', 1, 1, 'Title 1', 'Text 1', 'Created on 2021/01/01 00:00:00 ']]
+        new_spreadsheets = {'abcd1234': {'Sheet1!A3:F': new_range}}
+        spreadsheet_api.update_rows_in_many_spreadsheets.assert_called_with(new_spreadsheets)
