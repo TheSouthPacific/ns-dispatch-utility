@@ -150,8 +150,8 @@ class GoogleSpreadsheetApiAdapter():
             self.update_rows_in_many_ranges(spreadsheet_id, new_values)
 
 
-SuccessResult = collections.namedtuple('SuccessResult', ['name', 'action'])
-FailureResult = collections.namedtuple('FailureResult', ['name', 'action', 'details'])
+SuccessResult = collections.namedtuple('SuccessResult', ['name', 'action', 'update_time'])
+FailureResult = collections.namedtuple('FailureResult', ['name', 'action', 'details', 'update_time'])
 Message = collections.namedtuple('Message', ['is_failure', 'text'])
 class ResultReporter():
     """Result report manager.
@@ -160,31 +160,33 @@ class ResultReporter():
     def __init__(self):
         self.results = {}
 
-    def report_success(self, name, action):
+    def report_success(self, name, action, update_time):
         """Report a successful operation.
 
         Args:
             name (str): Dispatch name
             action (str): Action
+            update_time (datetime.datetime) Time the operation happened
         """
 
-        self.results[name] = SuccessResult(name, action)
+        self.results[name] = SuccessResult(name, action, update_time)
 
-    def report_failure(self, name, action, details):
+    def report_failure(self, name, action, details, update_time):
         """Report a failed operation.
 
         Args:
             name (str): Dispatch name
             action (str): Action
             details (str): Error details
+            update_time (datetime.datetime) Time the operation happened
         """
 
         if isinstance(details, Exception):
             details = str(details)
-        self.results[name] = FailureResult(name, action, details)
+        self.results[name] = FailureResult(name, action, details, update_time)
 
     @staticmethod
-    def format_success_message(action):
+    def format_success_message(action, update_time):
         """Format success messages.
 
         Args:
@@ -194,11 +196,11 @@ class ResultReporter():
             str: Formatted message
         """
 
-        current_time = datetime.now(tz=timezone.utc).strftime(RESULT_TIME_FORMAT)
+        current_time = update_time.strftime(RESULT_TIME_FORMAT)
         return SUCCESS_MESSAGES[action].format(time=current_time)
 
     @staticmethod
-    def format_failure_message(action, details):
+    def format_failure_message(action, details, update_time):
         """Format failure messages.
 
         Args:
@@ -209,7 +211,7 @@ class ResultReporter():
             str: Formatted message
         """
 
-        current_time = datetime.now(tz=timezone.utc).strftime(RESULT_TIME_FORMAT)
+        current_time = update_time.strftime(RESULT_TIME_FORMAT)
         message = FAILURE_MESSAGES[action].format(time=current_time)
         message += FAILURE_DETAILS.format(details=details)
         return message
@@ -224,12 +226,12 @@ class ResultReporter():
             str: Message
         """
 
-        if isinstance(self.results[name], SuccessResult):
-            message_text = ResultReporter.format_success_message(self.results[name].action)
+        result = self.results[name]
+        if isinstance(result, SuccessResult):
+            message_text = ResultReporter.format_success_message(result.action, result.update_time)
             return Message(is_failure=False, text=message_text)
-        elif isinstance(self.results[name], FailureResult):
-            message_text = ResultReporter.format_failure_message(self.results[name].action,
-                                                                 self.results[name].details)
+        elif isinstance(result, FailureResult):
+            message_text = ResultReporter.format_failure_message(result.action, result.details, result.update_time)
             return Message(is_failure=True, text=message_text)
 
 
@@ -701,16 +703,6 @@ class GoogleDispatchLoader():
 
         return self.dispatch_data.get_canonical_dispatch_config()
 
-    def add_dispatch_id(self, name, dispatch_id):
-        """Add id of new dispatch.
-
-        Args:
-            name (str): Dispatch name
-            dispatch_id (str): Dispatch id
-        """
-
-        self.dispatch_data.add_dispatch_id(name, dispatch_id)
-
     def get_dispatch_template(self, name):
         """Get dispatch template text.
 
@@ -725,27 +717,37 @@ class GoogleDispatchLoader():
             return self.utility_templates[name]
         return self.dispatch_data.get_dispatch_template(name)
 
-    def report_result(self, name, action, result):
+    def add_dispatch_id(self, name, dispatch_id):
+        """Add id of new dispatch.
+
+        Args:
+            name (str): Dispatch name
+            dispatch_id (str): Dispatch id
+        """
+
+        self.dispatch_data.add_dispatch_id(name, dispatch_id)
+
+    def report_result(self, name, action, result, update_time):
         """Report operation result from NSDU.
 
         Args:
             name (str): Dispatch name
             action (str): Action
             result (str): Result
+            update_time (datetime.Datetime): Time update operation happened
         """
 
         if result == 'success':
-            self.result_reporter.report_success(name, action)
+            self.result_reporter.report_success(name, action, update_time)
         else:
-            self.result_reporter.report_failure(name, action, result)
+            self.result_reporter.report_failure(name, action, result, update_time)
 
     def update_spreadsheets(self):
         """Update spreadsheets.
         """
 
         new_spreadsheet_values = self.converter.get_new_values(self.dispatch_data.dispatch_data)
-        for spreadsheet_id, values in new_spreadsheet_values.items():
-            self.spreadsheet_api.update_rows_in_many_ranges(spreadsheet_id, values)
+        self.spreadsheet_api.update_rows_in_many_spreadsheets(new_spreadsheet_values)
 
 
 @loader_api.dispatch_loader
@@ -781,8 +783,8 @@ def get_dispatch_template(loader, name):
 
 
 @loader_api.dispatch_loader
-def after_update(loader, name, action, result):
-    loader.report_result(name, action, result)
+def after_update(loader, name, action, result, update_time):
+    loader.report_result(name, action, result, update_time)
 
 
 @loader_api.dispatch_loader
