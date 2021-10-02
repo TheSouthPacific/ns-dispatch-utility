@@ -507,7 +507,7 @@ class TestRangeDisaptchDataValues():
         expected = [['name1', '', 1, 1, 'Title 1', 'Text 1', 'Old message']]
         assert r == expected
 
-    def test_get_new_values_failure_message_adds_message_keeps_values_same(self):
+    def test_get_new_values_failure_result_message_adds_message(self):
         message = google_dispatchloader.Message(is_failure=True, text='Error message')
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
@@ -517,6 +517,17 @@ class TestRangeDisaptchDataValues():
         r = obj.get_new_values(new_dispatch_data)
 
         expected = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Error message']]
+        assert r == expected
+
+    def test_get_new_values_skips_row_on_non_existent_result_message(self):
+        result_reporter = mock.Mock(get_message=mock.Mock(side_effect=KeyError))
+        row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
+        new_dispatch_data = {}
+        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+
+        r = obj.get_new_values(new_dispatch_data)
+
+        expected = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
         assert r == expected
 
     def test_get_new_values_keeps_rows_with_not_enough_cells_same(self):
@@ -530,7 +541,7 @@ class TestRangeDisaptchDataValues():
         expected = [['name1', 'create', 1, 1, 'Title 1']]
         assert r == expected
 
-    def test_get_new_values_adds_result_message_cell_when_missing(self):
+    def test_get_new_values_adds_missing_result_message_cell(self):
         message = google_dispatchloader.Message(is_failure=False, text='Test message')
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1']]

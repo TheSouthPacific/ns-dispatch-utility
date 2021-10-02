@@ -3,9 +3,8 @@
 
 import collections
 import copy
-from datetime import datetime
-from datetime import timezone
 import re
+import logging
 
 from google.oauth2 import service_account
 from googleapiclient import discovery
@@ -29,6 +28,9 @@ FAILURE_DETAILS = '\nError: {details}'
 RESULT_TIME_FORMAT = '%Y/%m/%d %H:%M:%S %Z'
 
 
+logger = logging.getLogger(__name__)
+
+
 class GoogleSpreadsheetApiAdapter():
     """Adapter for Google Spreadsheet API.
 
@@ -39,7 +41,8 @@ class GoogleSpreadsheetApiAdapter():
     def __init__(self, sheet_api):
         self.sheet_api = sheet_api
 
-    def execute(self, request):
+    @staticmethod
+    def execute(request):
         """Execute request.
 
         Args:
@@ -54,8 +57,8 @@ class GoogleSpreadsheetApiAdapter():
 
         try:
             return request.execute()
-        except HttpError as e:
-            raise exceptions.LoaderError('Google API Error {}: {}'.format(e.status_code, e.error_details))
+        except HttpError as err:
+            raise exceptions.LoaderError('Google API Error {}: {}'.format(err.status_code, err.error_details))
 
     def get_rows_in_range(self, spreadsheet_id, sheet_range):
         """Get cell values of a range in a spreadsheet.
@@ -70,7 +73,8 @@ class GoogleSpreadsheetApiAdapter():
         req = self.sheet_api.get(spreadsheetId=spreadsheet_id,
                                  range=sheet_range,
                                  valueRenderOption='FORMULA')
-        resp = self.execute(req)
+        resp = GoogleSpreadsheetApiAdapter.execute(req)
+        logger.debug('Downloaded spreadsheet "%s" with range "%s": "%r"', spreadsheet_id, sheet_range, resp)
 
         if 'values' not in resp:
             return []
@@ -90,7 +94,8 @@ class GoogleSpreadsheetApiAdapter():
         req = self.sheet_api.batchGet(spreadsheetId=spreadsheet_id,
                                       ranges=sheet_ranges,
                                       valueRenderOption='FORMULA')
-        resp = self.execute(req)
+        resp = GoogleSpreadsheetApiAdapter.execute(req)
+        logger.debug('Downloaded spreadsheet "%s" with many ranges: "%r"', spreadsheet_id, resp)
 
         result = {}
         for value_range in resp['valueRanges']:
@@ -137,7 +142,8 @@ class GoogleSpreadsheetApiAdapter():
         body = {'valueInputOption': 'USER_ENTERED',
                 'data': data}
         req = self.sheet_api.batchUpdate(spreadsheetId=spreadsheet_id, body=body)
-        self.execute(req)
+        GoogleSpreadsheetApiAdapter.execute(req)
+        logger.debug('Updated spreadsheet ranges: %r', body)
 
     def update_rows_in_many_spreadsheets(self, new_data):
         """Update cell values in many spreadsheets.
@@ -230,9 +236,8 @@ class ResultReporter():
         if isinstance(result, SuccessResult):
             message_text = ResultReporter.format_success_message(result.action, result.update_time)
             return Message(is_failure=False, text=message_text)
-        elif isinstance(result, FailureResult):
-            message_text = ResultReporter.format_failure_message(result.action, result.details, result.update_time)
-            return Message(is_failure=True, text=message_text)
+        message_text = ResultReporter.format_failure_message(result.action, result.details, result.update_time)
+        return Message(is_failure=True, text=message_text)
 
 
 class CategorySetups():
@@ -373,11 +378,11 @@ def extract_dispatch_id_from_hyperlink(cell_value):
         None: No dispatch id
     """
 
-    r = re.search(HYPERLINK_REGEX, cell_value, flags=re.IGNORECASE)
-    if r is None:
+    result = re.search(HYPERLINK_REGEX, cell_value, flags=re.IGNORECASE)
+    if result is None:
         return None
 
-    return r.group(1)
+    return result.group(1)
 
 
 def extract_name_from_hyperlink(cell_value):
@@ -390,14 +395,23 @@ def extract_name_from_hyperlink(cell_value):
         str: Dispatch name
     """
 
-    r = re.search(HYPERLINK_REGEX, cell_value, flags=re.IGNORECASE)
-    if r is None:
+    result = re.search(HYPERLINK_REGEX, cell_value, flags=re.IGNORECASE)
+    if result is None:
         return cell_value
 
-    return r.group(2)
+    return result.group(2)
 
 
 def get_hyperlink(name, dispatch_id):
+    """Get a hyperlink sheet function based on disptch name and id.
+
+    Args:
+        name (str): Dispatch name
+        dispatch_id (str): Dispatch id
+
+    Returns:
+        str: Hyperlink function
+    """
     return HYPERLINK.format(name=name, dispatch_id=dispatch_id)
 
 
@@ -493,13 +507,15 @@ class RangeDisaptchDataValues():
 
             name = extract_name_from_hyperlink(row[0])
 
-            user_message = self.result_reporter.get_message(name)
             try:
-                row[6] = user_message.text
-            except IndexError:
-                row.append(user_message.text)
-
-            if user_message.is_failure:
+                user_message = self.result_reporter.get_message(name)
+                try:
+                    row[6] = user_message.text
+                except IndexError:
+                    row.append(user_message.text)
+                if user_message.is_failure:
+                    continue
+            except KeyError:
                 continue
 
             if new_dispatch_data[name]['action'] == 'remove':
@@ -693,6 +709,7 @@ class GoogleDispatchLoader():
         self.converter = SpreadsheetDispatchDataConverter(dispatch_spreadsheets, self.result_reporter)
         extracted_data = self.converter.extract_dispatch_data(owner_nations, category_setups)
         self.dispatch_data = DispatchData(extracted_data)
+        logger.info('Processed dispatch data from spreadsheets.')
 
     def get_dispatch_config(self):
         """Get dispatch config.
@@ -795,3 +812,4 @@ def add_dispatch_id(loader, name, dispatch_id):
 @loader_api.dispatch_loader
 def cleanup_dispatch_loader(loader):
     loader.update_spreadsheets()
+    logger.info('Updated spreadsheets with new data.')
