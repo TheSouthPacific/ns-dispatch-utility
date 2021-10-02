@@ -154,6 +154,7 @@ def load_nsdu_dispatch_utility_from_config(config):
 
     singleloader_builder.load_loader(dispatch_loader_manager, plugin_opt['dispatch_loader'])
     dispatch_config = dispatch_loader_manager.get_dispatch_config()
+    logger.debug("Loaded dispatch config: %r", dispatch_config)
 
     singleloader_builder.load_loader(simple_bb_loader_manager, plugin_opt['simple_bb_loader'])
     simple_bb_config = simple_bb_loader_manager.get_simple_bb_config()
