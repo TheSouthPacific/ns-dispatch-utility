@@ -15,8 +15,8 @@ from nsdu import loader_api
 
 
 SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-HYPERLINK_REGEX = r'=hyperlink\("https://www.nationstates.net/page=dispatch/id=(\d+)", "(\w+)"\)'
-HYPERLINK = '=hyperlink("https://www.nationstates.net/page=dispatch/id={dispatch_id}", "{name}")'
+HYPERLINK_REGEX = r'=hyperlink\("https://www.nationstates.net/page=dispatch/id=(\d+)",\s*"(.+)"\)'
+HYPERLINK = '=hyperlink("https://www.nationstates.net/page=dispatch/id={dispatch_id}","{name}")'
 
 SUCCESS_MESSAGES = {'create': 'Created on {time}',
                     'edit': 'Edited on {time}',
