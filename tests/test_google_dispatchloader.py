@@ -190,7 +190,7 @@ class TestOwnerNations():
 
 class TestExtractNameFromHyperlink():
     def test_valid_hyperlink_returns_name(self):
-        cell_value = '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "foobar")'
+        cell_value = '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","foobar")'
 
         assert google_dispatchloader.extract_name_from_hyperlink(cell_value) == 'foobar'
 
@@ -202,7 +202,7 @@ class TestExtractNameFromHyperlink():
 
 class TestExtractDispatchIdFromHyperlink():
     def test_valid_hyperlink_returns_id_num(self):
-        cell_value = '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "foobar")'
+        cell_value = '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","foobar")'
 
         assert google_dispatchloader.extract_dispatch_id_from_hyperlink(cell_value) == '1234'
 
@@ -321,7 +321,7 @@ def category_setups():
 class TestRangeDisaptchDataValues():
     def test_extract_dispatch_data_valid_action_returns_data(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 1, 1, 'Title 1', 'Text 1', '']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
@@ -369,7 +369,7 @@ class TestRangeDisaptchDataValues():
 
     def test_extract_dispatch_data_skips_over_invalid_action_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'invalid action', 1, 1, 'Title 1', 'Text 1', '']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
@@ -380,7 +380,7 @@ class TestRangeDisaptchDataValues():
 
     def test_extract_dispatch_data_skips_over_empty_action_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        '', 1, 1, 'Title 1', 'Text 1', '']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
@@ -390,7 +390,7 @@ class TestRangeDisaptchDataValues():
 
     def test_extract_dispatch_data_skips_over_non_existent_owner_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 20, 1, 'Title 1', 'Text 1', '']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
@@ -401,7 +401,7 @@ class TestRangeDisaptchDataValues():
 
     def test_extract_dispatch_data_skips_over_unpermitted_owner_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 1, 1, 'Title 1', 'Text 1', '']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
@@ -412,7 +412,7 @@ class TestRangeDisaptchDataValues():
 
     def test_extract_dispatch_data_skips_over_non_existent_category_setup_dispatch(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
-        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 1, 20, 'Title 1', 'Text 1', '']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
@@ -424,7 +424,7 @@ class TestRangeDisaptchDataValues():
     def test_extract_dispatch_data_should_not_stop_on_skipped_rows(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
         row_values = [['', '', 1, 1, 'Title 1', 'Text 1', ''],
-                      ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name2")',
+                      ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name2")',
                        'edit', 1, 1, 'Title 2', 'Text 2', '']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
 
@@ -441,7 +441,7 @@ class TestRangeDisaptchDataValues():
     def test_get_new_values_of_edited_dispatch(self):
         message = google_dispatchloader.Message(is_failure=False, text='Test message')
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
-        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 1, 1, 'Title 1', 'Text 1', 'Old message']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
         new_dispatch_data = {'name1': {'owner_nation': 'testopia',
@@ -454,7 +454,7 @@ class TestRangeDisaptchDataValues():
 
         r = obj.get_new_values(new_dispatch_data)
 
-        expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                      'edit', 1, 1, 'Title 1', 'Text 1', 'Test message']]
         assert r == expected
 
@@ -473,14 +473,14 @@ class TestRangeDisaptchDataValues():
 
         r = obj.get_new_values(new_dispatch_data)
 
-        expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                      'edit', 1, 1, 'Title 1', 'Text 1', 'Test message']]
         assert r == expected
 
     def test_get_new_values_of_removed_dispatch_changes_action_to_empty_removes_hyperlink(self):
         message = google_dispatchloader.Message(is_failure=False, text='Test message')
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
-        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
         obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
         new_dispatch_data = {'name1': {'owner_nation': 'testopia',
@@ -556,7 +556,7 @@ class TestRangeDisaptchDataValues():
 
         r = obj.get_new_values(new_dispatch_data)
 
-        expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                      'edit', 1, 1, 'Title 1', 'Text 1', 'Test message']]
         assert r == expected
 
@@ -564,7 +564,7 @@ class TestRangeDisaptchDataValues():
         message = google_dispatchloader.Message(is_failure=False, text='Test message')
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [['', '', 1, 1, 'Title 1', 'Text 1'],
-                      ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name2")',
+                      ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name2")',
                        'edit', 1, 1, 'Title 2', 'Text 2'],]
         new_dispatch_data = {'name2': {'owner_nation': 'testopia',
                                        'ns_id': '1234',
@@ -578,7 +578,7 @@ class TestRangeDisaptchDataValues():
         r = obj.get_new_values(new_dispatch_data)
 
         expected = [['', '', 1, 1, 'Title 1', 'Text 1'],
-                    ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name2")',
+                    ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name2")',
                      'edit', 1, 1, 'Title 2', 'Text 2', 'Test message']]
         assert r == expected
 
@@ -604,9 +604,9 @@ def dispatch_data():
 class TestSpreadsheetDispatchDataValues():
     def test_extract_dispatch_data_returns_data(self, owner_nations, category_setups, dispatch_data):
         result_reporter = mock.Mock()
-        sheet_ranges = {'Sheet1!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        sheet_ranges = {'Sheet1!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                                          'edit', 1, 1, 'Title 1', 'Text 1', 'Old message']],
-                        'Sheet2!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321", "name2")',
+                        'Sheet2!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
                                          'remove', 1, 1, 'Title 2', 'Text 2', 'Old message']]}
         obj = google_dispatchloader.SpreadsheetDispatchDataValues(sheet_ranges, result_reporter)
 
@@ -617,16 +617,16 @@ class TestSpreadsheetDispatchDataValues():
     def test_get_new_values_returns_new_values(self, dispatch_data):
         message = google_dispatchloader.Message(is_failure=False, text='Test message')
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
-        sheet_ranges = {'Sheet1!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        sheet_ranges = {'Sheet1!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                                          'edit', 1, 1, 'Title 1', 'Text 1', 'Old message']],
-                        'Sheet2!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321", "name2")',
+                        'Sheet2!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
                                          'remove', 1, 1, 'Title 2', 'Text 2', 'Old message']]}
 
         obj = google_dispatchloader.SpreadsheetDispatchDataValues(sheet_ranges, result_reporter)
 
         r = obj.get_new_values(dispatch_data)
 
-        assert r == {'Sheet1!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        assert r == {'Sheet1!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                                       'edit', 1, 1, 'Title 1', 'Text 1', 'Test message']],
                      'Sheet2!A3:F': [['name2', '', 1, 1, 'Title 2', 'Text 2', 'Test message']]}
 
@@ -634,9 +634,9 @@ class TestSpreadsheetDispatchDataValues():
 class TestSpreadsheetDispatchDataConverter():
     def test_extract_dispatch_data_returns_data(self, owner_nations, category_setups, dispatch_data):
         result_reporter = mock.Mock()
-        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                    'edit', 1, 1, 'Title 1', 'Text 1', 'Old message']]
-        range2 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321", "name2")',
+        range2 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
                    'remove', 1, 1, 'Title 2', 'Text 2', 'Old message']]
         spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1},
                         'xyzt1234': {'Sheet2!A3:F': range2}}
@@ -649,9 +649,9 @@ class TestSpreadsheetDispatchDataConverter():
     def test_get_new_values_returns_new_values(self, dispatch_data):
         message = google_dispatchloader.Message(is_failure=False, text='Test message')
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
-        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                    'edit', 1, 1, 'Title 1', 'Text 1', 'Old message']]
-        range2 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321", "name2")',
+        range2 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
                    'remove', 1, 1, 'Title 2', 'Text 2', 'Old message']]
         spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1},
                         'xyzt1234': {'Sheet2!A3:F': range2}}
@@ -659,7 +659,7 @@ class TestSpreadsheetDispatchDataConverter():
 
         r = obj.get_new_values(dispatch_data)
 
-        range1_expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        range1_expected = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                             'edit', 1, 1, 'Title 1', 'Text 1', 'Test message']]
         range2_expected = [['name2', '', 1, 1, 'Title 2', 'Text 2', 'Test message']]
         assert r == {'abcd1234': {'Sheet1!A3:F': range1_expected},
@@ -669,9 +669,9 @@ class TestSpreadsheetDispatchDataConverter():
 class TestGoogleDispatchLoader():
     def test_get_dispatch_config(self):
         range1 = [['name1', 'create', 1, 1, 'Title 1', 'Text 1'],
-                  ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name2")',
+                  ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name2")',
                    'edit', 1, 2, 'Title 2', 'Text 2', 'Edited on 2021/01/01 01:00:00 UTC']]
-        range2 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321", "name3")',
+        range2 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name3")',
                    'remove', 2, 1, 'Title 3', 'Text 3', 'Edited on 2021/01/01 01:00:00 UTC']]
         dispatch_spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1},
                                  'xyzt1234': {'Sheet2!A3:F': range2}}
@@ -701,7 +701,7 @@ class TestGoogleDispatchLoader():
                                              'subcategory': 'Gameplay'}}}
 
     def test_get_dispatch_template_of_utility_template(self):
-        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                     'edit', 1, 1, 'Title 1', 'Text 1', 'Edited on 2021/01/01 01:00:00 UTC']]
         dispatch_spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1}}
         utility_template_spreadsheets = {'abcd1234': {'Layout!A3:B': [['layout1', 'abcd']]}}
@@ -718,7 +718,7 @@ class TestGoogleDispatchLoader():
         assert r == 'abcd'
 
     def test_get_dispatch_template_of_normal_dispatch(self):
-        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                     'edit', 1, 1, 'Title 1', 'Text 1', 'Edited on 2021/01/01 01:00:00 UTC']]
         dispatch_spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1}}
         utility_template_spreadsheets = {'abcd1234': {'Layout!A3:B': [['layout1', 'abcd']]}}
@@ -750,7 +750,7 @@ class TestGoogleDispatchLoader():
         obj.report_result('name1', 'create', 'success', datetime.fromisoformat('2021-01-01T00:00:00'))
         obj.update_spreadsheets()
 
-        new_range = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234", "name1")',
+        new_range = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                       'edit', 1, 1, 'Title 1', 'Text 1', 'Created on 2021/01/01 00:00:00 ']]
         new_spreadsheets = {'abcd1234': {'Sheet1!A3:F': new_range}}
         spreadsheet_api.update_rows_in_many_spreadsheets.assert_called_with(new_spreadsheets)
