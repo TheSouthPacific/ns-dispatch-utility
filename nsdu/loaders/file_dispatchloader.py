@@ -3,12 +3,9 @@
 
 import copy
 import pathlib
-import collections
-import json
 import logging
 import toml
 
-from nsdu import info
 from nsdu import exceptions
 from nsdu import loader_api
 from nsdu import utils
@@ -20,10 +17,14 @@ logger = logging.getLogger(__name__)
 
 
 class DispatchConfigManager():
+    """Get and save dispatch config with files.
+    """
+
     def __init__(self):
         # Dispatch config of all loaded files
         self.all_dispatch_config = {}
         self.new_dispatch_id = {}
+        self.saved = True
 
     def load_from_files(self, dispatch_config_paths):
         """Load dispatch configuration from paths.

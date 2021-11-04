@@ -2,11 +2,8 @@
 """
 
 import copy
-import os
 import logging
 import pathlib
-
-import toml
 
 from nsdu import loader_api
 from nsdu import exceptions

@@ -1,10 +1,7 @@
 """Load simple BBCode formatter config from a TOML file.
 """
 
-import os
 import logging
-
-import toml
 
 from nsdu import exceptions
 from nsdu import loader_api

@@ -6,7 +6,6 @@ import pathlib
 
 import jinja2
 
-from nsdu import info
 from nsdu import exceptions
 from nsdu import bb_parser
 from nsdu import utils
