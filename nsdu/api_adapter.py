@@ -41,7 +41,7 @@ class DispatchApi():
     """
 
     def __init__(self, user_agent):
-        self.api = nationstates.Nationstates(user_agent=user_agent)
+        self.api = nationstates.Nationstates(user_agent=user_agent, enable_beta=True)
         self.owner_nation = None
 
     def login(self, nation_name, password=None, autologin=None):
