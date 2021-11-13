@@ -3,6 +3,8 @@
 
 import collections
 import copy
+from datetime import datetime
+from datetime import timezone
 import re
 import logging
 
@@ -166,29 +168,33 @@ class ResultReporter():
     def __init__(self):
         self.results = {}
 
-    def report_success(self, name, action, update_time):
+    def report_success(self, name, action, update_time=None):
         """Report a successful operation.
 
         Args:
             name (str): Dispatch name
             action (str): Action
-            update_time (datetime.datetime) Time the operation happened
+            update_time (datetime.datetime) Time the operation happened. Use current time if this is None.
         """
 
+        if update_time is None:
+            update_time = datetime.now(tz=timezone.utc)
         self.results[name] = SuccessResult(name, action, update_time)
 
-    def report_failure(self, name, action, details, update_time):
+    def report_failure(self, name, action, details, update_time=None):
         """Report a failed operation.
 
         Args:
             name (str): Dispatch name
             action (str): Action
             details (str): Error details
-            update_time (datetime.datetime) Time the operation happened
+            update_time (datetime.datetime) Time the operation happened. Use current time if this is None.
         """
 
         if isinstance(details, Exception):
             details = str(details)
+        if update_time is None:
+            update_time = datetime.now(tz=timezone.utc)
         self.results[name] = FailureResult(name, action, details, update_time)
 
     @staticmethod
@@ -197,6 +203,7 @@ class ResultReporter():
 
         Args:
             action (str): Action
+            update_time (datetime.datetime): Time the operation happened
 
         Returns:
             str: Formatted message
@@ -206,12 +213,13 @@ class ResultReporter():
         return SUCCESS_MESSAGES[action].format(time=current_time)
 
     @staticmethod
-    def format_failure_message(action, details, update_time):
+    def format_failure_message(action, details, update_time=None):
         """Format failure messages.
 
         Args:
             action (str): Action
             details (str): Error details
+            update_time (datetime.datetime): Time the operation happened
 
         Returns:
             str: Formatted message

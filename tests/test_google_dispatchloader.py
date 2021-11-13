@@ -104,6 +104,13 @@ class TestResultReporter():
 
         assert reporter.results['foo'].action == 'create'
 
+    def test_report_success_uses_current_time_if_no_update_time_is_provided(self):
+        reporter = google_dispatchloader.ResultReporter()
+
+        reporter.report_success('foo', 'create')
+
+        assert isinstance(reporter.results['foo'].update_time, datetime)
+
     def test_report_failure_adds_failure_report(self):
         reporter = google_dispatchloader.ResultReporter()
 
@@ -111,6 +118,15 @@ class TestResultReporter():
         r = reporter.results['foo']
 
         assert r.action == 'create' and r.details == 'Some details'
+
+    def test_report_failure_uses_current_time_if_no_update_time_is_provided(self):
+        reporter = google_dispatchloader.ResultReporter()
+
+        reporter.report_failure('foo', 'create', 'Some details')
+        r = reporter.results['foo']
+
+        assert r.action == 'create' and r.details == 'Some details'
+        assert isinstance(reporter.results['foo'].update_time, datetime)
 
     def test_get_message_of_successful_result_returns_formatted_message(self):
         reporter = google_dispatchloader.ResultReporter()
