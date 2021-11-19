@@ -16,17 +16,17 @@ from nsdu import exceptions
 from nsdu import loader_api
 
 
-SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
+GOOGLE_API_SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
 HYPERLINK_REGEX = r'=hyperlink\("https://www.nationstates.net/page=dispatch/id=(\d+)",\s*"(.+)"\)'
-HYPERLINK = '=hyperlink("https://www.nationstates.net/page=dispatch/id={dispatch_id}","{name}")'
+HYPERLINK_BUILD_FORMAT = '=hyperlink("https://www.nationstates.net/page=dispatch/id={dispatch_id}","{name}")'
 
-SUCCESS_MESSAGES = {'create': 'Created on {time}',
-                    'edit': 'Edited on {time}',
-                    'remove': 'Removed on {time}'}
-FAILURE_MESSAGES = {'create': 'Failed to create on {time}',
-                    'edit': 'Failed to edit on {time}',
-                    'remove': 'Failed to remove on {time}'}
-FAILURE_DETAILS = '\nError: {details}'
+SUCCESS_MESSAGE_FORMATS = {'create': 'Created on {time}',
+                           'edit': 'Edited on {time}',
+                           'remove': 'Removed on {time}'}
+FAILURE_MESSAGE_FORMATS = {'create': 'Failed to create on {time}',
+                           'edit': 'Failed to edit on {time}',
+                           'remove': 'Failed to remove on {time}'}
+FAILURE_DETAILS_FORMAT = '\nError: {details}'
 RESULT_TIME_FORMAT = '%Y/%m/%d %H:%M:%S %Z'
 
 
@@ -158,76 +158,76 @@ class GoogleSpreadsheetApiAdapter():
             self.update_rows_in_many_ranges(spreadsheet_id, new_values)
 
 
-SuccessResult = collections.namedtuple('SuccessResult', ['name', 'action', 'update_time'])
-FailureResult = collections.namedtuple('FailureResult', ['name', 'action', 'details', 'update_time'])
+SuccessResult = collections.namedtuple('SuccessResult', ['name', 'action', 'result_time'])
+FailureResult = collections.namedtuple('FailureResult', ['name', 'action', 'details', 'result_time'])
 Message = collections.namedtuple('Message', ['is_failure', 'text'])
 class ResultReporter():
-    """Result report manager.
+    """Manages the results of spreadsheet and dispatch update operations.
     """
 
     def __init__(self):
         self.results = {}
 
-    def report_success(self, name, action, update_time=None):
+    def report_success(self, name, action, result_time=None):
         """Report a successful operation.
 
         Args:
             name (str): Dispatch name
             action (str): Action
-            update_time (datetime.datetime) Time the operation happened. Use current time if this is None.
+            result_time (datetime.datetime) Time the operation happened. Use current time if this is None.
         """
 
-        if update_time is None:
-            update_time = datetime.now(tz=timezone.utc)
-        self.results[name] = SuccessResult(name, action, update_time)
+        if result_time is None:
+            result_time = datetime.now(tz=timezone.utc)
+        self.results[name] = SuccessResult(name, action, result_time)
 
-    def report_failure(self, name, action, details, update_time=None):
+    def report_failure(self, name, action, details, result_time=None):
         """Report a failed operation.
 
         Args:
             name (str): Dispatch name
             action (str): Action
             details (str): Error details
-            update_time (datetime.datetime) Time the operation happened. Use current time if this is None.
+            result_time (datetime.datetime) Time the operation happened. Use current time if this is None.
         """
 
         if isinstance(details, Exception):
             details = str(details)
-        if update_time is None:
-            update_time = datetime.now(tz=timezone.utc)
-        self.results[name] = FailureResult(name, action, details, update_time)
+        if result_time is None:
+            result_time = datetime.now(tz=timezone.utc)
+        self.results[name] = FailureResult(name, action, details, result_time)
 
     @staticmethod
-    def format_success_message(action, update_time):
+    def format_success_message(action, result_time):
         """Format success messages.
 
         Args:
             action (str): Action
-            update_time (datetime.datetime): Time the operation happened
+            result_time (datetime.datetime): Time the operation happened
 
         Returns:
             str: Formatted message
         """
 
-        current_time = update_time.strftime(RESULT_TIME_FORMAT)
-        return SUCCESS_MESSAGES[action].format(time=current_time)
+        current_time = result_time.strftime(RESULT_TIME_FORMAT)
+        return SUCCESS_MESSAGE_FORMATS[action].format(time=current_time)
 
     @staticmethod
-    def format_failure_message(action, details, update_time=None):
+    def format_failure_message(action, details, result_time=None):
         """Format failure messages.
 
         Args:
             action (str): Action
             details (str): Error details
-            update_time (datetime.datetime): Time the operation happened
+            result_time (datetime.datetime): Time the operation happened
 
         Returns:
             str: Formatted message
         """
 
-        current_time = update_time.strftime(RESULT_TIME_FORMAT)
-        message = FAILURE_MESSAGES[action].format(time=current_time)
-        message += FAILURE_DETAILS.format(details=details)
+        current_time = result_time.strftime(RESULT_TIME_FORMAT)
+        message = FAILURE_MESSAGE_FORMATS[action].format(time=current_time)
+        message += FAILURE_DETAILS_FORMAT.format(details=details)
         return message
 
     def get_message(self, name):
@@ -242,9 +242,9 @@ class ResultReporter():
 
         result = self.results[name]
         if isinstance(result, SuccessResult):
-            message_text = ResultReporter.format_success_message(result.action, result.update_time)
+            message_text = ResultReporter.format_success_message(result.action, result.result_time)
             return Message(is_failure=False, text=message_text)
-        message_text = ResultReporter.format_failure_message(result.action, result.details, result.update_time)
+        message_text = ResultReporter.format_failure_message(result.action, result.details, result.result_time)
         return Message(is_failure=True, text=message_text)
 
 
@@ -411,7 +411,7 @@ def extract_name_from_hyperlink(cell_value):
 
 
 def get_hyperlink(name, dispatch_id):
-    """Get a hyperlink sheet function based on disptch name and id.
+    """Get a hyperlink sheet function based on dispatch name and id.
 
     Args:
         name (str): Dispatch name
@@ -420,11 +420,11 @@ def get_hyperlink(name, dispatch_id):
     Returns:
         str: Hyperlink function
     """
-    return HYPERLINK.format(name=name, dispatch_id=dispatch_id)
+    return HYPERLINK_BUILD_FORMAT.format(name=name, dispatch_id=dispatch_id)
 
 
-class RangeDisaptchDataValues():
-    """Handles dispatch data of a sheet range.
+class DispatchSheetRange():
+    """A sheet range that contains dispatches.
 
     Args:
         row_values (list): Row values
@@ -435,8 +435,9 @@ class RangeDisaptchDataValues():
         self.row_values = row_values
         self.result_reporter = result_reporter
 
-    def extract_dispatch_data(self, owner_nations, category_setups, spreadsheet_id):
-        """Extract dispatch data from row values.
+    def get_dispatches_as_dict(self, owner_nations, category_setups, spreadsheet_id):
+        """Get dispatches in this range as a dict of dispatch config
+        and content keyed by dispatch name.
 
         Args:
             owner_nations (OwnerNations): Owner nation instance
@@ -444,7 +445,7 @@ class RangeDisaptchDataValues():
             spreadsheet_id (str): Spreadsheet Id of this range
 
         Returns:
-            dict: Extracted dispatch data keyed by dispatch name
+            dict: Dispatch information keyed by dispatch name
         """
 
         dispatch_data = {}
@@ -536,8 +537,8 @@ class RangeDisaptchDataValues():
         return new_row_values
 
 
-class SpreadsheetDispatchDataValues():
-    """Handles dispatch data of a spreadsheet.
+class DispatchSpreadsheet():
+    """A spreadsheet that contains dispatches.
 
     Args:
         sheet_ranges (list): Ranges of this spreadsheet
@@ -547,10 +548,10 @@ class SpreadsheetDispatchDataValues():
     def __init__(self, sheet_ranges, result_reporter):
         self.values_of_ranges = {}
         for sheet_range, range_values in sheet_ranges.items():
-            self.values_of_ranges[sheet_range] = RangeDisaptchDataValues(range_values, result_reporter)
+            self.values_of_ranges[sheet_range] = DispatchSheetRange(range_values, result_reporter)
         self.result_reporter = result_reporter
 
-    def extract_dispatch_data(self, owner_nations, category_setups, spreadsheet_id):
+    def get_dispatches_as_dict(self, owner_nations, category_setups, spreadsheet_id):
         """Extract dispatch data from configured ranges in this spreadsheet.
 
         Args:
@@ -564,7 +565,7 @@ class SpreadsheetDispatchDataValues():
 
         all_dispatch_data = {}
         for range_data_values in self.values_of_ranges.values():
-            dispatch_data = range_data_values.extract_dispatch_data(owner_nations, category_setups, spreadsheet_id)
+            dispatch_data = range_data_values.get_dispatches_as_dict(owner_nations, category_setups, spreadsheet_id)
             all_dispatch_data.update(dispatch_data)
 
         return all_dispatch_data
@@ -586,8 +587,8 @@ class SpreadsheetDispatchDataValues():
         return new_spreadsheet_values
 
 
-class SpreadsheetDispatchDataConverter():
-    """Converting spreadsheets into dispatch data and backward.
+class DispatchSpreadsheets():
+    """Spreadsheets that contain dispatches.
 
     Args:
         spreadsheets (str): Spreadsheet data
@@ -597,11 +598,11 @@ class SpreadsheetDispatchDataConverter():
     def __init__(self, spreadsheets, result_reporter):
         self.spreadsheets = {}
         for spreadsheet_id, sheet_ranges in spreadsheets.items():
-            self.spreadsheets[spreadsheet_id] = SpreadsheetDispatchDataValues(sheet_ranges, result_reporter)
+            self.spreadsheets[spreadsheet_id] = DispatchSpreadsheet(sheet_ranges, result_reporter)
 
         self.result_reporter = result_reporter
 
-    def extract_dispatch_data(self, owner_nations, category_setups):
+    def get_dispatches_as_dict(self, owner_nations, category_setups):
         """Extract dispatch data from spreadsheets.
 
         Args:
@@ -614,7 +615,7 @@ class SpreadsheetDispatchDataConverter():
 
         all_dispatch_data = {}
         for spreadsheet_id, spreadsheet_data in self.spreadsheets.items():
-            dispatch_data = spreadsheet_data.extract_dispatch_data(owner_nations, category_setups, spreadsheet_id)
+            dispatch_data = spreadsheet_data.get_dispatches_as_dict(owner_nations, category_setups, spreadsheet_id)
             all_dispatch_data.update(dispatch_data)
 
         return all_dispatch_data
@@ -636,7 +637,7 @@ class SpreadsheetDispatchDataConverter():
         return new_spreadsheets
 
 
-class DispatchData():
+class Dispatches():
     """Manage dispatch data.
 
     Args:
@@ -714,9 +715,9 @@ class GoogleDispatchLoader():
 
         self.result_reporter = ResultReporter()
 
-        self.converter = SpreadsheetDispatchDataConverter(dispatch_spreadsheets, self.result_reporter)
-        extracted_data = self.converter.extract_dispatch_data(owner_nations, category_setups)
-        self.dispatch_data = DispatchData(extracted_data)
+        self.converter = DispatchSpreadsheets(dispatch_spreadsheets, self.result_reporter)
+        extracted_data = self.converter.get_dispatches_as_dict(owner_nations, category_setups)
+        self.dispatch_data = Dispatches(extracted_data)
         logger.info('Processed dispatch data from spreadsheets.')
 
     def get_dispatch_config(self):
@@ -752,20 +753,20 @@ class GoogleDispatchLoader():
 
         self.dispatch_data.add_dispatch_id(name, dispatch_id)
 
-    def report_result(self, name, action, result, update_time):
+    def report_result(self, name, action, result, result_time):
         """Report operation result from NSDU.
 
         Args:
             name (str): Dispatch name
             action (str): Action
             result (str): Result
-            update_time (datetime.Datetime): Time update operation happened
+            result_time (datetime.Datetime): Time update operation happened
         """
 
         if result == 'success':
-            self.result_reporter.report_success(name, action, update_time)
+            self.result_reporter.report_success(name, action, result_time)
         else:
-            self.result_reporter.report_failure(name, action, result, update_time)
+            self.result_reporter.report_failure(name, action, result, result_time)
 
     def update_spreadsheets(self):
         """Update spreadsheets.
@@ -779,7 +780,7 @@ class GoogleDispatchLoader():
 def init_dispatch_loader(config):
     config = config['google_dispatchloader']
 
-    google_api_creds = service_account.Credentials.from_service_account_file(config['google_cred_path'], scopes=SCOPES)
+    google_api_creds = service_account.Credentials.from_service_account_file(config['google_cred_path'], scopes=GOOGLE_API_SCOPES)
     # pylint: disable=maybe-no-member
     google_api = discovery.build('sheets', 'v4', credentials=google_api_creds).spreadsheets().values()
     spreadsheet_api = GoogleSpreadsheetApiAdapter(google_api)
@@ -808,8 +809,8 @@ def get_dispatch_template(loader, name):
 
 
 @loader_api.dispatch_loader
-def after_update(loader, name, action, result, update_time):
-    loader.report_result(name, action, result, update_time)
+def after_update(loader, name, action, result, result_time):
+    loader.report_result(name, action, result, result_time)
 
 
 @loader_api.dispatch_loader

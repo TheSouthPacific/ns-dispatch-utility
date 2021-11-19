@@ -86,14 +86,14 @@ class TestGoogleSpreadsheetApiAdapter():
 
 class TestResultReporter():
     def test_format_success_message_returns_formatted_messages(self):
-        update_time = datetime.fromisoformat('2021-01-01T00:00:00')
-        r = google_dispatchloader.ResultReporter.format_success_message('create', update_time)
+        result_time = datetime.fromisoformat('2021-01-01T00:00:00')
+        r = google_dispatchloader.ResultReporter.format_success_message('create', result_time)
 
         assert r == 'Created on 2021/01/01 00:00:00 '
 
     def test_format_failure_message_returns_formatted_messages(self):
-        update_time = datetime.fromisoformat('2021-01-01T00:00:00')
-        r = google_dispatchloader.ResultReporter.format_failure_message('create', 'Some details', update_time)
+        result_time = datetime.fromisoformat('2021-01-01T00:00:00')
+        r = google_dispatchloader.ResultReporter.format_failure_message('create', 'Some details', result_time)
 
         assert r == 'Failed to create on 2021/01/01 00:00:00 \nError: Some details'
 
@@ -104,12 +104,12 @@ class TestResultReporter():
 
         assert reporter.results['foo'].action == 'create'
 
-    def test_report_success_uses_current_time_if_no_update_time_is_provided(self):
+    def test_report_success_uses_current_time_if_no_result_time_is_provided(self):
         reporter = google_dispatchloader.ResultReporter()
 
         reporter.report_success('foo', 'create')
 
-        assert isinstance(reporter.results['foo'].update_time, datetime)
+        assert isinstance(reporter.results['foo'].result_time, datetime)
 
     def test_report_failure_adds_failure_report(self):
         reporter = google_dispatchloader.ResultReporter()
@@ -119,19 +119,19 @@ class TestResultReporter():
 
         assert r.action == 'create' and r.details == 'Some details'
 
-    def test_report_failure_uses_current_time_if_no_update_time_is_provided(self):
+    def test_report_failure_uses_current_time_if_no_result_time_is_provided(self):
         reporter = google_dispatchloader.ResultReporter()
 
         reporter.report_failure('foo', 'create', 'Some details')
         r = reporter.results['foo']
 
         assert r.action == 'create' and r.details == 'Some details'
-        assert isinstance(reporter.results['foo'].update_time, datetime)
+        assert isinstance(reporter.results['foo'].result_time, datetime)
 
     def test_get_message_of_successful_result_returns_formatted_message(self):
         reporter = google_dispatchloader.ResultReporter()
-        update_time = datetime.fromisoformat('2021-01-01T00:00:00')
-        reporter.report_success('foo', 'create', update_time)
+        result_time = datetime.fromisoformat('2021-01-01T00:00:00')
+        reporter.report_success('foo', 'create', result_time)
 
         r1 = reporter.get_message('foo')
 
@@ -140,8 +140,8 @@ class TestResultReporter():
 
     def test_get_message_of_failure_result_returns_formatted_message(self):
         reporter = google_dispatchloader.ResultReporter()
-        update_time = datetime.fromisoformat('2021-01-01T00:00:00')
-        reporter.report_failure('foo', 'edit', 'Some details', update_time)
+        result_time = datetime.fromisoformat('2021-01-01T00:00:00')
+        reporter.report_failure('foo', 'edit', 'Some details', result_time)
 
         r1 = reporter.get_message('foo')
 
@@ -253,7 +253,7 @@ class TestDispatchData():
                                    'template': 'Text 1',
                                    'category': 'meta',
                                    'subcategory': 'gameplay'}}
-        obj = google_dispatchloader.DispatchData(dispatch_data)
+        obj = google_dispatchloader.Dispatches(dispatch_data)
 
         r = obj.get_canonical_dispatch_config()
 
@@ -270,7 +270,7 @@ class TestDispatchData():
                                    'template': 'Text 1',
                                    'category': 'meta',
                                    'subcategory': 'gameplay'}}
-        obj = google_dispatchloader.DispatchData(dispatch_data)
+        obj = google_dispatchloader.Dispatches(dispatch_data)
 
         r = obj.get_canonical_dispatch_config()
 
@@ -287,12 +287,12 @@ class TestDispatchData():
                                    'template': 'Text 1',
                                    'category': 'meta',
                                    'subcategory': 'gameplay'}}
-        obj = google_dispatchloader.DispatchData(dispatch_data)
+        obj = google_dispatchloader.Dispatches(dispatch_data)
 
         assert obj.get_dispatch_template('name1') == 'Text 1'
 
     def test_get_non_existent_dispatch_template_raises_exception(self):
-        obj = google_dispatchloader.DispatchData({})
+        obj = google_dispatchloader.Dispatches({})
 
         with pytest.raises(KeyError):
             obj.get_dispatch_template('something non existent')
@@ -304,7 +304,7 @@ class TestDispatchData():
                                    'template': 'Text 1',
                                    'category': 'meta',
                                    'subcategory': 'gameplay'}}
-        obj = google_dispatchloader.DispatchData(dispatch_data)
+        obj = google_dispatchloader.Dispatches(dispatch_data)
 
         obj.add_dispatch_id('name1', '54321')
 
@@ -318,7 +318,7 @@ class TestDispatchData():
                                    'template': 'Text 1',
                                    'category': 'meta',
                                    'subcategory': 'gameplay'}}
-        obj = google_dispatchloader.DispatchData(dispatch_data)
+        obj = google_dispatchloader.Dispatches(dispatch_data)
 
         obj.add_dispatch_id('name1', '54321')
 
@@ -334,14 +334,14 @@ def category_setups():
     return google_dispatchloader.CategorySetups({1: 'meta'}, {1: 'reference'})
 
 
-class TestRangeDisaptchDataValues():
+class TestDispatchSheetRange():
     def test_extract_dispatch_data_valid_action_returns_data(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
         row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 1, 1, 'Title 1', 'Text 1', '']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == {'name1': {'owner_nation': 'testopia',
                                'ns_id': '1234',
@@ -354,9 +354,9 @@ class TestRangeDisaptchDataValues():
     def test_extract_dispatch_data_returns_data_of_no_id_rows(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
         row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', '']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == {'name1': {'owner_nation': 'testopia',
                                'action': 'create',
@@ -368,18 +368,18 @@ class TestRangeDisaptchDataValues():
     def test_extract_dispatch_data_skips_rows_with_not_enough_cells(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
         row_values = [['name1', 'create', 1, 1, 'Title 1']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
 
     def test_extract_dispatch_data_skips_rows_with_empty_name(self, owner_nations, category_setups):
         result_reporter = mock.Mock()
         row_values = [['name1', 'create', 1, 1, 'Title 1']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
 
@@ -387,9 +387,9 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock()
         row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'invalid action', 1, 1, 'Title 1', 'Text 1', '']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
         result_reporter.report_failure.assert_called()
@@ -398,9 +398,9 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock()
         row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        '', 1, 1, 'Title 1', 'Text 1', '']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
 
@@ -408,9 +408,9 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock()
         row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 20, 1, 'Title 1', 'Text 1', '']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
         result_reporter.report_failure.assert_called()
@@ -419,9 +419,9 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock()
         row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 1, 1, 'Title 1', 'Text 1', '']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'ijkl1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'ijkl1234')
 
         assert r == {}
         result_reporter.report_failure.assert_called()
@@ -430,9 +430,9 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock()
         row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 1, 20, 'Title 1', 'Text 1', '']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == {}
         result_reporter.report_failure.assert_called()
@@ -442,9 +442,9 @@ class TestRangeDisaptchDataValues():
         row_values = [['', '', 1, 1, 'Title 1', 'Text 1', ''],
                       ['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name2")',
                        'edit', 1, 1, 'Title 2', 'Text 2', '']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == {'name2': {'owner_nation': 'testopia',
                                'ns_id': '1234',
@@ -459,7 +459,7 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'edit', 1, 1, 'Title 1', 'Text 1', 'Old message']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
         new_dispatch_data = {'name1': {'owner_nation': 'testopia',
                                        'ns_id': '1234',
                                        'action': 'edit',
@@ -478,7 +478,7 @@ class TestRangeDisaptchDataValues():
         message = google_dispatchloader.Message(is_failure=False, text='Test message')
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
         new_dispatch_data = {'name1': {'owner_nation': 'testopia',
                                        'ns_id': '1234',
                                        'action': 'create',
@@ -498,7 +498,7 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                        'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
         new_dispatch_data = {'name1': {'owner_nation': 'testopia',
                                        'ns_id': '1234',
                                        'action': 'remove',
@@ -516,7 +516,7 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock()
         row_values = [['name1', '', 1, 1, 'Title 1', 'Text 1', 'Old message']]
         new_dispatch_data = {}
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -528,7 +528,7 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
         new_dispatch_data = {}
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -539,7 +539,7 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock(get_message=mock.Mock(side_effect=KeyError))
         row_values = [['name1', 'create', 1, 1, 'Title 1', 'Text 1', 'Old message']]
         new_dispatch_data = {}
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -550,7 +550,7 @@ class TestRangeDisaptchDataValues():
         result_reporter = mock.Mock()
         row_values = [['name1', 'create', 1, 1, 'Title 1']]
         new_dispatch_data = {}
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -568,7 +568,7 @@ class TestRangeDisaptchDataValues():
                                        'template': 'Text 1',
                                        'category': 'meta',
                                        'subcategory': 'reference'}}
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -589,7 +589,7 @@ class TestRangeDisaptchDataValues():
                                        'template': 'Text 1',
                                        'category': 'meta',
                                        'subcategory': 'reference'}}
-        obj = google_dispatchloader.RangeDisaptchDataValues(row_values, result_reporter)
+        obj = google_dispatchloader.DispatchSheetRange(row_values, result_reporter)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -617,16 +617,16 @@ def dispatch_data():
                       'subcategory': 'reference'}}
 
 
-class TestSpreadsheetDispatchDataValues():
+class TestDispatchSpreadsheet():
     def test_extract_dispatch_data_returns_data(self, owner_nations, category_setups, dispatch_data):
         result_reporter = mock.Mock()
         sheet_ranges = {'Sheet1!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
                                          'edit', 1, 1, 'Title 1', 'Text 1', 'Old message']],
                         'Sheet2!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
                                          'remove', 1, 1, 'Title 2', 'Text 2', 'Old message']]}
-        obj = google_dispatchloader.SpreadsheetDispatchDataValues(sheet_ranges, result_reporter)
+        obj = google_dispatchloader.DispatchSpreadsheet(sheet_ranges, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups, 'abcd1234')
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups, 'abcd1234')
 
         assert r == dispatch_data
 
@@ -638,7 +638,7 @@ class TestSpreadsheetDispatchDataValues():
                         'Sheet2!A3:F': [['=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
                                          'remove', 1, 1, 'Title 2', 'Text 2', 'Old message']]}
 
-        obj = google_dispatchloader.SpreadsheetDispatchDataValues(sheet_ranges, result_reporter)
+        obj = google_dispatchloader.DispatchSpreadsheet(sheet_ranges, result_reporter)
 
         r = obj.get_new_values(dispatch_data)
 
@@ -647,7 +647,7 @@ class TestSpreadsheetDispatchDataValues():
                      'Sheet2!A3:F': [['name2', '', 1, 1, 'Title 2', 'Text 2', 'Test message']]}
 
 
-class TestSpreadsheetDispatchDataConverter():
+class TestDispatchSpreadsheets():
     def test_extract_dispatch_data_returns_data(self, owner_nations, category_setups, dispatch_data):
         result_reporter = mock.Mock()
         range1 = [['=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -656,9 +656,9 @@ class TestSpreadsheetDispatchDataConverter():
                    'remove', 1, 1, 'Title 2', 'Text 2', 'Old message']]
         spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1},
                         'xyzt1234': {'Sheet2!A3:F': range2}}
-        obj = google_dispatchloader.SpreadsheetDispatchDataConverter(spreadsheets, result_reporter)
+        obj = google_dispatchloader.DispatchSpreadsheets(spreadsheets, result_reporter)
 
-        r = obj.extract_dispatch_data(owner_nations, category_setups)
+        r = obj.get_dispatches_as_dict(owner_nations, category_setups)
 
         assert r == dispatch_data
 
@@ -671,7 +671,7 @@ class TestSpreadsheetDispatchDataConverter():
                    'remove', 1, 1, 'Title 2', 'Text 2', 'Old message']]
         spreadsheets = {'abcd1234': {'Sheet1!A3:F': range1},
                         'xyzt1234': {'Sheet2!A3:F': range2}}
-        obj = google_dispatchloader.SpreadsheetDispatchDataConverter(spreadsheets, result_reporter)
+        obj = google_dispatchloader.DispatchSpreadsheets(spreadsheets, result_reporter)
 
         r = obj.get_new_values(dispatch_data)
 
