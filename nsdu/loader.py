@@ -93,7 +93,6 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
         try:
             loaded_module = utils.load_module((self.default_dir_path / name).with_suffix('.py'))
             manager.load_loader(loaded_module)
-            return
         except FileNotFoundError:
             raise exceptions.LoaderNotFound('Loader "{}" not found.'.format(name))
 
