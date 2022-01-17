@@ -1,5 +1,5 @@
 [general]
-user_agent = 'NSDU application run by <your main nation name>'
+user_agent = 'NationStates Dispatch Utility run by <your main nation name>'
 
 # Path to directory containing source files of your own loaders
 # custom_loader_dir_path = '~/my_nsdu_loaders'
@@ -14,7 +14,7 @@ dispatch_loader = 'file_dispatchloader'
 # Choose loader to load simple BBCode fornatters
 simple_bb_loader = 'file_simplebbloader'
 # Choose loader to load template variables.
-template_var_loader = 'file_templatevarloader'
+template_var_loader = ['file_templatevarloader']
 # Choose loader to load nation login credentials.
 cred_loader = 'json_credloader'
 
@@ -43,8 +43,8 @@ personnel_info_groups = ['reference']
 google_cred_path = '~/ns_dispatches/google_creds.json'
 owner_nation_sheet = {spreadsheet_id = '1234abcdefgh', range='Owner!A3:C'}
 category_setup_sheet = {spreadsheet_id = '1234abcdefgh', range='CategorySetup!A3:B'}
-utility_template_spreadsheets = [{spreadsheet_id = '1234abcdefgh', range='Layout!A3:B'},
-                                 {spreadsheet_id = '1234abcdefgh', range='Macros!A3:B'}]
+utility_template_spreadsheets = [{spreadsheet_id = '1234abcdefgh', 
+                                  ranges=['Layout!A3:B', 'Macros!A3:B']}]
 dispatch_spreadsheets = [{spreadsheet_id = '1234abcdefgh', ranges = ['Set1!A3:E', 'Set2!A3:E']},
                          {spreadsheet_id = '5678xyzjklmn', ranges = ['Set3!A3:E', 'Set4!A3:E']}]
 
