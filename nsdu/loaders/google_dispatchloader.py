@@ -809,8 +809,8 @@ def get_dispatch_template(loader, name):
 
 
 @loader_api.dispatch_loader
-def after_update(loader, name, action, result, update_time):
-    loader.report_result(name, action, result, update_time)
+def after_update(loader, name, action, result, result_time):
+    loader.report_result(name, action, result, result_time)
 
 
 @loader_api.dispatch_loader

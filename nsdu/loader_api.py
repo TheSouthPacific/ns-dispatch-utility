@@ -55,7 +55,7 @@ def get_dispatch_template(loader, name):
     """
 
 @dispatch_loader_specs(firstresult=True)
-def after_update(loader, name, action, result, update_time):
+def after_update(loader, name, action, result, result_time):
     """Run after a dispatch is updated to report
     result of an operation.
 
@@ -64,7 +64,7 @@ def after_update(loader, name, action, result, update_time):
         name (str): Dispatch name
         action (str): Action
         result (str): Result message
-        update_time (datetime.datetime): Update time
+        result_time (datetime.datetime): Update time
     """
 
 

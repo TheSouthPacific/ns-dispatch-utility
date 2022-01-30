@@ -219,8 +219,8 @@ class DispatchLoaderManager(PersistentLoaderManager):
     def get_dispatch_template(self, name):
         return self.manager.hook.get_dispatch_template(loader=self._loader, name=name)
 
-    def after_update(self, name, action, result, update_time):
-        self.manager.hook.after_update(loader=self._loader, name=name, action=action, result=result, update_time=update_time)
+    def after_update(self, name, action, result, result_time):
+        self.manager.hook.after_update(loader=self._loader, name=name, action=action, result=result, result_time=result_time)
 
     def add_dispatch_id(self, name, dispatch_id):
         self.manager.hook.add_dispatch_id(loader=self._loader, name=name, dispatch_id=dispatch_id)

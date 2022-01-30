@@ -53,7 +53,7 @@ class NsduDispatch():
         if action not in ('create', 'edit', 'remove'):
             raise exceptions.DispatchConfigError('Invalid action "{}" on dispatch "{}".'.format(action, name))
 
-        update_time = datetime.now(tz=timezone.utc)
+        result_time = datetime.now(tz=timezone.utc)
         try:
             if action == 'create':
                 logger.debug('Creating dispatch "%s" with params: %r', name, config)
@@ -72,17 +72,17 @@ class NsduDispatch():
                 logger.debug('Removing dispatch "%s" with id "%s".', name, dispatch_id)
                 self.dispatch_updater.remove_dispatch(dispatch_id)
                 logger.info('Removed dispatch "%s".', name)
-            update_time = datetime.now(tz=timezone.utc)
-            self.dispatch_loader_manager.after_update(name, action, 'success', update_time)
+            result_time = datetime.now(tz=timezone.utc)
+            self.dispatch_loader_manager.after_update(name, action, 'success', result_time)
         except exceptions.UnknownDispatchError:
             logger.error('Could not find dispatch "%s" with id "%s".', name, dispatch_id)
-            self.dispatch_loader_manager.after_update(name, action, 'unknown-dispatch-error', update_time)
+            self.dispatch_loader_manager.after_update(name, action, 'unknown-dispatch-error', result_time)
         except exceptions.NotOwnerDispatchError:
             logger.error('Dispatch "%s" is not owned by this nation.', name)
-            self.dispatch_loader_manager.after_update(name, action, 'not-owner-dispatch-error', update_time)
+            self.dispatch_loader_manager.after_update(name, action, 'not-owner-dispatch-error', result_time)
         except exceptions.NonexistentCategoryError as err:
             logger.error('%s "%s" of dispatch "%s" is invalid.', err.category_type, err.category_value, name)
-            self.dispatch_loader_manager.after_update(name, action, 'invalid-category-options', update_time)
+            self.dispatch_loader_manager.after_update(name, action, 'invalid-category-options', result_time)
 
     def update_dispatches(self, names):
         """Update dispatches. Empty list means update all.
