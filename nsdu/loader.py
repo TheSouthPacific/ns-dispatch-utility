@@ -1,6 +1,7 @@
 """Load and run plugins.
 """
 
+from typing import Sequence
 import collections
 import pathlib
 
@@ -10,129 +11,6 @@ from nsdu import exceptions
 from nsdu import info
 from nsdu import loader_api
 from nsdu import utils
-
-
-def load_module_from_entry_points(entry_points, name):
-    """Load module found via metadata entry points.
-
-    Args:
-        entry_points (list): List of entry points
-        name (str): Entry point's name
-
-    Returns:
-        Loaded Python module
-    """
-
-    for entry_point in entry_points:
-        if entry_point.name == name:
-            return entry_point.load()
-    return None
-
-
-def load_all_modules_from_entry_points(entry_points, names):
-    """Load all modules with name in names via metadata entry points.
-
-    Args:
-        entry_points (list): List of entry points
-        names (list): List of entry points' names
-
-    Returns:
-        Loaded Python module
-    """
-
-    modules = {}
-    for entry_point in entry_points:
-        if entry_point.name in names:
-            modules[entry_point.name] = entry_point.load()
-    return modules
-
-
-class LoaderManagerBuilder():
-    """Abstract class for loader manager builders.
-
-    Args:
-        default_dir_path (pathlib.Path): Default loader directory
-        custom_dir_path (pathlib.Path): User-confiured loader directory
-        entry_points (list): List of entry points
-    """
-
-    def __init__(self, default_dir_path, custom_dir_path, entry_points):
-        self.default_dir_path = default_dir_path
-        self.custom_dir_path = custom_dir_path
-        self.entry_points = entry_points
-
-
-class SingleLoaderManagerBuilder(LoaderManagerBuilder):
-    """Build loader managers that manage one loader.
-    """
-
-    def load_loader(self, manager, name):
-        """Load loader into manager.
-
-        Args:
-            manager (loader.LoaderManager): Single loader manager object
-            name (str): Loader name
-
-        Raises:
-            exceptions.LoaderNotFound: Failed to find loader
-        """
-
-        if self.custom_dir_path is not None:
-            try:
-                loaded_module = utils.load_module(pathlib.Path(self.custom_dir_path / name).with_suffix('.py'))
-                manager.load_loader(loaded_module)
-                return
-            except FileNotFoundError:
-                pass
-
-        loaded_module = load_module_from_entry_points(self.entry_points, name)
-        if loaded_module is not None:
-            manager.load_loader(loaded_module)
-            return
-
-        try:
-            loaded_module = utils.load_module((self.default_dir_path / name).with_suffix('.py'))
-            manager.load_loader(loaded_module)
-        except FileNotFoundError:
-            raise exceptions.LoaderNotFound('Loader "{}" not found.'.format(name))
-
-
-class MultiLoadersManagerBuilder(LoaderManagerBuilder):
-    """Build loader managers that manage many loaders
-    """
-
-    def load_loader(self, manager, names):
-        """Load loaders into manager.
-
-        Args:
-            manager (loader.LoaderManager): Multi-loaders manager object
-            names (list): Loader names
-
-        Raises:
-            exceptions.LoaderNotFound: Failed to find loader
-        """
-
-        loaded_modules = {}
-        for name in names:
-            try:
-                loaded_modules[name] = utils.load_module((self.default_dir_path / name).with_suffix('.py'))
-            except FileNotFoundError:
-                pass
-
-        loaded_modules.update(load_all_modules_from_entry_points(self.entry_points, names))
-
-        if self.custom_dir_path is not None:
-            for name in names:
-                try:
-                    loaded_modules[name] = utils.load_module(pathlib.Path(self.custom_dir_path / name).with_suffix('.py'))
-                except FileNotFoundError:
-                    pass
-
-        for name in names:
-            if name in loaded_modules:
-                manager.load_loader(loaded_modules[name])
-            else:
-                raise exceptions.LoaderNotFound('Loader "{}" not found.'.format(name))
 
 
 class LoaderManager():
@@ -156,6 +34,9 @@ class LoaderManager():
         """
 
         self.manager.register(module)
+
+    def get_loaded_loaders(self):
+        return self.manager.get_plugins()
 
 
 class PersistentLoaderManager(LoaderManager):
@@ -259,3 +140,235 @@ class CredLoaderManager(PersistentLoaderManager):
 
     def remove_cred(self, name):
         self.manager.hook.remove_cred(loader=self._loader, name=utils.canonical_nation_name(name))
+
+
+def load_module_from_entry_points(entry_points, name):
+    """Load a module found via package metadata entry points.
+
+    Args:
+        entry_points (list): List of entry points
+        name (str): Entry point's name
+
+    Returns:
+        Loaded Python module
+    """
+
+    for entry_point in entry_points:
+        if entry_point.name == name:
+            return entry_point.load()
+    return None
+
+
+def load_all_modules_from_entry_points(entry_points, names):
+    """Load all modules with name in names via package metadata entry points.
+
+    Args:
+        entry_points (list): List of entry points
+        names (list): List of entry points' names
+
+    Returns:
+        Loaded Python module
+    """
+
+    modules = {}
+    for entry_point in entry_points:
+        if entry_point.name in names:
+            modules[entry_point.name] = entry_point.load()
+    return modules
+
+
+class LoaderManagerBuilder():
+    """Base class for loader manager builders.
+
+    Args:
+        default_dir_path (pathlib.Path): Default loader directory
+        custom_dir_path (pathlib.Path): User-confiured loader directory
+        entry_points (list): List of entry points
+    """
+
+    def __init__(self, default_dir_path, custom_dir_path, entry_points):
+        self.default_dir_path = default_dir_path
+        self.custom_dir_path = custom_dir_path
+        self.entry_points = entry_points
+        self.loader_manager = None
+
+    def set_loader_manager(self, loader_manager: LoaderManager):
+        self.loader_manager = loader_manager
+
+
+class SingleLoaderManagerBuilder(LoaderManagerBuilder):
+    """Load a loader into a loader manager.
+    """
+
+    def load_from_default_dir(self, name: str) -> None:
+        """Load a loader into loader manager from default loader directory.
+
+        Args:
+            name (str): Loader name
+
+        Raises:
+            exceptions.LoaderNotFound: Failed to find loader
+        """
+
+        if self.default_dir_path is None:
+            raise ValueError('Default loader directory path is None')
+
+        try:
+            loader_module = utils.load_module((self.default_dir_path / name).with_suffix('.py'))
+        except FileNotFoundError:
+            raise exceptions.LoaderNotFound
+        self.loader_manager.load_loader(loader_module)
+
+    def load_from_custom_dir(self, name: str) -> None:
+        """Load a loader into loader manager from custom loader directory.
+
+        Args:
+            name (str): Loader name
+
+        Raises:
+            exceptions.LoaderNotFound: Failed to find loader
+        """
+
+        if self.custom_dir_path is None:
+            raise ValueError('Custom loader directory path is None')
+
+        try:
+            loader_module = utils.load_module(pathlib.Path(self.custom_dir_path / name).with_suffix('.py'))
+        except FileNotFoundError:
+            raise exceptions.LoaderNotFound
+        self.loader_manager.load_loader(loader_module)
+
+    def load_from_entry_points(self, name: str) -> None:
+        """Load a loader into loader manager from package metadata entry points.
+
+        Args:
+            name (str): Loader name
+
+        Raises:
+            exceptions.LoaderNotFound: Failed to find loader
+        """
+
+        loader_module = load_module_from_entry_points(self.entry_points, name)
+        if loader_module is None:
+            raise exceptions.LoaderNotFound
+        self.loader_manager.load_loader(loader_module)
+
+
+class MultiLoadersManagerBuilder(LoaderManagerBuilder):
+    """Load many loaders into a loader manager.
+    """
+
+    def load_into_manager(self, loader_modules: list) -> None:
+        """Load loader modules into loader manager.
+
+        Args:
+            loader_modules (list): Loader modules
+        """
+
+        for module in loader_modules:
+            self.loader_manager.load_loader(module)
+
+    def load_from_default_dir(self, names: Sequence[str]) -> Sequence[str]:
+        """Load loaders into loader manager from default loader directory.
+
+        Args:
+            names (Sequence[str]): Names of loaders to load
+
+        Raises:
+            ValueError: [description]
+
+        Returns:
+            Sequence[str]: Names of failed to load modules
+        """
+
+        if self.default_dir_path is None:
+            raise ValueError('Custom loader directory path is None')
+
+        loader_modules = {}
+        failed_loader_module_names = []
+
+        for name in names:
+            try:
+                loader_modules[name] = utils.load_module((self.default_dir_path / name).with_suffix('.py'))
+            except FileNotFoundError:
+                failed_loader_module_names.append(name)
+
+        self.load_into_manager(loader_modules)
+        return failed_loader_module_names
+
+    def load_from_custom_dir(self, names: Sequence[str]) -> Sequence[str]:
+        """Load loaders into loader manager from custom loader directory.
+
+        Args:
+            names (list): Names of loaders to load
+
+        Raises:
+            exceptions.LoaderNotFound: Failed to find loader
+        """
+
+        if self.custom_dir_path is None:
+            raise ValueError('Custom loader directory path is None')
+
+        loader_modules = {}
+
+        for name in names:
+            try:
+                loader_modules[name] = utils.load_module((self.custom_dir_path / name).with_suffix('.py'))
+            except FileNotFoundError:
+                pass
+
+        self.load_into_manager(loader_modules)
+
+    def load_from_entry_points(self, names: Sequence[str]) -> Sequence[str]:
+        """Load loaders into loader manager from package metadata entry points.
+
+        Args:
+            names (list): Names of loaders to load
+
+        Raises:
+            exceptions.LoaderNotFound: Failed to find loader
+        """
+
+        loader_modules = load_all_modules_from_entry_points(self.entry_points, names)
+        self.load_into_manager(loader_modules)
+
+
+class LoaderManagerBuildDirector():
+    def __init__(self):
+        self.builder: LoaderManagerBuilder = None
+
+    @property
+    def builder(self) -> LoaderManagerBuilder:
+        return self.builder
+
+    @builder.setter
+    def set_builder(self, new_builder: LoaderManagerBuilder):
+        self.builder = new_builder
+
+    def load_one_loader(self, loader_manager: LoaderManager, loader_name: str) -> None:
+        self.builder.set_loader_manager(loader_manager)
+        methods = [
+            self.builder.load_from_custom_dir,
+            self.builder.load_from_entry_points,
+            self.builder.load_from_default_dir
+        ]
+
+        for method in methods:
+            try:
+                method(loader_name)
+                break
+            except exceptions.LoaderNotFound as err:
+                if method == methods[-1]:
+                    raise err
+
+    def load_all_loaders(self, loader_manager: LoaderManager, loader_names: Sequence[str]) -> None:
+        self.builder.set_loader_manager(loader_manager)
+
+        methods = [
+            self.builder.load_from_custom_dir,
+            self.builder.load_from_entry_points,
+            self.builder.load_from_default_dir
+        ]
+
+        for method in methods:
+            method(loader_names)
