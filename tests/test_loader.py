@@ -1,3 +1,4 @@
+from distutils.command.build import build
 import pathlib
 import importlib
 from unittest import mock
@@ -9,7 +10,7 @@ from nsdu import loader
 from nsdu import info
 
 
-LOADER_DIR_PATH = pathlib.Path('tests/resources')
+CUSTOM_LOADER_DIR_PATH = pathlib.Path('tests/resources')
 DEFAULT_LOADER_DIR_PATH = pathlib.Path('tests/resources/default')
 
 
@@ -116,53 +117,73 @@ class MockSingleLoaderManager():
 class TestSingleLoaderManagerBuilder():
     @pytest.fixture
     def entry_points(self):
-        module_1 = mock.Mock()
-        module_1.__file__ = 'someplaces/simplebbloader-test1.py'
-        module_2 = mock.Mock()
-        module_2.__file__ = 'someplaces/someloader.py'
-        entry_points = [mock.Mock(load=mock.Mock(return_value=module_1)),
-                        mock.Mock(load=mock.Mock(return_value=module_2))]
+        entry_points = [mock.Mock(load=mock.Mock(return_value=mock.Mock()))]
         entry_points[0].name = 'simplebbloader-test1'
-        entry_points[1].name = 'someloader'
 
         yield entry_points
 
-    def test_load_loader_in_custom_source_dir(self, entry_points):
+    def test_load_loader_from_default_source_dir(self, entry_points):
         manager = MockSingleLoaderManager()
-        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, LOADER_DIR_PATH, entry_points)
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
 
-        builder.load_loader(manager, 'simplebbloader-test1')
-        assert manager.module
-
-    def test_load_loader_found_via_entry_points(self, entry_points):
-        manager = MockSingleLoaderManager()
-        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, LOADER_DIR_PATH, entry_points)
-
-        builder.load_loader(manager, 'someloader')
+        builder.load_from_default_dir('simplebbloader-test2')
 
         assert manager.module
 
-    def test_load_loader_in_default_source_dir(self, entry_points):
-        manager = MockSingleLoaderManager()
-        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, LOADER_DIR_PATH, entry_points)
-
-        builder.load_loader(manager, 'simplebbloader-test2')
-
-        assert manager.module
-
-    def test_load_loader_with_no_custom_source_dir(self, entry_points):
-        manager = MockSingleLoaderManager()
-        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
-
-        builder.load_loader(manager, 'simplebbloader-test1')
-        assert manager.module.__file__ == 'someplaces/simplebbloader-test1.py'
-
-    def test_load_loader_with_non_existent_loader(self, entry_points):
-        manager = MockSingleLoaderManager()
-        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, LOADER_DIR_PATH, entry_points)
+    def test_load_non_existent_loader_from_default_dir_raises_exception(self, entry_points):
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(MockSingleLoaderManager())
 
         with pytest.raises(exceptions.LoaderNotFound):
-            builder.load_loader(manager, 'zoo')
+            builder.load_from_default_dir('zoo')
+
+    def test_load_loader_with_no_default_source_dir_raises_exception(self, entry_points):
+        builder = loader.SingleLoaderManagerBuilder(None, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(MockSingleLoaderManager())
+
+        with pytest.raises(ValueError):
+            builder.load_from_default_dir('simplebbloader-test1')
+
+    def test_load_loader_from_custom_source_dir(self, entry_points):
+        manager = MockSingleLoaderManager()
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_from_custom_dir('simplebbloader-test1')
+
+        assert manager.module
+
+    def test_load_non_existent_loader_from_custom_dir_raises_exception(self, entry_points):
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(MockSingleLoaderManager())
+
+        with pytest.raises(exceptions.LoaderNotFound):
+            builder.load_from_custom_dir('zoo')
+
+    
+    def test_load_loader_with_no_custom_source_dir_raises_exception(self, entry_points):
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
+        builder.set_loader_manager(MockSingleLoaderManager())
+
+        with pytest.raises(ValueError):
+            builder.load_from_custom_dir('simplebbloader-test1')
+
+    def test_load_loader_from_entry_points(self, entry_points):
+        manager = MockSingleLoaderManager()
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_from_entry_points('simplebbloader-test1')
+
+        assert manager.module
+    
+    def test_load_non_existent_loader_from_entry_points_raises_exception(self, entry_points):
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(MockSingleLoaderManager())
+
+        with pytest.raises(exceptions.LoaderNotFound):
+            builder.load_from_entry_points('zoo')
 
 
 class MockMultiLoadersManager():
@@ -186,6 +207,68 @@ class MockMultiLoadersManager():
 class TestMultiLoadersManagerBuilder():
     @pytest.fixture
     def entry_points(self):
+        entry_points = [mock.Mock(load=mock.Mock(return_value=mock.Mock()))]
+        entry_points[0].name = 'templatevarloader-test1'
+
+        yield entry_points
+
+    def test_load_loader_from_default_source_dir(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_from_default_dir(['templatevarloader-test1'])
+
+        assert manager.modules[0]
+
+    def test_load_non_existent_loaders_from_default_source_dir_returns_non_existent_loader_names(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        non_existent_loader_names = builder.load_from_default_dir(['foo'])
+
+        assert non_existent_loader_names == ['foo']
+
+    def test_load_loader_from_custom_source_dir(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_from_custom_dir(['templatevarloader-test1'])
+
+        assert manager.modules[0]
+
+    def test_load_non_existent_loaders_from_custom_source_dir_returns_non_existent_loader_names(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        non_existent_loader_names = builder.load_from_custom_dir(['foo'])
+
+        assert non_existent_loader_names == ['foo']
+
+    def test_load_loader_from_entry_points(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_from_entry_points(['templatevarloader-test1'])
+
+        assert manager.modules[0]
+
+    def test_load_non_existent_loaders_from_entry_points_returns_non_existent_loader_names(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        non_existent_loader_names = builder.load_from_entry_points(['foo'])
+
+        assert non_existent_loader_names == ['foo']
+
+class TestLoaderManagerBuildDirector():
+    @pytest.fixture
+    def entry_points(self):
         module_1 = mock.Mock()
         module_1.__file__ = 'someplaces/templatevarloader-test2'
         module_2 = mock.Mock()
@@ -199,7 +282,7 @@ class TestMultiLoadersManagerBuilder():
 
     def test_load_loader_in_everywhere(self, entry_points):
         manager = MockMultiLoadersManager()
-        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, LOADER_DIR_PATH, entry_points)
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
 
         builder.load_loader(manager, ['templatevarloader-test1', 'templatevarloader-test2', 'templatevarloader-test3', 'templatevarloader-test4'])
 
@@ -214,7 +297,7 @@ class TestMultiLoadersManagerBuilder():
 
     def test_load_loader_with_a_non_existent_loader(self, entry_points):
         manager = MockMultiLoadersManager()
-        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, LOADER_DIR_PATH, entry_points)
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
 
         with pytest.raises(exceptions.LoaderNotFound):
             builder.load_loader(manager, ['templatevarloader-test1', 'templatevarloader-test3', 'nonexistentloader'])
@@ -227,7 +310,7 @@ DISPATCH_LOADER_CONFIG = {'dispatchloader-test1': {'key1': 'val1'}}
 class TestDispatchLoaderManager():
     def test_get_dispatch_config(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
-        manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
+        manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
         r = manager.get_dispatch_config()
         manager.cleanup_loader()
@@ -236,7 +319,7 @@ class TestDispatchLoaderManager():
 
     def test_get_dispatch_template(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
-        manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
+        manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
         r = manager.get_dispatch_template('test')
         manager.cleanup_loader()
@@ -245,7 +328,7 @@ class TestDispatchLoaderManager():
 
     def test_after_update(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
-        manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
+        manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
         result_time = mock.Mock()
         manager.after_update('test', 'edit', 'success', result_time)
@@ -256,7 +339,7 @@ class TestDispatchLoaderManager():
 
     def test_add_dispatch_id(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
-        manager.load_loader(load_module(LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
+        manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
 
         manager.add_dispatch_id('test', '123456')
         manager.cleanup_loader()
@@ -273,7 +356,7 @@ class TestTemplateVarLoaderManager():
     def test_get_all_template_vars(self):
         manager = loader.TemplateVarLoaderManager(VAR_LOADER_CONFIG)
         for name in VAR_LOADER_NAMES:
-            manager.load_loader(load_module(LOADER_DIR_PATH / name))
+            manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / name))
 
         r = manager.get_all_template_vars()
 
@@ -287,7 +370,7 @@ SIMPLE_BB_LOADER_CONFIG = {'simplebbloader-test1': {'key1': 'val1'}}
 class TestSimpleBBLoaderManager():
     def test_get_simple_bb_config(self):
         manager = loader.SimpleBBLoaderManager(SIMPLE_BB_LOADER_CONFIG)
-        manager.load_loader(load_module(LOADER_DIR_PATH / SIMPLE_BB_LOADER_NAME))
+        manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / SIMPLE_BB_LOADER_NAME))
 
         r = manager.get_simple_bb_config()
 
@@ -301,7 +384,7 @@ CRED_LOADER_CONFIG = {'credloader-test1': {'key1': 'val1'}}
 class TestCredLoaderManager():
     def test_get_all_creds(self):
         manager = loader.CredLoaderManager(CRED_LOADER_CONFIG)
-        manager.load_loader(load_module(LOADER_DIR_PATH / CRED_LOADER_NAME))
+        manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / CRED_LOADER_NAME))
 
         r = manager.get_creds()
         manager.cleanup_loader()
@@ -310,7 +393,7 @@ class TestCredLoaderManager():
 
     def test_add_cred(self):
         manager = loader.CredLoaderManager(CRED_LOADER_CONFIG)
-        manager.load_loader(load_module(LOADER_DIR_PATH / CRED_LOADER_NAME))
+        manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / CRED_LOADER_NAME))
         manager.add_cred('Nation1', '123456')
         manager.cleanup_loader()
 
@@ -318,7 +401,7 @@ class TestCredLoaderManager():
 
     def test_remove_cred(self):
         manager = loader.CredLoaderManager(CRED_LOADER_CONFIG)
-        manager.load_loader(load_module(LOADER_DIR_PATH / CRED_LOADER_NAME))
+        manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / CRED_LOADER_NAME))
         manager.add_cred('Nation1', '123456')
 
         manager.remove_cred('nation1')

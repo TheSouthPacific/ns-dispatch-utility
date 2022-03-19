@@ -275,10 +275,10 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
             names (Sequence[str]): Names of loaders to load
 
         Raises:
-            ValueError: [description]
+            ValueError: Custom loader directory path is None
 
         Returns:
-            Sequence[str]: Names of failed to load modules
+            Sequence[str]: Names of non-existent loaders
         """
 
         if self.default_dir_path is None:
@@ -300,24 +300,29 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         """Load loaders into loader manager from custom loader directory.
 
         Args:
-            names (list): Names of loaders to load
+            names (Sequence[str]): Names of loaders to load
 
         Raises:
-            exceptions.LoaderNotFound: Failed to find loader
+            ValueError: Custom loader directory path is None
+
+        Returns:
+            Sequence[str]: Names of non-existent loaders
         """
 
         if self.custom_dir_path is None:
             raise ValueError('Custom loader directory path is None')
 
         loader_modules = {}
+        failed_loader_module_names = []
 
         for name in names:
             try:
                 loader_modules[name] = utils.load_module((self.custom_dir_path / name).with_suffix('.py'))
             except FileNotFoundError:
-                pass
+                failed_loader_module_names.append(name)
 
         self.load_into_manager(loader_modules)
+        return failed_loader_module_names
 
     def load_from_entry_points(self, names: Sequence[str]) -> Sequence[str]:
         """Load loaders into loader manager from package metadata entry points.
@@ -325,12 +330,15 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         Args:
             names (list): Names of loaders to load
 
-        Raises:
-            exceptions.LoaderNotFound: Failed to find loader
+        Returns:
+            Sequence[str]: Names of non-existent loaders
         """
 
         loader_modules = load_all_modules_from_entry_points(self.entry_points, names)
         self.load_into_manager(loader_modules)
+
+        failed_loader_module_names = [name for name in names if name not in loader_modules]
+        return failed_loader_module_names
 
 
 class LoaderManagerBuildDirector():
@@ -371,4 +379,7 @@ class LoaderManagerBuildDirector():
         ]
 
         for method in methods:
-            method(loader_names)
+            loader_names = method(loader_names)
+
+        if loader_names:
+            raise exceptions.LoaderNotFound("Loaders {} not found".format(", ".join(loader_names)))
