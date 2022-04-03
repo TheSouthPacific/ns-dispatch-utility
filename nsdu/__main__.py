@@ -6,6 +6,7 @@ from datetime import timezone
 import importlib.metadata as import_metadata
 import logging
 import logging.config
+from typing import Sequence
 
 from nsdu import info
 from nsdu import exceptions
@@ -119,6 +120,19 @@ class NsduDispatch():
         self.dispatch_loader_manager.cleanup_loader()
 
 
+def get_entry_points() -> Sequence[import_metadata.EntryPoint]:
+    """Get all metadata entry points.
+
+    Returns:
+        Sequence[import_metadata.EntryPoint]: Entry points
+    """
+
+    try:
+        return import_metadata.entry_points()[info.LOADER_ENTRY_POINT_NAME]
+    except KeyError:
+        return []
+
+
 def load_nsdu_dispatch_utility_from_config(config):
     """Build NSDU dispatch uility object from config.
 
@@ -138,28 +152,30 @@ def load_nsdu_dispatch_utility_from_config(config):
     cred_loader_manager = loader.CredLoaderManager(loader_config)
 
     plugin_opt = config['plugins']
-    try:
-        entry_points = import_metadata.entry_points()[info.LOADER_ENTRY_POINT_NAME]
-    except KeyError:
-        entry_points = []
+    loader_build_director = loader.LoaderManagerBuildDirector()
+    entry_points = get_entry_points()
+
     singleloader_builder = loader.SingleLoaderManagerBuilder(info.LOADER_DIR_PATH,
                                                              custom_loader_dir_path,
                                                              entry_points)
-    multiloaders_builder = loader.MultiLoadersManagerBuilder(info.LOADER_DIR_PATH,
-                                                             custom_loader_dir_path,
-                                                             entry_points)
+    loader_build_director.builder = singleloader_builder
 
-    singleloader_builder.load_loader(cred_loader_manager, plugin_opt['cred_loader'])
+    loader_build_director.load_one_loader(cred_loader_manager, plugin_opt['cred_loader'])
     creds = cred_loader_manager.get_creds()
 
-    singleloader_builder.load_loader(dispatch_loader_manager, plugin_opt['dispatch_loader'])
+    loader_build_director.load_one_loader(dispatch_loader_manager, plugin_opt['dispatch_loader'])
     dispatch_config = dispatch_loader_manager.get_dispatch_config()
     logger.debug("Loaded dispatch config: %r", dispatch_config)
 
-    singleloader_builder.load_loader(simple_bb_loader_manager, plugin_opt['simple_bb_loader'])
+    loader_build_director.load_one_loader(simple_bb_loader_manager, plugin_opt['simple_bb_loader'])
     simple_bb_config = simple_bb_loader_manager.get_simple_bb_config()
 
-    multiloaders_builder.load_loader(template_var_loader_manager, plugin_opt['template_var_loader'])
+    multiloaders_builder = loader.MultiLoadersManagerBuilder(info.LOADER_DIR_PATH,
+                                                             custom_loader_dir_path,
+                                                             entry_points)
+    loader_build_director.builder = multiloaders_builder
+
+    loader_build_director.load_all_loaders(template_var_loader_manager, plugin_opt['template_var_loader'])
     template_vars = template_var_loader_manager.get_all_template_vars()
     dispatch_info = utils.get_dispatch_info(dispatch_config)
     template_vars['dispatch_info'] = dispatch_info

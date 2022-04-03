@@ -1,7 +1,7 @@
 """Load and run plugins.
 """
 
-from typing import Sequence
+from typing import Mapping, Sequence
 import collections
 import pathlib
 
@@ -258,14 +258,14 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
     """Load many loaders into a loader manager.
     """
 
-    def load_into_manager(self, loader_modules: list) -> None:
+    def load_into_manager(self, loader_modules: dict) -> None:
         """Load loader modules into loader manager.
 
         Args:
             loader_modules (list): Loader modules
         """
 
-        for module in loader_modules:
+        for module in loader_modules.values():
             self.loader_manager.load_loader(module)
 
     def load_from_default_dir(self, names: Sequence[str]) -> Sequence[str]:
@@ -343,15 +343,15 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
 
 class LoaderManagerBuildDirector():
     def __init__(self):
-        self.builder: LoaderManagerBuilder = None
+        self._builder: LoaderManagerBuilder = None
 
     @property
     def builder(self) -> LoaderManagerBuilder:
-        return self.builder
+        return self._builder
 
     @builder.setter
-    def set_builder(self, new_builder: LoaderManagerBuilder):
-        self.builder = new_builder
+    def builder(self, new_builder: LoaderManagerBuilder):
+        self._builder = new_builder
 
     def load_one_loader(self, loader_manager: LoaderManager, loader_name: str) -> None:
         self.builder.set_loader_manager(loader_manager)
@@ -368,6 +368,8 @@ class LoaderManagerBuildDirector():
             except exceptions.LoaderNotFound as err:
                 if method == methods[-1]:
                     raise err
+            except ValueError:
+                pass
 
     def load_all_loaders(self, loader_manager: LoaderManager, loader_names: Sequence[str]) -> None:
         self.builder.set_loader_manager(loader_manager)
@@ -379,7 +381,10 @@ class LoaderManagerBuildDirector():
         ]
 
         for method in methods:
-            loader_names = method(loader_names)
+            try:
+                loader_names = method(loader_names)
+            except ValueError:
+                pass
 
         if loader_names:
             raise exceptions.LoaderNotFound("Loaders {} not found".format(", ".join(loader_names)))

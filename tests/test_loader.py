@@ -1,13 +1,12 @@
-from distutils.command.build import build
 import pathlib
 import importlib
 from unittest import mock
+from importlib.metadata import EntryPoint
 
 import pytest
 
 from nsdu import exceptions
 from nsdu import loader
-from nsdu import info
 
 
 CUSTOM_LOADER_DIR_PATH = pathlib.Path('tests/resources')
@@ -207,10 +206,10 @@ class MockMultiLoadersManager():
 class TestMultiLoadersManagerBuilder():
     @pytest.fixture
     def entry_points(self):
-        entry_points = [mock.Mock(load=mock.Mock(return_value=mock.Mock()))]
-        entry_points[0].name = 'templatevarloader-test1'
+        entry_point = mock.create_autospec(EntryPoint)
+        entry_point.name = 'templatevarloader-test1'
 
-        yield entry_points
+        yield [entry_point]
 
     def test_load_loader_from_default_source_dir(self, entry_points):
         manager = MockMultiLoadersManager()
@@ -265,42 +264,6 @@ class TestMultiLoadersManagerBuilder():
         non_existent_loader_names = builder.load_from_entry_points(['foo'])
 
         assert non_existent_loader_names == ['foo']
-
-class TestLoaderManagerBuildDirector():
-    @pytest.fixture
-    def entry_points(self):
-        module_1 = mock.Mock()
-        module_1.__file__ = 'someplaces/templatevarloader-test2'
-        module_2 = mock.Mock()
-        module_2.__file__ = 'someplaces/templatevarloader-test4'
-        entry_points = [mock.Mock(load=mock.Mock(return_value=module_1)),
-                        mock.Mock(load=mock.Mock(return_value=module_2))]
-        entry_points[0].name = 'templatevarloader-test2'
-        entry_points[1].name = 'templatevarloader-test4'
-
-        yield entry_points
-
-    def test_load_loader_in_everywhere(self, entry_points):
-        manager = MockMultiLoadersManager()
-        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
-
-        builder.load_loader(manager, ['templatevarloader-test1', 'templatevarloader-test2', 'templatevarloader-test3', 'templatevarloader-test4'])
-
-        assert manager.modules[0] and manager.modules[1] and manager.modules[2] and manager.modules[3]
-
-    def test_load_loader_with_no_custom_source_dir(self, entry_points):
-        manager = MockMultiLoadersManager()
-        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
-
-        builder.load_loader(manager, ['templatevarloader-test1', 'templatevarloader-test2'])
-        assert manager.modules[0] and manager.modules[1]
-
-    def test_load_loader_with_a_non_existent_loader(self, entry_points):
-        manager = MockMultiLoadersManager()
-        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
-
-        with pytest.raises(exceptions.LoaderNotFound):
-            builder.load_loader(manager, ['templatevarloader-test1', 'templatevarloader-test3', 'nonexistentloader'])
 
 
 DISPATCH_LOADER_NAME = 'dispatchloader-test1.py'
