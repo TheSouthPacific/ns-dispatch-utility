@@ -21,10 +21,6 @@ class LoaderError(NSDUError):
     """Error of loader plugins.
     """
 
-    def __init__(self, suppress_nsdu_error=True):
-        self.suppress_nsdu_error = suppress_nsdu_error
-        super().__init__()
-
 
 class LoaderConfigError(LoaderError):
     """Loader's config error.
