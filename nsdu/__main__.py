@@ -6,7 +6,8 @@ from datetime import timezone
 import importlib.metadata as import_metadata
 import logging
 import logging.config
-from typing import Sequence
+import signal
+import sys
 
 from nsdu import info
 from nsdu import exceptions
@@ -202,7 +203,7 @@ class NsduCred():
         cred_loader_manager (nsdu.loader.CredLoaderManager): Cred loader manager
     """
 
-    def __init__(self, cred_loader_manager, dispatch_api):
+    def __init__(self, cred_loader_manager: loader.CredLoaderManager, dispatch_api):
         self.dispatch_api = dispatch_api
         self.cred_loader_manager = cred_loader_manager
 
@@ -243,19 +244,19 @@ def load_nsdu_cred_utility_from_config(config):
         Built object
     """
 
-    cred_loader_manager = loader.CredLoaderManager(config['loader_config'])
-
     custom_loader_dir_path = config['general'].get('custom_loader_dir_path', None)
     entry_points = get_entry_points()
     singleloader_builder = loader.SingleLoaderManagerBuilder(info.LOADER_DIR_PATH,
                                                              custom_loader_dir_path,
                                                              entry_points)
+    cred_loader_manager = loader.CredLoaderManager(config['loader_config'])
     singleloader_builder.set_loader_manager(cred_loader_manager)
     singleloader_builder.load_loader(config['plugins']['cred_loader'])
+    cred_loader_manager.init_loader()
 
-    dispatch_api = dispatch_api.DispatchApi(config['general']['user_agent'])
+    dispatch_api_obj = dispatch_api.DispatchApi(config['general']['user_agent'])
 
-    return NsduCred(cred_loader_manager, dispatch_api)
+    return NsduCred(cred_loader_manager, dispatch_api_obj)
 
 
 def run(config, inputs):
@@ -265,6 +266,17 @@ def run(config, inputs):
         config: General config
         inputs: CLI arguments
     """
+
+    app = None
+
+    def interrupt_handler(sig, frame):
+        logger.info('Exiting NSDU...')
+        if app is not None:
+            app.close()
+        logger.info('Exited NSDU.')
+        sys.exit()
+
+    signal.signal(signal.SIGINT, interrupt_handler)
 
     if inputs.subparser_name == 'cred':
         app = load_nsdu_cred_utility_from_config(config)
@@ -280,8 +292,8 @@ def run(config, inputs):
             for nation_name in inputs.remove:
                 try:
                     app.remove_nation_cred(nation_name)
-                except exceptions.CredNotFound:
-                    logger.error('Nation "%s" not found.', nation_name)
+                except exceptions.CredNotFound as err:
+                    logger.error(err)
                     failure = True
                     break
 

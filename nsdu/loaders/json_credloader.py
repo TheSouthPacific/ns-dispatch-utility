@@ -61,7 +61,7 @@ class JSONCredLoader(collections.UserDict):
         """
 
         if name not in self.data:
-            raise exceptions.CredNotFound
+            raise exceptions.CredNotFound('Credential of nation "{}" not found.'.format(name))
         del self.data[name]
         self.saved = False
 
