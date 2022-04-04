@@ -53,7 +53,7 @@ class NsduDispatch():
         action = config['action']
 
         if action not in ('create', 'edit', 'remove'):
-            raise exceptions.DispatchConfigError('Invalid action "{}" on dispatch "{}".'.format(action, name))
+            raise exceptions.DispatchConfigError(f'Invalid action "{action}" on dispatch "{name}".')
 
         result_time = datetime.now(tz=timezone.utc)
         try:
@@ -110,9 +110,12 @@ class NsduDispatch():
                 continue
 
             if not names:
-                [self.update_a_dispatch(name) for name in dispatch_config.keys()]
+                for name in dispatch_config.keys():
+                    self.update_a_dispatch(name)
             else:
-                [self.update_a_dispatch(name) for name in dispatch_config.keys() if name in names]
+                for name in dispatch_config.keys():
+                    if name in names:
+                        self.update_a_dispatch(name)
 
     def close(self):
         """Save dispatch config changes and close dispatch loader.

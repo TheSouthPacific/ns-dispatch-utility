@@ -1,6 +1,7 @@
 """Load and run plugins.
 """
 
+from abc import ABC
 from typing import Sequence
 import collections
 import pathlib
@@ -93,7 +94,13 @@ class DispatchLoaderManager(PersistentLoaderManager):
         return self.manager.hook.get_dispatch_template(loader=self._loader, name=name)
 
     def after_update(self, name, action, result, result_time):
-        self.manager.hook.after_update(loader=self._loader, name=name, action=action, result=result, result_time=result_time)
+        self.manager.hook.after_update(
+            loader=self._loader,
+            name=name,
+            action=action,
+            result=result,
+            result_time=result_time
+        )
 
     def add_dispatch_id(self, name, dispatch_id):
         self.manager.hook.add_dispatch_id(loader=self._loader, name=name, dispatch_id=dispatch_id)
@@ -169,7 +176,7 @@ def load_all_modules_from_entry_points(entry_points, names):
     return modules
 
 
-class LoaderManagerBuilder():
+class LoaderManagerBuilder(ABC):
     """Base class for loader manager builders.
 
     Args:
@@ -190,7 +197,7 @@ class LoaderManagerBuilder():
         Args:
             loader_manager (LoaderManager): Loader manager instance
         """
-        
+
         self.loader_manager = loader_manager
 
 
@@ -271,12 +278,12 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
             try:
                 method(loader_name)
                 break
-            except exceptions.LoaderNotFound as err:
+            except exceptions.LoaderNotFound:
                 if method == methods[-1]:
-                    raise exceptions.LoaderNotFound("Loader {} not found.".format(loader_name))
+                    raise exceptions.LoaderNotFound(f'Loader {loader_name} not found.')
             except ValueError:
                 pass
-        
+
 
 class MultiLoadersManagerBuilder(LoaderManagerBuilder):
     """Load many loaders into a loader manager.
@@ -373,7 +380,7 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         Raises:
             exceptions.LoaderNotFound: No builder could find some loaders
         """
-        
+
         methods = [
             self.load_from_custom_dir,
             self.load_from_entry_points,
@@ -387,4 +394,4 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
                 pass
 
         if loader_names:
-            raise exceptions.LoaderNotFound("Loaders {} not found.".format(", ".join(loader_names)))
+            raise exceptions.LoaderNotFound(f'Loaders {", ".join(loader_names)} not found.')
