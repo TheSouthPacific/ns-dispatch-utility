@@ -313,7 +313,7 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         """
 
         if self.default_dir_path is None:
-            raise ValueError('Custom loader directory path is None')
+            raise ValueError('Default loader directory path is None')
 
         loader_modules = {}
         failed_loader_module_names = []
