@@ -347,6 +347,7 @@ class TestDispatchLoaderManager():
     def test_get_dispatch_config(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
         manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
+        manager.init_loader()
 
         r = manager.get_dispatch_config()
         manager.cleanup_loader()
@@ -356,6 +357,7 @@ class TestDispatchLoaderManager():
     def test_get_dispatch_template(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
         manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
+        manager.init_loader()
 
         r = manager.get_dispatch_template('test')
         manager.cleanup_loader()
@@ -365,6 +367,7 @@ class TestDispatchLoaderManager():
     def test_after_update(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
         manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
+        manager.init_loader()
 
         result_time = mock.Mock()
         manager.after_update('test', 'edit', 'success', result_time)
@@ -376,6 +379,7 @@ class TestDispatchLoaderManager():
     def test_add_dispatch_id(self):
         manager = loader.DispatchLoaderManager(DISPATCH_LOADER_CONFIG)
         manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / DISPATCH_LOADER_NAME))
+        manager.init_loader()
 
         manager.add_dispatch_id('test', '123456')
         manager.cleanup_loader()
@@ -421,6 +425,7 @@ class TestCredLoaderManager():
     def test_get_all_creds(self):
         manager = loader.CredLoaderManager(CRED_LOADER_CONFIG)
         manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / CRED_LOADER_NAME))
+        manager.init_loader()
 
         r = manager.get_creds()
         manager.cleanup_loader()
@@ -430,6 +435,7 @@ class TestCredLoaderManager():
     def test_add_cred(self):
         manager = loader.CredLoaderManager(CRED_LOADER_CONFIG)
         manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / CRED_LOADER_NAME))
+        manager.init_loader()
         manager.add_cred('Nation1', '123456')
         manager.cleanup_loader()
 
@@ -438,6 +444,7 @@ class TestCredLoaderManager():
     def test_remove_cred(self):
         manager = loader.CredLoaderManager(CRED_LOADER_CONFIG)
         manager.load_loader(load_module(CUSTOM_LOADER_DIR_PATH / CRED_LOADER_NAME))
+        manager.init_loader()
         manager.add_cred('Nation1', '123456')
 
         manager.remove_cred('nation1')

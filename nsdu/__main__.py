@@ -120,11 +120,11 @@ class NsduDispatch():
         self.dispatch_loader_manager.cleanup_loader()
 
 
-def get_entry_points() -> Sequence[import_metadata.EntryPoint]:
+def get_entry_points() -> list[import_metadata.EntryPoint]:
     """Get all metadata entry points.
 
     Returns:
-        Sequence[import_metadata.EntryPoint]: Entry points
+        list[import_metadata.EntryPoint]: Entry points
     """
 
     try:
@@ -153,30 +153,31 @@ def load_nsdu_dispatch_utility_from_config(config):
 
     plugin_opt = config['plugins']
     entry_points = get_entry_points()
-
     singleloader_builder = loader.SingleLoaderManagerBuilder(info.LOADER_DIR_PATH,
+                                                             custom_loader_dir_path,
+                                                             entry_points)
+    multiloaders_builder = loader.MultiLoadersManagerBuilder(info.LOADER_DIR_PATH,
                                                              custom_loader_dir_path,
                                                              entry_points)
     
     singleloader_builder.set_loader_manager(cred_loader_manager)
     singleloader_builder.load_loader(plugin_opt['cred_loader'])
-    creds = cred_loader_manager.get_creds()
-
     singleloader_builder.set_loader_manager(dispatch_loader_manager)
     singleloader_builder.load_loader(plugin_opt['dispatch_loader'])
-    dispatch_config = dispatch_loader_manager.get_dispatch_config()
-    logger.debug("Loaded dispatch config: %r", dispatch_config)
-
     singleloader_builder.set_loader_manager(simple_bb_loader_manager)
     singleloader_builder.load_loader(plugin_opt['simple_bb_loader'])
-    simple_bb_config = simple_bb_loader_manager.get_simple_bb_config()
-
-    multiloaders_builder = loader.MultiLoadersManagerBuilder(info.LOADER_DIR_PATH,
-                                                             custom_loader_dir_path,
-                                                             entry_points)
-
     multiloaders_builder.set_loader_manager(template_var_loader_manager)
     multiloaders_builder.load_loaders(plugin_opt['template_var_loader'])
+
+    cred_loader_manager.init_loader()
+    creds = cred_loader_manager.get_creds()
+    
+    dispatch_loader_manager.init_loader()
+    dispatch_config = dispatch_loader_manager.get_dispatch_config()
+    logger.debug("Loaded dispatch config: %r", dispatch_config)
+    
+    simple_bb_config = simple_bb_loader_manager.get_simple_bb_config()
+    
     template_vars = template_var_loader_manager.get_all_template_vars()
     dispatch_info = utils.get_dispatch_info(dispatch_config)
     template_vars['dispatch_info'] = dispatch_info

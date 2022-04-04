@@ -52,14 +52,6 @@ class PersistentLoaderManager(LoaderManager):
         # across hook calls.
         self._loader = None
 
-    def load_loader(self, module):
-        """Load a loader and return its instance for
-        reusing file managerrs/database connections.
-        """
-
-        super().load_loader(module)
-        self.init_loader()
-
     def init_loader(self):
         raise NotImplementedError
 
@@ -193,6 +185,12 @@ class LoaderManagerBuilder():
         self.loader_manager = None
 
     def set_loader_manager(self, loader_manager: LoaderManager):
+        """Set loader manager to build.
+
+        Args:
+            loader_manager (LoaderManager): Loader manager instance
+        """
+        
         self.loader_manager = loader_manager
 
 
@@ -275,7 +273,7 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
                 break
             except exceptions.LoaderNotFound as err:
                 if method == methods[-1]:
-                    raise exceptions.LoaderNotFound("Loader {} not found".format(loader_name))
+                    raise exceptions.LoaderNotFound("Loader {} not found.".format(loader_name))
             except ValueError:
                 pass
         
@@ -389,4 +387,4 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
                 pass
 
         if loader_names:
-            raise exceptions.LoaderNotFound("Loaders {} not found".format(", ".join(loader_names)))
+            raise exceptions.LoaderNotFound("Loaders {} not found.".format(", ".join(loader_names)))
