@@ -1,7 +1,7 @@
 """Load and run plugins.
 """
 
-from typing import Mapping, Sequence
+from typing import Sequence
 import collections
 import pathlib
 
@@ -253,6 +253,32 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
             raise exceptions.LoaderNotFound
         self.loader_manager.load_loader(loader_module)
 
+    def load_loader(self, loader_name: str) -> None:
+        """Load one loader into loader manager.
+
+        Args:
+            loader_name (str): Name of loader to load
+
+        Raises:
+            exceptions.LoaderNotFound: No builder could find this loader
+        """
+
+        methods = [
+            self.load_from_custom_dir,
+            self.load_from_entry_points,
+            self.load_from_default_dir
+        ]
+
+        for method in methods:
+            try:
+                method(loader_name)
+                break
+            except exceptions.LoaderNotFound as err:
+                if method == methods[-1]:
+                    raise err
+            except ValueError:
+                pass
+        
 
 class MultiLoadersManagerBuilder(LoaderManagerBuilder):
     """Load many loaders into a loader manager.
@@ -340,44 +366,20 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         failed_loader_module_names = [name for name in names if name not in loader_modules]
         return failed_loader_module_names
 
+    def load_loaders(self, loader_names: Sequence[str]) -> None:
+        """Load all provided loaders into loader manager.
 
-class LoaderManagerBuildDirector():
-    def __init__(self):
-        self._builder: LoaderManagerBuilder = None
+        Args:
+            loader_names (Sequence[str]): Names of loaders to load
 
-    @property
-    def builder(self) -> LoaderManagerBuilder:
-        return self._builder
-
-    @builder.setter
-    def builder(self, new_builder: LoaderManagerBuilder):
-        self._builder = new_builder
-
-    def load_one_loader(self, loader_manager: LoaderManager, loader_name: str) -> None:
-        self.builder.set_loader_manager(loader_manager)
+        Raises:
+            exceptions.LoaderNotFound: No builder could find some loaders
+        """
+        
         methods = [
-            self.builder.load_from_custom_dir,
-            self.builder.load_from_entry_points,
-            self.builder.load_from_default_dir
-        ]
-
-        for method in methods:
-            try:
-                method(loader_name)
-                break
-            except exceptions.LoaderNotFound as err:
-                if method == methods[-1]:
-                    raise err
-            except ValueError:
-                pass
-
-    def load_all_loaders(self, loader_manager: LoaderManager, loader_names: Sequence[str]) -> None:
-        self.builder.set_loader_manager(loader_manager)
-
-        methods = [
-            self.builder.load_from_custom_dir,
-            self.builder.load_from_entry_points,
-            self.builder.load_from_default_dir
+            self.load_from_custom_dir,
+            self.load_from_entry_points,
+            self.load_from_default_dir
         ]
 
         for method in methods:

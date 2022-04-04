@@ -1,7 +1,7 @@
 import pathlib
 import importlib
 from unittest import mock
-from importlib.metadata import EntryPoint
+from importlib.metadata import EntryPoint, entry_points
 
 import pytest
 
@@ -113,13 +113,17 @@ class MockSingleLoaderManager():
         self.module = module
 
 
+def get_parent_directory_name(file_path: str) -> str:
+    return pathlib.Path(file_path).parents[0].name
+
+
 class TestSingleLoaderManagerBuilder():
     @pytest.fixture
     def entry_points(self):
-        entry_points = [mock.Mock(load=mock.Mock(return_value=mock.Mock()))]
-        entry_points[0].name = 'simplebbloader-test1'
+        entry_point = mock.create_autospec(EntryPoint)
+        entry_point.name = 'simplebbloader-test3'
 
-        yield entry_points
+        yield [entry_point]
 
     def test_load_loader_from_default_source_dir(self, entry_points):
         manager = MockSingleLoaderManager()
@@ -160,7 +164,6 @@ class TestSingleLoaderManagerBuilder():
         with pytest.raises(exceptions.LoaderNotFound):
             builder.load_from_custom_dir('zoo')
 
-    
     def test_load_loader_with_no_custom_source_dir_raises_exception(self, entry_points):
         builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
         builder.set_loader_manager(MockSingleLoaderManager())
@@ -173,7 +176,7 @@ class TestSingleLoaderManagerBuilder():
         builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
         builder.set_loader_manager(manager)
 
-        builder.load_from_entry_points('simplebbloader-test1')
+        builder.load_from_entry_points('simplebbloader-test3')
 
         assert manager.module
     
@@ -183,6 +186,41 @@ class TestSingleLoaderManagerBuilder():
 
         with pytest.raises(exceptions.LoaderNotFound):
             builder.load_from_entry_points('zoo')
+
+    def test_load_one_loader_with_name_exists_in_one_source(self, entry_points):
+        manager = MockSingleLoaderManager()
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_loader('simplebbloader-test1')
+
+        assert get_parent_directory_name(manager.module.__file__) == "resources"
+
+    def test_load_first_found_loader_when_load_one_loader_that_exists_in_many_sources(self, entry_points):
+        manager = MockSingleLoaderManager()
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_loader('simplebbloader-test1')
+
+        assert get_parent_directory_name(manager.module.__file__) == "resources"
+
+    def test_load_one_loader_when_a_builder_loader_dir_is_not_set(self, entry_points):
+        manager = MockSingleLoaderManager()
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_loader('simplebbloader-test1')
+
+        assert get_parent_directory_name(manager.module.__file__) == "default"
+
+    def test_load_one_loader_when_loader_does_not_exist_anywhere(self, entry_points):
+        manager = MockSingleLoaderManager()
+        builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
+        builder.set_loader_manager(manager)
+        
+        with pytest.raises(exceptions.LoaderNotFound):
+            builder.load_loader('abcdefg')
 
 
 class MockMultiLoadersManager():
@@ -207,7 +245,7 @@ class TestMultiLoadersManagerBuilder():
     @pytest.fixture
     def entry_points(self):
         entry_point = mock.create_autospec(EntryPoint)
-        entry_point.name = 'templatevarloader-test1'
+        entry_point.name = 'templatevarloader-test4'
 
         yield [entry_point]
 
@@ -252,7 +290,7 @@ class TestMultiLoadersManagerBuilder():
         builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
         builder.set_loader_manager(manager)
 
-        builder.load_from_entry_points(['templatevarloader-test1'])
+        builder.load_from_entry_points(['templatevarloader-test4'])
 
         assert manager.modules[0]
 
@@ -264,6 +302,41 @@ class TestMultiLoadersManagerBuilder():
         non_existent_loader_names = builder.load_from_entry_points(['foo'])
 
         assert non_existent_loader_names == ['foo']
+
+    def test_load_loaders_with_name_exists_in_one_source(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_loaders(['templatevarloader-test3'])
+
+        assert get_parent_directory_name(manager.modules[0].__file__) == "default"
+
+    def test_load_first_found_loader_when_load_loaders_that_exists_in_many_sources(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_loaders(['templatevarloader-test1'])
+
+        assert get_parent_directory_name(manager.modules[0].__file__) == "resources"
+
+    def test_load_loaders_when_a_builder_loader_dir_is_not_set(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
+        builder.set_loader_manager(manager)
+
+        builder.load_loaders(['templatevarloader-test1'])
+
+        assert get_parent_directory_name(manager.modules[0].__file__) == "default"
+
+    def test_load_loaders_when_a_loader_does_not_exist_anywhere(self, entry_points):
+        manager = MockMultiLoadersManager()
+        builder = loader.MultiLoadersManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
+        builder.set_loader_manager(manager)
+
+        with pytest.raises(exceptions.LoaderNotFound):
+            builder.load_loaders(['templatevarloader-test1', 'abcdefg'])
 
 
 DISPATCH_LOADER_NAME = 'dispatchloader-test1.py'
