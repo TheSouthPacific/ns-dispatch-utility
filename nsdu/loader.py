@@ -275,7 +275,7 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
                 break
             except exceptions.LoaderNotFound as err:
                 if method == methods[-1]:
-                    raise err
+                    raise exceptions.LoaderNotFound("Loader {} not found".format(loader_name))
             except ValueError:
                 pass
         
