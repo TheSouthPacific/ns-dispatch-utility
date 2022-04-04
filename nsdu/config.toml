@@ -43,7 +43,7 @@ personnel_info_groups = ['reference']
 google_cred_path = '~/ns_dispatches/google_creds.json'
 owner_nation_sheet = {spreadsheet_id = '1234abcdefgh', range='Owner!A3:C'}
 category_setup_sheet = {spreadsheet_id = '1234abcdefgh', range='CategorySetup!A3:B'}
-utility_template_spreadsheets = [{spreadsheet_id = '1234abcdefgh', 
+utility_template_spreadsheets = [{spreadsheet_id = '1234abcdefgh',
                                   ranges=['Layout!A3:B', 'Macros!A3:B']}]
 dispatch_spreadsheets = [{spreadsheet_id = '1234abcdefgh', ranges = ['Set1!A3:E', 'Set2!A3:E']},
                          {spreadsheet_id = '5678xyzjklmn', ranges = ['Set3!A3:E', 'Set4!A3:E']}]
