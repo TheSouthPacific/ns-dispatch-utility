@@ -179,7 +179,7 @@ class TestSingleLoaderManagerBuilder():
         builder.load_from_entry_points('simplebbloader-test3')
 
         assert manager.module
-    
+
     def test_load_non_existent_loader_from_entry_points_raises_exception(self, entry_points):
         builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, CUSTOM_LOADER_DIR_PATH, entry_points)
         builder.set_loader_manager(MockSingleLoaderManager())
@@ -218,7 +218,7 @@ class TestSingleLoaderManagerBuilder():
         manager = MockSingleLoaderManager()
         builder = loader.SingleLoaderManagerBuilder(DEFAULT_LOADER_DIR_PATH, None, entry_points)
         builder.set_loader_manager(manager)
-        
+
         with pytest.raises(exceptions.LoaderNotFound):
             builder.load_loader('abcdefg')
 

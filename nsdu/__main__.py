@@ -10,7 +10,7 @@ from typing import Sequence
 
 from nsdu import info
 from nsdu import exceptions
-from nsdu import api_adapter
+from nsdu import dispatch_api
 from nsdu import loader
 from nsdu import updater_api
 from nsdu import utils
@@ -146,11 +146,6 @@ def load_nsdu_dispatch_utility_from_config(config):
     custom_loader_dir_path = config['general'].get('custom_loader_dir_path', None)
     loader_config = config['loader_config']
 
-    dispatch_loader_manager = loader.DispatchLoaderManager(loader_config)
-    template_var_loader_manager = loader.TemplateVarLoaderManager(loader_config)
-    simple_bb_loader_manager = loader.SimpleBBLoaderManager(loader_config)
-    cred_loader_manager = loader.CredLoaderManager(loader_config)
-
     plugin_opt = config['plugins']
     entry_points = get_entry_points()
     singleloader_builder = loader.SingleLoaderManagerBuilder(info.LOADER_DIR_PATH,
@@ -159,7 +154,12 @@ def load_nsdu_dispatch_utility_from_config(config):
     multiloaders_builder = loader.MultiLoadersManagerBuilder(info.LOADER_DIR_PATH,
                                                              custom_loader_dir_path,
                                                              entry_points)
-    
+
+    dispatch_loader_manager = loader.DispatchLoaderManager(loader_config)
+    template_var_loader_manager = loader.TemplateVarLoaderManager(loader_config)
+    simple_bb_loader_manager = loader.SimpleBBLoaderManager(loader_config)
+    cred_loader_manager = loader.CredLoaderManager(loader_config)
+
     singleloader_builder.set_loader_manager(cred_loader_manager)
     singleloader_builder.load_loader(plugin_opt['cred_loader'])
     singleloader_builder.set_loader_manager(dispatch_loader_manager)
@@ -171,13 +171,13 @@ def load_nsdu_dispatch_utility_from_config(config):
 
     cred_loader_manager.init_loader()
     creds = cred_loader_manager.get_creds()
-    
+
     dispatch_loader_manager.init_loader()
     dispatch_config = dispatch_loader_manager.get_dispatch_config()
     logger.debug("Loaded dispatch config: %r", dispatch_config)
-    
+
     simple_bb_config = simple_bb_loader_manager.get_simple_bb_config()
-    
+
     template_vars = template_var_loader_manager.get_all_template_vars()
     dispatch_info = utils.get_dispatch_info(dispatch_config)
     template_vars['dispatch_info'] = dispatch_info
@@ -253,7 +253,7 @@ def load_nsdu_cred_utility_from_config(config):
     singleloader_builder.set_loader_manager(cred_loader_manager)
     singleloader_builder.load_loader(config['plugins']['cred_loader'])
 
-    dispatch_api = api_adapter.DispatchApi(config['general']['user_agent'])
+    dispatch_api = dispatch_api.DispatchApi(config['general']['user_agent'])
 
     return NsduCred(cred_loader_manager, dispatch_api)
 
