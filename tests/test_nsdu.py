@@ -30,19 +30,19 @@ class TestNsduCred():
     def test_add_nation_cred_calls_cred_loader(self):
         mock_cred_loader = mock.Mock(add_cred=mock.Mock())
         mock_dispatch_api = mock.Mock(login=mock.Mock(return_value='123456'))
-        app = __main__.NsduCred(mock_cred_loader, mock_dispatch_api)
+        app = __main__.CredOperations(mock_cred_loader, mock_dispatch_api)
 
         app.add_nation_cred('nation1', '123456')
-        app.close()
+        app.cleanup()
 
         mock_cred_loader.add_cred.assert_called_with('nation1', '123456')
 
     def test_remove_nation_cred_calls_cred_loader(self):
         mock_cred_loader = mock.Mock(remove_cred=mock.Mock())
-        app = __main__.NsduCred(mock_cred_loader, mock.Mock())
+        app = __main__.CredOperations(mock_cred_loader, mock.Mock())
 
         app.remove_nation_cred('nation1')
-        app.close()
+        app.cleanup()
 
         mock_cred_loader.remove_cred.assert_called_with('nation1')
 
@@ -55,7 +55,7 @@ class TestNsduDispatch():
                                  'title': 'Test title',
                                  'category': '1',
                                  'subcategory': '100'}}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
 
         app.update_a_dispatch('foo')
 
@@ -69,7 +69,7 @@ class TestNsduDispatch():
                                  'title': 'Test title',
                                  'category': '1',
                                  'subcategory': '100'}}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
 
         app.update_a_dispatch('foo')
 
@@ -83,7 +83,7 @@ class TestNsduDispatch():
                                  'title': 'Test title',
                                  'category': '1',
                                  'subcategory': '100'}}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
 
         app.update_a_dispatch('foo')
 
@@ -97,7 +97,7 @@ class TestNsduDispatch():
                                  'title': 'Test title',
                                  'category': '1',
                                  'subcategory': '100'}}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
 
         with pytest.raises(exceptions.DispatchConfigError):
             app.update_a_dispatch('foo')
@@ -110,7 +110,7 @@ class TestNsduDispatch():
                                  'title': 'Test title',
                                  'category': '1',
                                  'subcategory': '100'}}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
 
         app.update_a_dispatch('foo')
 
@@ -129,7 +129,7 @@ class TestNsduDispatch():
                                  'title': 'Test title',
                                  'category': '1',
                                  'subcategory': '100'}}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {})
 
         app.update_a_dispatch('foo')
 
@@ -145,7 +145,7 @@ class TestNsduDispatch():
                                                 'subcategory': '100'}}}
         dispatch_info = get_dispatch_info(dispatch_config)
         creds = {'nation1': 'abcd1234'}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager,
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager,
                                     dispatch_config, dispatch_info, creds)
 
         app.update_dispatches([])
@@ -158,7 +158,7 @@ class TestNsduDispatch():
         dispatch_config = {'Nation1' : {}}
         dispatch_info = get_dispatch_info(dispatch_config)
         creds = {'nation1': 'abcd1234'}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager,
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager,
                                     dispatch_config, dispatch_info, creds)
 
         app.update_dispatches([])
@@ -174,7 +174,7 @@ class TestNsduDispatch():
                                                 'subcategory': '100'}}}
         dispatch_info = get_dispatch_info(dispatch_config)
         creds = {'nation1': 'abcd1234'}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager,
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager,
                                     dispatch_config, dispatch_info, creds)
 
         app.update_dispatches(['foo'])
@@ -191,7 +191,7 @@ class TestNsduDispatch():
                                                 'subcategory': '100'}}}
         dispatch_info = get_dispatch_info(dispatch_config)
         creds = {'nation1': 'abcd1234'}
-        app = __main__.NsduDispatch(dispatch_updater, dispatch_loader_manager,
+        app = __main__.DispatchOperations(dispatch_updater, dispatch_loader_manager,
                                     dispatch_config, dispatch_info, creds)
 
         app.update_dispatches(['voo'])
