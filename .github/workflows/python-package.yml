@@ -31,7 +31,7 @@ jobs:
         poetry install
     - name: Lint with pylint
       run: |
-        poetry run pylint nsdu
+        poetry run pylint -E nsdu
     - name: Test with pytest
       run: |
         poetry run pytest
