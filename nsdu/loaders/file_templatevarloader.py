@@ -44,7 +44,9 @@ def replace_name_with_personnel_info(name, personnel_info):
     try:
         name = personnel_info[name]
     except KeyError:
-        raise exceptions.LoaderConfigError('Info for personnel "{}" not found'.format(name))
+        raise exceptions.LoaderConfigError(
+            'Info for personnel "{}" not found'.format(name)
+        )
 
     return name
 
@@ -62,10 +64,12 @@ def merge_personnel_info_groups(template_vars, personnel_info_groups):
         try:
             personnel_info.update(copy.deepcopy(template_vars[group]))
         except KeyError:
-            raise exceptions.LoaderConfigError('Personnel info var group "{}" not found'.format(group))
+            raise exceptions.LoaderConfigError(
+                'Personnel info var group "{}" not found'.format(group)
+            )
 
     for name, info in personnel_info.items():
-        info['name'] = name
+        info["name"] = name
 
     return personnel_info
 
@@ -78,18 +82,28 @@ def add_personnel_info(template_vars, personnel_groups, personnel_info_groups):
             personnel = template_vars[group]
             for position, names in personnel.items():
                 if isinstance(names, list):
-                    personnel[position] = replace_name_list_with_personnel_info(names, personnel_info)
+                    personnel[position] = replace_name_list_with_personnel_info(
+                        names, personnel_info
+                    )
                 else:
-                    personnel[position] = replace_name_with_personnel_info(names, personnel_info)
+                    personnel[position] = replace_name_with_personnel_info(
+                        names, personnel_info
+                    )
         except KeyError:
-            raise exceptions.LoaderConfigError('Personnel var group "{}" not found'.format(group))
+            raise exceptions.LoaderConfigError(
+                'Personnel var group "{}" not found'.format(group)
+            )
 
 
 @loader_api.template_var_loader
 def get_template_vars(config):
-    loader_config = config['file_templatevarloader']
+    loader_config = config["file_templatevarloader"]
 
-    template_vars = load_template_vars_from_files(loader_config['template_var_paths'])
-    add_personnel_info(template_vars, loader_config['personnel_groups'], loader_config['personnel_info_groups'])
+    template_vars = load_template_vars_from_files(loader_config["template_var_paths"])
+    add_personnel_info(
+        template_vars,
+        loader_config["personnel_groups"],
+        loader_config["personnel_info_groups"],
+    )
 
     return template_vars

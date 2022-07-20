@@ -46,7 +46,9 @@ def get_config_from_env(config_path):
     try:
         return get_config_from_toml(config_path)
     except FileNotFoundError as err:
-        raise exceptions.ConfigError('Could not find general config file {}'.format(config_path)) from err
+        raise exceptions.ConfigError(
+            "Could not find general config file {}".format(config_path)
+        ) from err
 
 
 def get_config_from_default(config_dir, default_config_path, config_name):
@@ -69,9 +71,13 @@ def get_config_from_default(config_dir, default_config_path, config_name):
     try:
         return get_config_from_toml(config_path)
     except FileNotFoundError as err:
-        shutil.copyfile(default_config_path , config_path)
-        raise exceptions.ConfigError(('Could not find config.toml. First time run? '
-                                      'Created one in {}. Please edit it.').format(config_path)) from err
+        shutil.copyfile(default_config_path, config_path)
+        raise exceptions.ConfigError(
+            (
+                "Could not find config.toml. First time run? "
+                "Created one in {}. Please edit it."
+            ).format(config_path)
+        ) from err
 
 
 def get_general_config():
@@ -87,9 +93,9 @@ def get_general_config():
         return get_config_from_env(pathlib.Path(env_var))
 
     info.CONFIG_DIR.mkdir(exist_ok=True)
-    return get_config_from_default(info.CONFIG_DIR,
-                                   info.DEFAULT_CONFIG_PATH,
-                                   info.CONFIG_NAME)
+    return get_config_from_default(
+        info.CONFIG_DIR, info.DEFAULT_CONFIG_PATH, info.CONFIG_NAME
+    )
 
 
 def get_dispatch_info(dispatch_config):
@@ -106,7 +112,7 @@ def get_dispatch_info(dispatch_config):
     dispatch_info = {}
     for nation, dispatches in dispatch_config.items():
         for name, config in dispatches.items():
-            config['owner_nation'] = nation
+            config["owner_nation"] = nation
             dispatch_info[name] = config
 
     return dispatch_info
@@ -150,4 +156,4 @@ def canonical_nation_name(name):
         str: Lower case nation name
     """
 
-    return name.lower().replace('_', ' ')
+    return name.lower().replace("_", " ")

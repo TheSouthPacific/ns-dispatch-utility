@@ -56,8 +56,11 @@ def get_dispatch_template(loader: object, name: str) -> str:
         str: Dispatch content text
     """
 
+
 @dispatch_loader_specs(firstresult=True)
-def after_update(loader: object, name: str, action: str, result: str, result_time: datetime.datetime):
+def after_update(
+    loader: object, name: str, action: str, result: str, result_time: datetime.datetime
+):
     """Run after a dispatch is updated to report
     result of an operation.
 

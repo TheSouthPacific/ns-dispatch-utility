@@ -29,14 +29,16 @@ def get_category_number(category, subcategory):
     if category.isalpha() and subcategory.isalpha():
         try:
             category_info = info.CATEGORIES[category.lower()]
-            category_num = category_info['num']
+            category_num = category_info["num"]
         except KeyError as err:
-            raise exceptions.NonexistentCategoryError('category', category) from err
+            raise exceptions.NonexistentCategoryError("category", category) from err
 
         try:
-            subcategory_num = category_info['subcategories'][subcategory.lower()]
+            subcategory_num = category_info["subcategories"][subcategory.lower()]
         except KeyError as err:
-            raise exceptions.NonexistentCategoryError('subcategory', subcategory) from err
+            raise exceptions.NonexistentCategoryError(
+                "subcategory", subcategory
+            ) from err
     else:
         category_num = category
         subcategory_num = subcategory
@@ -44,7 +46,7 @@ def get_category_number(category, subcategory):
     return category_num, subcategory_num
 
 
-class DispatchUpdater():
+class DispatchUpdater:
     """API for rendering and updating dispatches.
 
     Args:
@@ -56,14 +58,23 @@ class DispatchUpdater():
         template_vars (dict): Variables for templates
     """
 
-    def __init__(self, user_agent, template_filter_paths, simple_formatter_config,
-                 complex_formatter_source_path, template_load_func, template_vars):
+    def __init__(
+        self,
+        user_agent,
+        template_filter_paths,
+        simple_formatter_config,
+        complex_formatter_source_path,
+        template_load_func,
+        template_vars,
+    ):
         self.dispatch_api = dispatch_api.DispatchApi(user_agent=user_agent)
-        self.renderer = renderer.DispatchRenderer(template_load_func,
-                                                  simple_formatter_config,
-                                                  complex_formatter_source_path,
-                                                  template_filter_paths,
-                                                  template_vars)
+        self.renderer = renderer.DispatchRenderer(
+            template_load_func,
+            simple_formatter_config,
+            complex_formatter_source_path,
+            template_filter_paths,
+            template_vars,
+        )
 
     def login_owner_nation(self, nation_name, password=None, autologin=None):
         """Log into dispatch owner nation.
@@ -103,10 +114,9 @@ class DispatchUpdater():
 
         text = self.get_rendered_dispatch_text(name)
         category_num, subcategory_num = get_category_number(category, subcategory)
-        new_dispatch_id = self.dispatch_api.create_dispatch(title=title,
-                                                            text=text,
-                                                            category=category_num,
-                                                            subcategory=subcategory_num)
+        new_dispatch_id = self.dispatch_api.create_dispatch(
+            title=title, text=text, category=category_num, subcategory=subcategory_num
+        )
         return new_dispatch_id
 
     def edit_dispatch(self, name, dispatch_id, title, category, subcategory):
@@ -122,11 +132,13 @@ class DispatchUpdater():
 
         text = self.get_rendered_dispatch_text(name)
         category_num, subcategory_num = get_category_number(category, subcategory)
-        self.dispatch_api.edit_dispatch(dispatch_id=dispatch_id,
-                                        title=title,
-                                        text=text,
-                                        category=category_num,
-                                        subcategory=subcategory_num)
+        self.dispatch_api.edit_dispatch(
+            dispatch_id=dispatch_id,
+            title=title,
+            text=text,
+            category=category_num,
+            subcategory=subcategory_num,
+        )
 
     def remove_dispatch(self, dispatch_id):
         """Delete a dispatch.

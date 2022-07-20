@@ -14,7 +14,7 @@ from nsdu import loader_api
 from nsdu import utils
 
 
-class LoaderManager():
+class LoaderManager:
     """Manager for loaded loaders.
 
     Args:
@@ -62,8 +62,7 @@ class PersistentLoaderManager(LoaderManager):
 
 # pylint: disable=maybe-no-member
 class TemplateVarLoaderManager(LoaderManager):
-    """Manager for template variable loaders.
-    """
+    """Manager for template variable loaders."""
 
     def __init__(self, loader_config):
         super().__init__(info.TEMPLATE_VAR_LOADER_PROJ, loader_config)
@@ -75,8 +74,7 @@ class TemplateVarLoaderManager(LoaderManager):
 
 
 class DispatchLoaderManager(PersistentLoaderManager):
-    """Manager for a dispatch loader.
-    """
+    """Manager for a dispatch loader."""
 
     def __init__(self, loader_config):
         super().__init__(info.DISPATCH_LOADER_PROJ, loader_config)
@@ -99,16 +97,17 @@ class DispatchLoaderManager(PersistentLoaderManager):
             name=name,
             action=action,
             result=result,
-            result_time=result_time
+            result_time=result_time,
         )
 
     def add_dispatch_id(self, name, dispatch_id):
-        self.manager.hook.add_dispatch_id(loader=self._loader, name=name, dispatch_id=dispatch_id)
+        self.manager.hook.add_dispatch_id(
+            loader=self._loader, name=name, dispatch_id=dispatch_id
+        )
 
 
 class SimpleBBLoaderManager(LoaderManager):
-    """Manager for a simple BBCode formatter loader.
-    """
+    """Manager for a simple BBCode formatter loader."""
 
     def __init__(self, loader_config):
         super().__init__(info.SIMPLE_BB_LOADER_PROJ, loader_config)
@@ -118,8 +117,7 @@ class SimpleBBLoaderManager(LoaderManager):
 
 
 class CredLoaderManager(PersistentLoaderManager):
-    """Manager for a login credential loader.
-    """
+    """Manager for a login credential loader."""
 
     def __init__(self, loader_config):
         super().__init__(info.CRED_LOADER_PROJ, loader_config)
@@ -134,11 +132,16 @@ class CredLoaderManager(PersistentLoaderManager):
         return self.manager.hook.get_creds(loader=self._loader)
 
     def add_cred(self, name, x_autologin):
-        self.manager.hook.add_cred(loader=self._loader, name=utils.canonical_nation_name(name),
-                                          x_autologin=x_autologin)
+        self.manager.hook.add_cred(
+            loader=self._loader,
+            name=utils.canonical_nation_name(name),
+            x_autologin=x_autologin,
+        )
 
     def remove_cred(self, name):
-        self.manager.hook.remove_cred(loader=self._loader, name=utils.canonical_nation_name(name))
+        self.manager.hook.remove_cred(
+            loader=self._loader, name=utils.canonical_nation_name(name)
+        )
 
 
 def load_module_from_entry_points(entry_points, name):
@@ -202,8 +205,7 @@ class LoaderManagerBuilder(ABC):
 
 
 class SingleLoaderManagerBuilder(LoaderManagerBuilder):
-    """Load a loader into a loader manager.
-    """
+    """Load a loader into a loader manager."""
 
     def load_from_default_dir(self, name: str) -> None:
         """Load a loader into loader manager from default loader directory.
@@ -216,10 +218,12 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
         """
 
         if self.default_dir_path is None:
-            raise ValueError('Default loader directory path is None')
+            raise ValueError("Default loader directory path is None")
 
         try:
-            loader_module = utils.load_module((self.default_dir_path / name).with_suffix('.py'))
+            loader_module = utils.load_module(
+                (self.default_dir_path / name).with_suffix(".py")
+            )
         except FileNotFoundError:
             raise exceptions.LoaderNotFound
         self.loader_manager.load_loader(loader_module)
@@ -235,10 +239,12 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
         """
 
         if self.custom_dir_path is None:
-            raise ValueError('Custom loader directory path is None')
+            raise ValueError("Custom loader directory path is None")
 
         try:
-            loader_module = utils.load_module(pathlib.Path(self.custom_dir_path / name).with_suffix('.py'))
+            loader_module = utils.load_module(
+                pathlib.Path(self.custom_dir_path / name).with_suffix(".py")
+            )
         except FileNotFoundError:
             raise exceptions.LoaderNotFound
         self.loader_manager.load_loader(loader_module)
@@ -271,7 +277,7 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
         methods = [
             self.load_from_custom_dir,
             self.load_from_entry_points,
-            self.load_from_default_dir
+            self.load_from_default_dir,
         ]
 
         for method in methods:
@@ -280,14 +286,13 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
                 break
             except exceptions.LoaderNotFound:
                 if method == methods[-1]:
-                    raise exceptions.LoaderNotFound(f'Loader {loader_name} not found.')
+                    raise exceptions.LoaderNotFound(f"Loader {loader_name} not found.")
             except ValueError:
                 pass
 
 
 class MultiLoadersManagerBuilder(LoaderManagerBuilder):
-    """Load many loaders into a loader manager.
-    """
+    """Load many loaders into a loader manager."""
 
     def load_into_manager(self, loader_modules: dict) -> None:
         """Load loader modules into loader manager.
@@ -313,14 +318,16 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         """
 
         if self.default_dir_path is None:
-            raise ValueError('Default loader directory path is None')
+            raise ValueError("Default loader directory path is None")
 
         loader_modules = {}
         failed_loader_module_names = []
 
         for name in names:
             try:
-                loader_modules[name] = utils.load_module((self.default_dir_path / name).with_suffix('.py'))
+                loader_modules[name] = utils.load_module(
+                    (self.default_dir_path / name).with_suffix(".py")
+                )
             except FileNotFoundError:
                 failed_loader_module_names.append(name)
 
@@ -341,14 +348,16 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         """
 
         if self.custom_dir_path is None:
-            raise ValueError('Custom loader directory path is None')
+            raise ValueError("Custom loader directory path is None")
 
         loader_modules = {}
         failed_loader_module_names = []
 
         for name in names:
             try:
-                loader_modules[name] = utils.load_module((self.custom_dir_path / name).with_suffix('.py'))
+                loader_modules[name] = utils.load_module(
+                    (self.custom_dir_path / name).with_suffix(".py")
+                )
             except FileNotFoundError:
                 failed_loader_module_names.append(name)
 
@@ -368,7 +377,9 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         loader_modules = load_all_modules_from_entry_points(self.entry_points, names)
         self.load_into_manager(loader_modules)
 
-        failed_loader_module_names = [name for name in names if name not in loader_modules]
+        failed_loader_module_names = [
+            name for name in names if name not in loader_modules
+        ]
         return failed_loader_module_names
 
     def load_loaders(self, loader_names: Sequence[str]) -> None:
@@ -384,7 +395,7 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         methods = [
             self.load_from_custom_dir,
             self.load_from_entry_points,
-            self.load_from_default_dir
+            self.load_from_default_dir,
         ]
 
         for method in methods:
@@ -394,4 +405,6 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
                 pass
 
         if loader_names:
-            raise exceptions.LoaderNotFound(f'Loaders {", ".join(loader_names)} not found.')
+            raise exceptions.LoaderNotFound(
+                f'Loaders {", ".join(loader_names)} not found.'
+            )

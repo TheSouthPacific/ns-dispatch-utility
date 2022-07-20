@@ -18,22 +18,21 @@ def convert_to_html_entities(text):
         str: Converted text
     """
 
-    return text.encode('ascii', 'xmlcharrefreplace')
+    return text.encode("ascii", "xmlcharrefreplace")
 
 
 def reraise_exception(err):
-    """Reraise appropriate exceptions.
-    """
+    """Reraise appropriate exceptions."""
 
-    if 'Unknown dispatch' in str(err):
+    if "Unknown dispatch" in str(err):
         raise exceptions.UnknownDispatchError from err
-    if 'not the author of this dispatch' in str(err):
+    if "not the author of this dispatch" in str(err):
         raise exceptions.NotOwnerDispatchError from err
 
     raise exceptions.DispatchApiError from err
 
 
-class DispatchApi():
+class DispatchApi:
     """Wrapper around pynationstates for dispatch functions.
 
     Args:
@@ -61,15 +60,17 @@ class DispatchApi():
             self.owner_nation = self.api.nation(nation_name, autologin=autologin)
 
         try:
-            resp_headers = self.owner_nation.get_shards('ping', full_response=True)['headers']
+            resp_headers = self.owner_nation.get_shards("ping", full_response=True)[
+                "headers"
+            ]
         except nationstates.exceptions.Forbidden as err:
             raise exceptions.NationLoginError from err
 
         if password is not None:
-            if 'X-Autologin' not in resp_headers:
+            if "X-Autologin" not in resp_headers:
                 raise exceptions.NationLoginError
 
-            return resp_headers['X-Autologin']
+            return resp_headers["X-Autologin"]
 
         return None
 
@@ -85,12 +86,14 @@ class DispatchApi():
             str: New dispatch ID
         """
 
-        resp = self.owner_nation.create_dispatch(title=title,
-                                                 text=convert_to_html_entities(text),
-                                                 category=category,
-                                                 subcategory=subcategory)
+        resp = self.owner_nation.create_dispatch(
+            title=title,
+            text=convert_to_html_entities(text),
+            category=category,
+            subcategory=subcategory,
+        )
 
-        new_dispatch_id = re.search('id=(\\d+)', resp['success']).group(1)
+        new_dispatch_id = re.search("id=(\\d+)", resp["success"]).group(1)
         return new_dispatch_id
 
     def edit_dispatch(self, dispatch_id, title, text, category, subcategory):
@@ -105,11 +108,13 @@ class DispatchApi():
         """
 
         try:
-            self.owner_nation.edit_dispatch(dispatch_id=dispatch_id,
-                                            title=title,
-                                            text=convert_to_html_entities(text),
-                                            category=category,
-                                            subcategory=subcategory)
+            self.owner_nation.edit_dispatch(
+                dispatch_id=dispatch_id,
+                title=title,
+                text=convert_to_html_entities(text),
+                category=category,
+                subcategory=subcategory,
+            )
         except nationstates.exceptions.APIUsageError as err:
             reraise_exception(err)
 

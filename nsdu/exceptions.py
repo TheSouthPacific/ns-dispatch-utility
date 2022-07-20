@@ -3,68 +3,55 @@
 
 
 class NSDUError(Exception):
-    """NSDU general error.
-    """
+    """NSDU general error."""
 
 
 class ConfigError(NSDUError):
-    """NSDU general config error.
-    """
+    """NSDU general config error."""
 
 
 class LoaderNotFound(NSDUError):
-    """Loader source file not found.
-    """
+    """Loader source file not found."""
 
 
 class LoaderError(NSDUError):
-    """Error of loader plugins.
-    """
+    """Error of loader plugins."""
 
 
 class LoaderConfigError(LoaderError):
-    """Loader's config error.
-    """
+    """Loader's config error."""
 
 
 class CredNotFound(LoaderError):
-    """Login credential not found. For cred loader.
-    """
+    """Login credential not found. For cred loader."""
 
 
 class DispatchTemplateNotFound(LoaderError):
-    """Dispatch template not found.
-    """
+    """Dispatch template not found."""
 
 
 class DispatchApiError(NSDUError):
-    """Dispatch API error.
-    """
+    """Dispatch API error."""
 
 
 class UnknownDispatchError(DispatchApiError):
-    """This dispatch does not exist.
-    """
+    """This dispatch does not exist."""
 
 
 class NotOwnerDispatchError(DispatchApiError):
-    """You do not own this dispatch.
-    """
+    """You do not own this dispatch."""
 
 
 class NationLoginError(DispatchApiError):
-    """Failed to log in to nation.
-    """
+    """Failed to log in to nation."""
 
 
 class DispatchConfigError(NSDUError):
-    """Dispatch config error.
-    """
+    """Dispatch config error."""
 
 
 class NonexistentCategoryError(DispatchConfigError):
-    """Category or subcategory doesn't exist.
-    """
+    """Category or subcategory doesn't exist."""
 
     def __init__(self, category_type, category_value):
         self.category_type = category_type
@@ -73,15 +60,12 @@ class NonexistentCategoryError(DispatchConfigError):
 
 
 class DispatchRenderingError(NSDUError):
-    """Dispatch rendering error.
-    """
+    """Dispatch rendering error."""
 
 
 class BBParsingError(DispatchRenderingError):
-    """BBCode parsing errors.
-    """
+    """BBCode parsing errors."""
 
 
 class TemplateRenderingError(DispatchRenderingError):
-    """Jinja template rendering errors.
-    """
+    """Jinja template rendering errors."""

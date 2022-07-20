@@ -10,15 +10,14 @@ from nsdu import exceptions
 from nsdu import loader_api
 from nsdu import utils
 
-DEFAULT_ID_STORE_FILENAME = 'dispatch_id.json'
-DEFAULT_EXT = '.txt'
+DEFAULT_ID_STORE_FILENAME = "dispatch_id.json"
+DEFAULT_EXT = ".txt"
 
 logger = logging.getLogger(__name__)
 
 
-class DispatchConfigManager():
-    """Get and save dispatch config with files.
-    """
+class DispatchConfigManager:
+    """Get and save dispatch config with files."""
 
     def __init__(self):
         # Dispatch config of all loaded files
@@ -34,7 +33,9 @@ class DispatchConfigManager():
         """
 
         for dispatch_config_path in dispatch_config_paths:
-            self.all_dispatch_config[dispatch_config_path] = utils.get_config_from_toml(dispatch_config_path)
+            self.all_dispatch_config[dispatch_config_path] = utils.get_config_from_toml(
+                dispatch_config_path
+            )
 
         logger.debug('Loaded all dispatch config files: "%r"', self.all_dispatch_config)
 
@@ -53,14 +54,14 @@ class DispatchConfigManager():
                     canonical_dispatch_config[owner_nation] = {}
                 for name, config in owner_dispatches.items():
                     canonical_config = copy.deepcopy(config)
-                    if 'ns_id' not in config and 'action' not in config:
-                        canonical_config['action'] = 'create'
-                    elif 'action' not in config:
-                        canonical_config['action'] = 'edit'
-                    elif canonical_config['action'] == 'remove':
-                        canonical_config['action'] = 'remove'
+                    if "ns_id" not in config and "action" not in config:
+                        canonical_config["action"] = "create"
+                    elif "action" not in config:
+                        canonical_config["action"] = "edit"
+                    elif canonical_config["action"] == "remove":
+                        canonical_config["action"] = "remove"
                     else:
-                        canonical_config['action'] = 'skip'
+                        canonical_config["action"] = "skip"
                     canonical_dispatch_config[owner_nation][name] = canonical_config
 
         return canonical_dispatch_config
@@ -77,8 +78,7 @@ class DispatchConfigManager():
         self.saved = False
 
     def save(self):
-        """Update dispatch config with new id (if there is) and save it into appropriate files
-        """
+        """Update dispatch config with new id (if there is) and save it into appropriate files"""
 
         if not self.new_dispatch_id:
             return
@@ -86,18 +86,20 @@ class DispatchConfigManager():
         for dispatch_config_path, dispatch_config in self.all_dispatch_config.items():
             for owner_nation, owner_dispatches in dispatch_config.items():
                 for name, config in owner_dispatches.items():
-                    if 'ns_id' not in config and name in self.new_dispatch_id:
-                        self.all_dispatch_config[dispatch_config_path][owner_nation][name]['ns_id'] = self.new_dispatch_id.pop(name)
+                    if "ns_id" not in config and name in self.new_dispatch_id:
+                        self.all_dispatch_config[dispatch_config_path][owner_nation][
+                            name
+                        ]["ns_id"] = self.new_dispatch_id.pop(name)
 
         for dispatch_config_path, dispatch_config in self.all_dispatch_config.items():
-            with open(pathlib.Path(dispatch_config_path).expanduser(), 'w') as f:
+            with open(pathlib.Path(dispatch_config_path).expanduser(), "w") as f:
                 toml.dump(dispatch_config, f)
 
         self.saved = True
-        logger.debug('Saved modified dispatch config: %r', self.all_dispatch_config)
+        logger.debug("Saved modified dispatch config: %r", self.all_dispatch_config)
 
 
-class FileDispatchLoader():
+class FileDispatchLoader:
     """Load dispatches from plain text files.
 
     Args:
@@ -151,8 +153,7 @@ class FileDispatchLoader():
         self.dispatch_config_manager.add_new_dispatch_id(name, dispatch_id)
 
     def save_dispatch_config(self):
-        """Save all changes to id store.
-        """
+        """Save all changes to id store."""
 
         self.dispatch_config_manager.save()
 
@@ -160,28 +161,35 @@ class FileDispatchLoader():
 @loader_api.dispatch_loader
 def init_dispatch_loader(config):
     try:
-        this_config = config['file_dispatchloader']
+        this_config = config["file_dispatchloader"]
     except KeyError:
-        raise exceptions.ConfigError('File dispatch loader does not have config.')
+        raise exceptions.ConfigError("File dispatch loader does not have config.")
 
     try:
-        dispatch_config_paths = this_config['dispatch_config_paths']
+        dispatch_config_paths = this_config["dispatch_config_paths"]
     except KeyError:
-        raise exceptions.ConfigError('There is no dispatch config path!')
+        raise exceptions.ConfigError("There is no dispatch config path!")
 
     dispatch_config_manager = DispatchConfigManager()
     try:
         dispatch_config_manager.load_from_files(dispatch_config_paths)
     except FileNotFoundError as e:
-        raise exceptions.ConfigError('Dispatch config file(s) not found: {}'.format(str(e)))
+        raise exceptions.ConfigError(
+            "Dispatch config file(s) not found: {}".format(str(e))
+        )
 
     try:
-        dispatch_template_path = pathlib.Path(this_config['dispatch_template_path']).expanduser()
+        dispatch_template_path = pathlib.Path(
+            this_config["dispatch_template_path"]
+        ).expanduser()
     except KeyError:
-        raise exceptions.ConfigError('There is no dispatch template path!')
+        raise exceptions.ConfigError("There is no dispatch template path!")
 
-    loader = FileDispatchLoader(dispatch_config_manager, dispatch_template_path,
-                                this_config.get('file_ext', DEFAULT_EXT))
+    loader = FileDispatchLoader(
+        dispatch_config_manager,
+        dispatch_template_path,
+        this_config.get("file_ext", DEFAULT_EXT),
+    )
 
     return loader
 

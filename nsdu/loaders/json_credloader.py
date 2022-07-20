@@ -9,13 +9,13 @@ from nsdu import info
 from nsdu import loader_api
 
 
-CRED_FILENAME = 'creds.json'
+CRED_FILENAME = "creds.json"
 
 
 logger = logging.getLogger(__name__)
 
 
-class JSONCredLoader():
+class JSONCredLoader:
     """JSON Credential Loader.
 
     Args:
@@ -61,26 +61,27 @@ class JSONCredLoader():
         """
 
         if name not in self.creds:
-            raise exceptions.CredNotFound('Credential of nation "{}" not found.'.format(name))
+            raise exceptions.CredNotFound(
+                'Credential of nation "{}" not found.'.format(name)
+            )
         del self.creds[name]
         self.saved = False
 
     def save(self) -> None:
-        """Save creds to JSON file.
-        """
+        """Save creds to JSON file."""
 
         if not self.saved:
-            with open(self.json_path, 'w') as f:
+            with open(self.json_path, "w") as f:
                 json.dump(self.creds, f)
 
 
 @loader_api.cred_loader
 def init_cred_loader(config: dict) -> JSONCredLoader:
-    config = config.get('json_credloader')
-    if config is None or not 'cred_path' in config:
+    config = config.get("json_credloader")
+    if config is None or not "cred_path" in config:
         json_path = info.DATA_DIR / CRED_FILENAME
     else:
-        json_path = config['cred_path']
+        json_path = config["cred_path"]
 
     loader = JSONCredLoader(json_path)
     loader.load_creds()
