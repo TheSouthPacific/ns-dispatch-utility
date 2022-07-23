@@ -36,6 +36,9 @@ personnel_groups = ['personnel']
 # Variable groups that define information associated with a personnel name (e.g. nation name, Discord ID)
 personnel_info_groups = ['reference']
 
+[loader_config.json_templatevarloader]
+template_var_paths = ['~/ns_dispatches/vars.json']
+
 [loader_config.json_credloader]
 # cred_path = '~/ns_dispatches/nations.json'
 
