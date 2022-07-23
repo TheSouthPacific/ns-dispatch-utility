@@ -9,7 +9,7 @@ from nsdu import loader_api
 
 
 @loader_api.template_var_loader
-def get_template_vars(config: Mapping[str, Any]) -> dict:
+def get_template_vars(config: Mapping[str, dict]) -> dict[dict, Any]:
     var_json_paths: list = config["json_templatevarloader"]["template_var_paths"]
 
     template_vars = {}

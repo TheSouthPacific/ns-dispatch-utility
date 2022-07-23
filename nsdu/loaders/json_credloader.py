@@ -3,6 +3,7 @@
 
 import json
 import logging
+from typing import Any
 
 from nsdu import exceptions
 from nsdu import info
@@ -76,7 +77,7 @@ class JSONCredLoader:
 
 
 @loader_api.cred_loader
-def init_cred_loader(config: dict) -> JSONCredLoader:
+def init_cred_loader(config: dict[str, Any]) -> JSONCredLoader:
     config = config.get("json_credloader")
     if config is None or not "cred_path" in config:
         json_path = info.DATA_DIR / CRED_FILENAME
@@ -90,7 +91,7 @@ def init_cred_loader(config: dict) -> JSONCredLoader:
 
 
 @loader_api.cred_loader
-def get_creds(loader: JSONCredLoader) -> dict:
+def get_creds(loader: JSONCredLoader) -> dict[str, str]:
     return loader.creds
 
 

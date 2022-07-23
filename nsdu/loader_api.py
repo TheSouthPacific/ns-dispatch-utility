@@ -1,7 +1,8 @@
-"""API for loaders.
+"""API for loader plugins.
 """
 
 import datetime
+from typing import Any, Mapping
 
 import pluggy
 
@@ -22,11 +23,11 @@ cred_loader = pluggy.HookimplMarker(info.CRED_LOADER_PROJ)
 
 
 @dispatch_loader_specs(firstresult=True)
-def init_dispatch_loader(config: dict) -> object:
-    """Initiate a loader.
+def init_dispatch_loader(config: Mapping[str, dict]) -> object:
+    """Create and return a loader object to persist.
 
     Args:
-        config (dict): Loader's configuration
+        config (Mapping[str, dict]): Loader's configuration
 
     Return:
         Loader object
@@ -34,14 +35,14 @@ def init_dispatch_loader(config: dict) -> object:
 
 
 @dispatch_loader_specs(firstresult=True)
-def get_dispatch_config(loader: object) -> dict:
-    """Get a dict of dispatch parameters.
+def get_dispatch_config(loader: object) -> dict[str, dict]:
+    """Get configuration of dispatches as a dict.
 
     Args:
         loader: Loader
 
     Return:
-        dict: Dispatch configuration
+        dict[str, dict]: Dispatch configuration
     """
 
 
@@ -61,15 +62,15 @@ def get_dispatch_template(loader: object, name: str) -> str:
 def after_update(
     loader: object, name: str, action: str, result: str, result_time: datetime.datetime
 ):
-    """Run after a dispatch is updated to report
-    result of an operation.
+    """Run after a dispatch has finished updating to report
+    the result of an operation.
 
     Args:
         loader: Loader
         name (str): Dispatch name
-        action (str): Action
+        action (str): Finished action
         result (str): Result message
-        result_time (datetime.datetime): Update time
+        result_time (datetime.datetime): Time of the update
     """
 
 
@@ -86,7 +87,8 @@ def add_dispatch_id(loader: object, name: str, dispatch_id: str):
 
 @dispatch_loader_specs(firstresult=True)
 def cleanup_dispatch_loader(loader: object):
-    """Cleanup loader and close it.
+    """Run cleanup operations such as saving files
+    on the loader when NSDU don't use it anymore.
 
     Args:
         loader: Loader
@@ -94,31 +96,32 @@ def cleanup_dispatch_loader(loader: object):
 
 
 @template_var_loader_specs
-def get_template_vars(config: dict) -> dict:
-    """Get variables for placeholders.
+def get_template_vars(config: Mapping[str, dict]) -> dict[str, Any]:
+    """Get variables for template placeholders.
 
     Args:
-        config (dict): Loader's configuration
+        config (Mapping[str, dict]): Loader's configuration
 
     Return:
-        dict: Placeholder variables
+        dict[str, Any]: Placeholder variables
     """
 
 
 @simple_bb_loader_specs(firstresult=True)
-def get_simple_bb_config(config: dict) -> dict:
-    """Get simple BBCode formatter config.
+def get_simple_bb_config(config: Mapping[str, dict]) -> dict[str, dict]:
+    """Get configuration for simple BBCode formatters.
 
     Args:
-        config (dict): Loader's configuration
+        config (dict[str, dict]): Loader's configuration
+
     Return:
-        dict: Config for simple BBCode formatters
+        dict[str, dict]: Config for simple BBCode formatters
     """
 
 
 @cred_loader_specs(firstresult=True)
-def init_cred_loader(config: dict) -> object:
-    """Initiate a loader.
+def init_cred_loader(config: Mapping[str, dict]) -> object:
+    """Create and return a loader object to persist.
 
     Args:
         config (dict): Loader's configuration
@@ -130,10 +133,10 @@ def init_cred_loader(config: dict) -> object:
 
 @cred_loader_specs(firstresult=True)
 def get_creds(loader: object) -> dict:
-    """Get all nations' credential.
+    """Get all login credentials.
 
     Args:
-        config (dict): Loader's configuration
+        loader: Loader
 
     Return:
         dict: Nations' credential
@@ -142,28 +145,29 @@ def get_creds(loader: object) -> dict:
 
 @cred_loader_specs(firstresult=True)
 def add_cred(loader: object, name: str, x_autologin: str):
-    """Add a nation's credential.
+    """Add a login credential.
 
     Args:
-        config (dict): Loader's configuration
-        name (str): Nation name
-        x_autologin (str): Nation's X-Autologin.
+        loader: Loader
+        name (str): Nation's name
+        x_autologin (str): Nation's X-Autologin value.
     """
 
 
 @cred_loader_specs(firstresult=True)
 def remove_cred(loader: object, name: str):
-    """Delete a nation's credential.
+    """Delete a login credential.
 
     Args:
-        config (dict): Loader's configuration
-        name (str): Nation name
+        loader: Loader
+        name (str): Nation's name
     """
 
 
 @cred_loader_specs(firstresult=True)
 def cleanup_cred_loader(loader: object):
-    """Cleanup loader and close it.
+    """Run cleanup operations such as saving files
+    on the loader when NSDU don't use it anymore.
 
     Args:
         loader: Loader
