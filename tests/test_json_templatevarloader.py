@@ -37,7 +37,7 @@ class TestJsonTemplateVarLoader:
             json_templatevarloader.get_template_vars(loader_config)
 
     def test_load_non_existent_json_file_raises_exception(self):
-        loader_config = {"json_templatevarloader": {"template_var_paths": [""]}}
+        loader_config = {"json_templatevarloader": {"template_var_paths": ["abcd"]}}
 
         with pytest.raises(exceptions.LoaderConfigError):
             json_templatevarloader.get_template_vars(loader_config)
