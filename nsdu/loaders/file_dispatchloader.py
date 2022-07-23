@@ -1,9 +1,10 @@
-"""Load dispatches from plain text files with TOML dispatch configuration.
+"""Load dispatch content from plain text files and dispatch configuration from TOML files.
 """
 
 import copy
 import pathlib
 import logging
+from typing import Sequence
 import toml
 
 from nsdu import exceptions
@@ -17,7 +18,7 @@ logger = logging.getLogger(__name__)
 
 
 class DispatchConfigManager:
-    """Get and save dispatch config with files."""
+    """Load and save dispatch configuration in TOML files."""
 
     def __init__(self):
         # Dispatch config of all loaded files
@@ -25,25 +26,30 @@ class DispatchConfigManager:
         self.new_dispatch_id = {}
         self.saved = True
 
-    def load_from_files(self, dispatch_config_paths):
-        """Load dispatch configuration from paths.
+    def load_from_files(self, dispatch_config_paths: Sequence[str]) -> None:
+        """Load dispatch configuration files from provided paths.
 
         Args:
-            dispatch_config_paths (list): Dispatch config file paths
+            dispatch_config_paths (Sequence[str]): Dispatch config file paths
         """
 
         for dispatch_config_path in dispatch_config_paths:
-            self.all_dispatch_config[dispatch_config_path] = utils.get_config_from_toml(
-                dispatch_config_path
-            )
+            try:
+                self.all_dispatch_config[
+                    dispatch_config_path
+                ] = utils.get_config_from_toml(dispatch_config_path)
+            except FileNotFoundError as err:
+                raise exceptions.LoaderConfigError(
+                    f"Dispatch config file {dispatch_config_path} not found."
+                )
 
         logger.debug('Loaded all dispatch config files: "%r"', self.all_dispatch_config)
 
-    def get_canonical_dispatch_config(self):
-        """Get canonicalized dispatch config
+    def get_canonical_dispatch_config(self) -> dict[str, dict]:
+        """Get dispatch configuration in NSDU's standard format.
 
         Returns:
-            dict: Canonicalized dispatch configuration
+            dict[str, dict]: Canonicalized dispatch configuration
         """
 
         canonical_dispatch_config = {}
@@ -66,19 +72,19 @@ class DispatchConfigManager:
 
         return canonical_dispatch_config
 
-    def add_new_dispatch_id(self, name, dispatch_id):
-        """Add id of new dispatch.
+    def add_new_dispatch_id(self, name: str, dispatch_id: str) -> None:
+        """Add NationStates-provided ID of a new dispatch.
 
         Args:
             name (str): Dispatch name
-            dispatch_id (str): Dispatch id
+            dispatch_id (str): NationStates-provided ID
         """
 
         self.new_dispatch_id[name] = dispatch_id
         self.saved = False
 
-    def save(self):
-        """Update dispatch config with new id (if there is) and save it into appropriate files"""
+    def save(self) -> None:
+        """Save new dispatch IDs into the dispatch configuration file(s)."""
 
         if not self.new_dispatch_id:
             return
@@ -100,21 +106,28 @@ class DispatchConfigManager:
 
 
 class FileDispatchLoader:
-    """Load dispatches from plain text files.
+    """Wrapper to persist state and expose standard operations."""
 
-    Args:
-        dispatch_config_manager (DispatchConfigManager): Dispatch config manager
-        template_path (str): Dispatch template folder path
-        file_ext (str): Dispatch file extension
-    """
+    def __init__(
+        self,
+        dispatch_config_manager: DispatchConfigManager,
+        template_path: str,
+        file_ext: str,
+    ) -> None:
+        """Wrapper to persist state and expose standard operations.
 
-    def __init__(self, dispatch_config_manager, template_path, file_ext):
+        Args:
+            dispatch_config_manager (DispatchConfigManager): Dispatch config manager
+            template_path (str): Dispatch template folder path
+            file_ext (str): Dispatch file extension
+        """
+
         self.dispatch_config_manager = dispatch_config_manager
         self.template_path = template_path
         self.file_ext = file_ext
 
-    def get_dispatch_config(self):
-        """Get dispatch configuration for NSDU's usage
+    def get_dispatch_config(self) -> dict[str, dict]:
+        """Get dispatch configuration in NSDU's standard format.
 
         Returns:
             dict: Dispatch configuration
@@ -122,7 +135,7 @@ class FileDispatchLoader:
 
         return self.dispatch_config_manager.get_canonical_dispatch_config()
 
-    def get_dispatch_template(self, name):
+    def get_dispatch_template(self, name: str) -> str:
         """Get the template text of a dispatch.
 
         Args:
@@ -132,7 +145,7 @@ class FileDispatchLoader:
             exceptions.LoaderError: Could not find dispatch file
 
         Returns:
-            str: Text
+            str: Template text
         """
 
         file_path = pathlib.Path(self.template_path, name).with_suffix(self.file_ext)
@@ -142,18 +155,18 @@ class FileDispatchLoader:
             logger.error('Could not find dispatch template file "%s".', file_path)
             return None
 
-    def add_new_dispatch_id(self, name, dispatch_id):
-        """Add id of new dispatch into id store.
+    def add_new_dispatch_id(self, name, dispatch_id) -> None:
+        """Add NationStates-provided ID of a new dispatch.
 
         Args:
             name (str): Dispatch name
-            dispatch_id (str): Dispatch id
+            dispatch_id (str): NationStates-provided ID
         """
 
         self.dispatch_config_manager.add_new_dispatch_id(name, dispatch_id)
 
-    def save_dispatch_config(self):
-        """Save all changes to id store."""
+    def save_dispatch_config(self) -> None:
+        """Save new dispatch IDs into dispatch configuration file(s)."""
 
         self.dispatch_config_manager.save()
 
@@ -161,34 +174,29 @@ class FileDispatchLoader:
 @loader_api.dispatch_loader
 def init_dispatch_loader(config):
     try:
-        this_config = config["file_dispatchloader"]
+        config = config["file_dispatchloader"]
     except KeyError:
-        raise exceptions.ConfigError("File dispatch loader does not have config.")
+        raise exceptions.LoaderConfigError("File dispatch loader does not have config.")
 
     try:
-        dispatch_config_paths = this_config["dispatch_config_paths"]
+        dispatch_config_paths = config["dispatch_config_paths"]
     except KeyError:
-        raise exceptions.ConfigError("There is no dispatch config path!")
+        raise exceptions.LoaderConfigError("There is no dispatch config path!")
 
     dispatch_config_manager = DispatchConfigManager()
-    try:
-        dispatch_config_manager.load_from_files(dispatch_config_paths)
-    except FileNotFoundError as e:
-        raise exceptions.ConfigError(
-            "Dispatch config file(s) not found: {}".format(str(e))
-        )
+    dispatch_config_manager.load_from_files(dispatch_config_paths)
 
     try:
         dispatch_template_path = pathlib.Path(
-            this_config["dispatch_template_path"]
+            config["dispatch_template_path"]
         ).expanduser()
     except KeyError:
-        raise exceptions.ConfigError("There is no dispatch template path!")
+        raise exceptions.LoaderConfigError("There is no dispatch template path!")
 
     loader = FileDispatchLoader(
         dispatch_config_manager,
         dispatch_template_path,
-        this_config.get("file_ext", DEFAULT_EXT),
+        config.get("file_ext", DEFAULT_EXT),
     )
 
     return loader
