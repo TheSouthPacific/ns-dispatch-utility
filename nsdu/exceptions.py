@@ -34,6 +34,10 @@ class DispatchApiError(NSDUError):
     """Dispatch API error."""
 
 
+class CredOperationError(NSDUError):
+    """Error about a login credential operation (e.g. add, remove)."""
+
+
 class UnknownDispatchError(DispatchApiError):
     """This dispatch does not exist."""
 

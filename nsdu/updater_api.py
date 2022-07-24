@@ -76,16 +76,15 @@ class DispatchUpdater:
             template_vars,
         )
 
-    def login_owner_nation(self, nation_name, password=None, autologin=None):
-        """Log into dispatch owner nation.
+    def set_owner_nation(self, nation_name, autologin):
+        """Set the nation to do dispatch operations on.
 
         Args:
             nation_name (str): Nation name
-            password (str): Password
-            autologin (str): X-Autologin code
+            autologin (str): Nation's autologin code
         """
 
-        self.dispatch_api.login(nation_name, password=password, autologin=autologin)
+        self.dispatch_api.set_owner_nation(nation_name, autologin)
 
     def get_rendered_dispatch_text(self, name):
         """Get rendered text of a dispatch.

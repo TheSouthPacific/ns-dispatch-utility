@@ -37,23 +37,9 @@ class TestDispatchUpdater():
         dispatch_api = mock.Mock()
         updater.dispatch_api = dispatch_api
 
-        updater.login_owner_nation('testopia', autologin='hunterprime')
+        updater.set_owner_nation('testopia', '123456')
 
-        dispatch_api.login.assert_called_with('testopia', password=None, autologin='hunterprime')
-
-    def test_login_owner_nation_calls_dispatch_api_with_password(self):
-        updater = updater_api.DispatchUpdater(user_agent='foo',
-                                              template_filter_paths=[],
-                                              simple_formatter_config=None,
-                                              complex_formatter_source_path=None,
-                                              template_load_func=mock.Mock(),
-                                              template_vars={})
-        dispatch_api = mock.Mock()
-        updater.dispatch_api = dispatch_api
-
-        updater.login_owner_nation('testopia', password='hunterprime')
-
-        dispatch_api.login.assert_called_with('testopia', password='hunterprime', autologin=None)
+        dispatch_api.set_owner_nation.assert_called_with('testopia', '123456')
 
     def test_create_dispatch_calls_dispatch_api(self):
         updater = updater_api.DispatchUpdater(user_agent='foo',

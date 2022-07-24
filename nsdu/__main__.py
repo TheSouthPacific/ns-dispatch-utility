@@ -146,12 +146,10 @@ class DispatchOperations(OperationWrapper):
         for owner_nation, dispatch_config in self.dispatch_config.items():
             try:
                 owner_nation = utils.canonical_nation_name(owner_nation)
-                self.dispatch_updater.login_owner_nation(
-                    owner_nation, autologin=self.creds[owner_nation]
-                )
-                logger.info('Logged in nation "%s".', owner_nation)
+                self.dispatch_updater.set_owner_nation(owner_nation, self.creds[owner_nation])
+                logger.info('Begin to update dispatches of nation "%s".', owner_nation)
             except exceptions.NationLoginError:
-                logger.error('Could not log into nation "%s".', owner_nation)
+                logger.error('Could not log in to nation "%s".', owner_nation)
                 continue
 
             if not names:
@@ -250,31 +248,52 @@ class CredOperations(OperationWrapper):
     def __init__(
         self,
         cred_loader_manager: loader.CredLoaderManager,
-        dispatch_api: dispatch_api.DispatchApi,
+        login_api: dispatch_api.LoginApi,
     ) -> None:
         """A wrapper for credential operations such as adding credential.
 
         Args:
-            dispatch_api (api_adapter.DispatchApi): Dispatch API wrapper
+            login_api (api_adapter.LoginApi): Login API wrapper
             cred_loader_manager (loader.CredLoaderManager): Cred loader manager
         """
 
-        self.dispatch_api = dispatch_api
+        self.login_api = login_api
         self.cred_loader_manager = cred_loader_manager
 
-    def add_nation_cred(self, nation_name: str, password: str):
-        """Add new credentials.
+    def add_password_cred(self, nation_name: str, password: str) -> None:
+        """Add a new credential that uses password.
 
         Args:
             nation_name (str): Nation name
             password (str): Password
         """
 
-        x_autologin = self.dispatch_api.login(nation_name, password=password)
-        self.cred_loader_manager.add_cred(nation_name, x_autologin)
+        try:
+            x_autologin = self.login_api.get_autologin_code(nation_name, password)
+            self.cred_loader_manager.add_cred(nation_name, x_autologin)
+        except exceptions.NationLoginError:
+            raise exceptions.CredOperationError(
+                f'Could not log in to the nation "{nation_name}" with that password.'
+            )
 
-    def remove_nation_cred(self, nation_name: str):
-        """Remove credentials.
+    def add_autologin_cred(self, nation_name: str, autologin: str) -> None:
+        """Add a new credential that uses autologin code.
+
+        Args:
+            nation_name (str): Nation name
+            autologin (str): Autologin code
+        """
+
+        is_correct = self.login_api.verify_autologin_code(nation_name, autologin)
+        if is_correct:
+            self.cred_loader_manager.add_cred(nation_name, autologin)
+        else:
+            raise exceptions.CredOperationError(
+                f'Could not log in to the nation "{nation_name}" with that autologin code (use --add-password if you are adding passwords).'
+            )
+
+    def remove_cred(self, nation_name: str) -> None:
+        """Remove a login credential.
 
         Args:
             nation_name (str): Nation name
@@ -306,9 +325,9 @@ def setup_cred_operations(
     singleloader_builder.load_loader(config["plugins"]["cred_loader"])
     cred_loader_manager.init_loader()
 
-    dispatch_api_obj = dispatch_api.DispatchApi(config["general"]["user_agent"])
+    login_api = dispatch_api.LoginApi(config["general"]["user_agent"])
 
-    return CredOperations(cred_loader_manager, dispatch_api_obj)
+    return CredOperations(cred_loader_manager, login_api)
 
 
 def setup_operations(
@@ -350,12 +369,41 @@ def run_add_password_creds(
         cli_args (argparse.Namespace): CLI argument values
     """
 
+    if len(cli_args.add_password) % 2 != 0:
+        print("There is no password for the last name.")
+        return
+
+    try:
+        for i in range(0, len(cli_args.add_password), 2):
+            operations.add_password_cred(cli_args.add[i], cli_args.add[i + 1])
+    except exceptions.CredOperationError as err:
+        print(err)
+        return
+
+    print("Successfully added all login credentials")
+
+
+def run_add_autologin_creds(
+    operations: CredOperations, cli_args: argparse.Namespace
+) -> None:
+    """Run autologin credential add operation.
+
+    Args:
+        operations (CredOperations): Credential operation wrapper
+        cli_args (argparse.Namespace): CLI argument values
+    """
+
     if len(cli_args.add) % 2 != 0:
         print("There is no password for the last name.")
         return
 
-    for i in range(0, len(cli_args.add), 2):
-        operations.add_nation_cred(cli_args.add[i], cli_args.add[i + 1])
+    try:
+        for i in range(0, len(cli_args.add), 2):
+            operations.add_autologin_cred(cli_args.add[i], cli_args.add[i + 1])
+    except exceptions.CredOperationError as err:
+        print(err)
+        return
+
     print("Successfully added all login credentials")
 
 
@@ -369,7 +417,7 @@ def run_remove_cred(operations: CredOperations, cli_args: argparse.Namespace) ->
 
     for nation_name in cli_args.remove:
         try:
-            operations.remove_nation_cred(nation_name)
+            operations.remove_cred(nation_name)
         except exceptions.CredNotFound:
             print(f'Nation "{nation_name}" not found.')
             break
@@ -395,6 +443,8 @@ def run(config: Mapping[str, Any], cli_args: argparse.Namespace) -> None:
 
     if cli_args.subparser_name == "cred":
         if hasattr(cli_args, "add") and cli_args.add is not None:
+            run_add_autologin_creds(operations, cli_args)
+        elif hasattr(cli_args, "add-password") and cli_args.add is not None:
             run_add_password_creds(operations, cli_args)
         elif hasattr(cli_args, "remove") and cli_args.remove is not None:
             run_remove_cred(operations, cli_args)
@@ -416,8 +466,14 @@ def get_cli_args() -> argparse.Namespace:
     cred_command.add_argument(
         "--add",
         nargs="*",
+        metavar=("NAME", "AUTOLOGIN-CODE"),
+        help="Add autologin code for a nation",
+    )
+    cred_command.add_argument(
+        "--add-password",
+        nargs="*",
         metavar=("NAME", "PASSWORD"),
-        help="Add new login credential",
+        help="Add password for a nation",
     )
     cred_command.add_argument(
         "--remove", nargs="*", metavar="NAME", help="Remove login credential"
@@ -447,7 +503,7 @@ def main():
 
     try:
         config = utils.get_general_config()
-        logger.info("Loaded general config.")
+        logger.debug("Loaded general configuration.")
     except exceptions.ConfigError as err:
         print(err)
         return

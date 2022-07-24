@@ -7,6 +7,7 @@ import appdirs
 
 
 APP_NAME = "nsdu"
+APP_VERSION = "0.3.0"
 AUTHOR = "ns_tsp_usovietnam"
 DESCRIPTION = "Automatically update and format dispatches."
 

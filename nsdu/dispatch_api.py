@@ -8,7 +8,7 @@ import nationstates
 from nsdu import exceptions
 
 
-def convert_to_html_entities(text):
+def convert_to_html_entities(text: str) -> str:
     """Convert special characters to HTML entities
 
     Args:
@@ -21,58 +21,97 @@ def convert_to_html_entities(text):
     return text.encode("ascii", "xmlcharrefreplace")
 
 
-def reraise_exception(err):
-    """Reraise appropriate exceptions."""
+def raise_nsdu_exception(err: Exception) -> None:
+    """Reraise NSDU-specific exceptions from API wrapper's exceptions."""
 
     if "Unknown dispatch" in str(err):
         raise exceptions.UnknownDispatchError from err
     if "not the author of this dispatch" in str(err):
         raise exceptions.NotOwnerDispatchError from err
+    if err == nationstates.exceptions.Forbidden:
+        raise exceptions.NationLoginError from err
 
     raise exceptions.DispatchApiError from err
 
 
-class DispatchApi:
-    """Wrapper around pynationstates for dispatch functions.
-
-    Args:
-        user_agent (str): User agent
-    """
+class LoginApi:
+    """Wrapper for login-related NationStates API calls."""
 
     def __init__(self, user_agent):
-        self.api = nationstates.Nationstates(user_agent=user_agent, enable_beta=True)
-        self.owner_nation = None
-
-    def login(self, nation_name, password=None, autologin=None):
-        """Get nation and test login.
+        """Wrapper for login-related API calls.
 
         Args:
-            nation_name (str): Nation name
-            password (str): Nation password
+            user_agent (_type_): _description_
+        """
+        self.orig_api = nationstates.Nationstates(
+            user_agent=user_agent, enable_beta=True
+        )
+
+    def get_autologin_code(self, nation_name: str, password: str) -> str:
+        """Get autologin code of a nation from its password.
+
+        Args:
+            nation_name (str): Nation's name
+            password (str): Nation's password
+
+        Raises:
+            exceptions.NationLoginError: Failed to log in to the nation
 
         Returns:
-            str or None: X-Autologin or None if doesn't login via password
+            str: Autologin code
         """
 
-        if autologin is None:
-            self.owner_nation = self.api.nation(nation_name, password=password)
-        else:
-            self.owner_nation = self.api.nation(nation_name, autologin=autologin)
+        nation = self.orig_api.nation(nation_name, password=password)
 
         try:
-            resp_headers = self.owner_nation.get_shards("ping", full_response=True)[
-                "headers"
-            ]
+            resp = nation.get_shards("ping", full_response=True)
+            return resp["headers"]["X-Autologin"]
         except nationstates.exceptions.Forbidden as err:
             raise exceptions.NationLoginError from err
 
-        if password is not None:
-            if "X-Autologin" not in resp_headers:
-                raise exceptions.NationLoginError
+    def verify_autologin_code(self, nation_name: str, autologin: str) -> bool:
+        """Verify if an autologin code can log in to the provided nation.
 
-            return resp_headers["X-Autologin"]
+        Args:
+            nation_name (str): Nation's name
+            autologin (str): Nation's autologin code
 
-        return None
+        Raises:
+            exceptions.NationLoginError: Failed to log in to the nation
+        """
+
+        nation = self.orig_api.nation(nation_name, autologin=autologin)
+
+        try:
+            nation.get_shards("ping")
+            return True
+        except nationstates.exceptions.Forbidden as err:
+            return False
+
+
+class DispatchApi:
+    """Wrapper for dispatch-related NationStates API calls."""
+
+    def __init__(self, user_agent):
+        """Wrapper around pynationstates for dispatch functions.
+
+        Args:
+            user_agent (str): User agent
+        """
+        self.orig_api = nationstates.Nationstates(
+            user_agent=user_agent, enable_beta=True
+        )
+        self.owner_nation = None
+
+    def set_owner_nation(self, nation_name: str, autologin: str) -> None:
+        """Set the nation to perform dispatch API calls on.
+
+        Args:
+            nation_name (str): Nation's name
+            autologin (str): Nation's autologin code
+        """
+
+        self.owner_nation = self.orig_api.nation(nation_name, autologin=autologin)
 
     def create_dispatch(self, title, text, category, subcategory):
         """Create a dispatch.
@@ -86,15 +125,17 @@ class DispatchApi:
             str: New dispatch ID
         """
 
-        resp = self.owner_nation.create_dispatch(
-            title=title,
-            text=convert_to_html_entities(text),
-            category=category,
-            subcategory=subcategory,
-        )
-
-        new_dispatch_id = re.search("id=(\\d+)", resp["success"]).group(1)
-        return new_dispatch_id
+        try:
+            resp = self.owner_nation.create_dispatch(
+                title=title,
+                text=convert_to_html_entities(text),
+                category=category,
+                subcategory=subcategory,
+            )
+            new_dispatch_id = re.search("id=(\\d+)", resp["success"]).group(1)
+            return new_dispatch_id
+        except nationstates.exceptions.APIError as err:
+            raise_nsdu_exception(err)
 
     def edit_dispatch(self, dispatch_id, title, text, category, subcategory):
         """Edit a dispatch.
@@ -115,8 +156,8 @@ class DispatchApi:
                 category=category,
                 subcategory=subcategory,
             )
-        except nationstates.exceptions.APIUsageError as err:
-            reraise_exception(err)
+        except nationstates.exceptions.APIError as err:
+            raise_nsdu_exception(err)
 
     def remove_dispatch(self, dispatch_id):
         """Delete a dispatch.
@@ -127,5 +168,5 @@ class DispatchApi:
 
         try:
             self.owner_nation.remove_dispatch(dispatch_id=dispatch_id)
-        except nationstates.exceptions.APIUsageError as err:
-            reraise_exception(err)
+        except nationstates.exceptions.APIError as err:
+            raise_nsdu_exception(err)
