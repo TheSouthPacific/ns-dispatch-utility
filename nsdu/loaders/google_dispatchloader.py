@@ -783,7 +783,7 @@ class GoogleDispatchLoader:
             owner_nations, category_setups
         )
         self.dispatch_data = Dispatches(extracted_data)
-        logger.info("Processed dispatch data from spreadsheets.")
+        logger.info("Pulled dispatch data from Google spreadsheets.")
 
     def get_dispatch_config(self):
         """Get dispatch config.
@@ -840,6 +840,7 @@ class GoogleDispatchLoader:
             self.dispatch_data.dispatch_data
         )
         self.spreadsheet_api.update_rows_in_many_spreadsheets(new_spreadsheet_values)
+        logger.info("Updated Google spreadsheets.")
 
 
 @loader_api.dispatch_loader
@@ -851,7 +852,7 @@ def init_dispatch_loader(config):
     )
     # pylint: disable=maybe-no-member
     google_api = (
-        discovery.build("sheets", "v4", credentials=google_api_creds)
+        discovery.build("sheets", "v4", credentials=google_api_creds, cache_discovery=False)
         .spreadsheets()
         .values()
     )
@@ -904,4 +905,3 @@ def add_dispatch_id(loader, name, dispatch_id):
 @loader_api.dispatch_loader
 def cleanup_dispatch_loader(loader):
     loader.update_spreadsheets()
-    logger.info("Updated spreadsheets with new data.")
