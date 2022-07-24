@@ -146,7 +146,9 @@ class DispatchOperations(OperationWrapper):
         for owner_nation, dispatch_config in self.dispatch_config.items():
             try:
                 owner_nation = utils.canonical_nation_name(owner_nation)
-                self.dispatch_updater.set_owner_nation(owner_nation, self.creds[owner_nation])
+                self.dispatch_updater.set_owner_nation(
+                    owner_nation, self.creds[owner_nation]
+                )
                 logger.info('Begin to update dispatches of nation "%s".', owner_nation)
             except exceptions.NationLoginError:
                 logger.error('Could not log in to nation "%s".', owner_nation)
