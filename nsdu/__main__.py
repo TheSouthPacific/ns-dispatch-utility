@@ -250,7 +250,7 @@ class CredOperations(OperationWrapper):
     def __init__(
         self,
         cred_loader_manager: loader.CredLoaderManager,
-        login_api: ns_api.LoginApi,
+        login_api: ns_api.AuthApi,
     ) -> None:
         """A wrapper for credential operations such as adding credential.
 
@@ -327,7 +327,7 @@ def setup_cred_operations(
     singleloader_builder.load_loader(config["plugins"]["cred_loader"])
     cred_loader_manager.init_loader()
 
-    login_api = ns_api.LoginApi(config["general"]["user_agent"])
+    login_api = ns_api.AuthApi(config["general"]["user_agent"])
 
     return CredOperations(cred_loader_manager, login_api)
 

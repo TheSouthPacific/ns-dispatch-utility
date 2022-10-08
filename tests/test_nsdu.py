@@ -29,7 +29,7 @@ def get_dispatch_info(dispatch_config):
 class TestNsduCred:
     def test_add_correct_password_cred_calls_cred_loader_with_autologin_code(self):
         mock_cred_loader = mock.Mock(add_cred=mock.Mock())
-        login_api = mock.create_autospec(ns_api.LoginApi)
+        login_api = mock.create_autospec(ns_api.AuthApi)
         login_api.get_autologin_code.return_value = "123456"
         operations = __main__.CredOperations(mock_cred_loader, login_api)
 
@@ -40,7 +40,7 @@ class TestNsduCred:
 
     def test_add_incorrect_password_raises_exception(self):
         mock_cred_loader = mock.Mock(add_cred=mock.Mock())
-        login_api = mock.create_autospec(ns_api.LoginApi)
+        login_api = mock.create_autospec(ns_api.AuthApi)
         login_api.get_autologin_code.side_effect = exceptions.NationLoginError
         operations = __main__.CredOperations(mock_cred_loader, login_api)
 
@@ -51,7 +51,7 @@ class TestNsduCred:
 
     def test_add_correct_autologin_cred_calls_cred_loader_with_autologin_code(self):
         mock_cred_loader = mock.Mock(add_cred=mock.Mock())
-        login_api = mock.create_autospec(ns_api.LoginApi)
+        login_api = mock.create_autospec(ns_api.AuthApi)
         login_api.verify_autologin_code.return_value = True
         operations = __main__.CredOperations(mock_cred_loader, login_api)
 
@@ -62,7 +62,7 @@ class TestNsduCred:
 
     def test_add_incorrect_autologin_code_raises_exception(self):
         mock_cred_loader = mock.Mock(add_cred=mock.Mock())
-        login_api = mock.create_autospec(ns_api.LoginApi)
+        login_api = mock.create_autospec(ns_api.AuthApi)
         login_api.verify_autologin_code.return_value = False
         operations = __main__.CredOperations(mock_cred_loader, login_api)
 

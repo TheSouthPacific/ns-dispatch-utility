@@ -34,8 +34,8 @@ def raise_nsdu_exception(err: Exception) -> None:
     raise exceptions.DispatchApiError from err
 
 
-class LoginApi:
-    """Wrapper for login-related NationStates API calls."""
+class AuthApi:
+    """Wrapper for authentication-related NationStates API calls."""
 
     def __init__(self, user_agent: str) -> None:
         """Wrapper for login-related NationStates API calls.
@@ -98,7 +98,7 @@ class DispatchApi:
         Args:
             user_agent (str): API call's user agent
         """
-        self.orig_api = nationstates.Nationstates(
+        self.original_api = nationstates.Nationstates(
             user_agent=user_agent, enable_beta=True
         )
         self.owner_nation = None
@@ -111,7 +111,7 @@ class DispatchApi:
             autologin (str): Nation's autologin code
         """
 
-        self.owner_nation = self.orig_api.nation(nation_name, autologin=autologin)
+        self.owner_nation = self.original_api.nation(nation_name, autologin=autologin)
 
     def create_dispatch(
         self, title: str, text: str, category: str, subcategory: str

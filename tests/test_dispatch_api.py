@@ -38,7 +38,7 @@ class TestLoginApi:
         original_api.nation.return_value = mock.Mock(
             get_shards=mock.Mock(return_value=response)
         )
-        api = ns_api.LoginApi("")
+        api = ns_api.AuthApi("")
         api.original_api = original_api
 
         autologin = api.get_autologin_code("my_nation", password="hunterprime123")
@@ -50,7 +50,7 @@ class TestLoginApi:
         original_api.nation.return_value = mock.Mock(
             get_shards=mock.Mock(side_effect=nationstates.exceptions.Forbidden)
         )
-        api = ns_api.LoginApi("")
+        api = ns_api.AuthApi("")
         api.original_api = original_api
 
         with pytest.raises(exceptions.NationLoginError):
@@ -58,7 +58,7 @@ class TestLoginApi:
 
     def test_verify_correct_autologin_code_returns_true(self):
         original_api = mock.create_autospec(nationstates.Nationstates)
-        api = ns_api.LoginApi("")
+        api = ns_api.AuthApi("")
         api.original_api = original_api
 
         assert api.verify_autologin_code("my_nation", "123456")
@@ -68,7 +68,7 @@ class TestLoginApi:
         original_api.nation.return_value = mock.Mock(
             get_shards=mock.Mock(side_effect=nationstates.exceptions.Forbidden)
         )
-        api = ns_api.LoginApi("")
+        api = ns_api.AuthApi("")
         api.original_api = original_api
 
         assert not api.verify_autologin_code("my_nation", "123456")
