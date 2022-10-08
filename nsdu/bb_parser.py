@@ -1,8 +1,9 @@
-"""Parse BBCode tags.
+"""Convert custom BBCode tags into NSCode tags.
 """
 
 import logging
-import pathlib
+from pathlib import Path
+from typing import Callable, Mapping, Type, Union
 
 import bbcode
 
@@ -19,31 +20,27 @@ class BBRegistry:
     complex_formatters = []
 
     @classmethod
-    def register(cls, tag_name, **kwargs):
-        """Register a complex formatter.
+    def register(cls, tag_name: str, **kwargs) -> Callable:
+        """A decorator to register a complex formatter.
 
         Args:
             tag_name (str): Tag name.
         """
 
-        def decorator(class_obj):
+        def decorator(formatter_class: Type):
             formatter_info = kwargs
-            formatter_info["obj"] = class_obj
+            formatter_info["obj"] = formatter_class
             formatter_info["tag_name"] = tag_name
             cls.complex_formatters.append(formatter_info)
 
-            # Return original class object to make tests on them possible.
-            return class_obj
+            # Return the formatter class to make tests on them possible.
+            return formatter_class
 
         return decorator
 
     @classmethod
     def init_complex_formatters(cls):
         """Initialize complex formatters and give them config.
-
-        Args:
-            source_path (pathlib.Path): Path to complex formatter source file
-            config (dict|None): Complex formatter config
         """
 
         inited_formatters = []
@@ -59,9 +56,11 @@ class BBRegistry:
 
 
 class BBParserCore:
-    """Adapter of library's BBCode parser"""
+    """A wrapper around bbcode library's parser."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """A wrapper around bbcode library's parser."""
+
         self.parser = bbcode.Parser(
             newline="\n",
             install_defaults=False,
@@ -70,40 +69,40 @@ class BBParserCore:
             replace_cosmetic=False,
         )
 
-    def add_simple_formatter(self, tag_name, format_string, **kwargs):
-        """Add simple formatter
+    def add_simple_formatter(self, tag_name: str, format_string: str, **kwargs):
+        """Add a simple formatter.
 
         Args:
             tag_name (str): Tag name
-            format_string (str): Format string
+            format_string (str): Template of the formatted string
         """
 
         self.parser.add_simple_formatter(tag_name, format_string, **kwargs)
 
-    def add_complex_formatter(self, tag_name, render_func, **kwargs):
-        """Add complex formatter
+    def add_complex_formatter(self, tag_name: str, render_func: Callable[..., str], **kwargs):
+        """Add a complex formatter.
 
         Args:
             tag_name (str): Tag name
-            render_func (Function): A function that returns formatted string
+            render_func (Callable): A callable that returns formatted string
         """
 
         self.parser.add_formatter(tag_name, render_func, **kwargs)
 
-    def format(self, text, **kwargs):
+    def format(self, text: str, **kwargs):
         """Format text with loaded formatters."""
 
         return self.parser.format(text, **kwargs)
 
 
-def build_simple_parser_from_config(config):
-    """Build parser for simple formatters from config.
+def build_simple_parser_from_config(config: Mapping[str, Mapping[str, str]]) -> BBParserCore:
+    """Build a BBCode parser with simple formatters loaded from config.
 
     Args:
-        config (dict): Simple formatter config
+        config (Mapping[str, Mapping[str, str]]): Simple formatter config
 
     Returns:
-        nsdu.bb_parser.BBParserCore: Loaded parser
+        BBParserCore: Parser with loaded formatters
     """
 
     parser = BBParserCore()
@@ -126,17 +125,17 @@ def build_simple_parser_from_config(config):
     return parser
 
 
-def build_complex_parser_from_source(source_path):
-    """Build parser for complex formatters from source file.
+def build_complex_parser_from_source(source_path: Path) -> BBParserCore:
+    """Build a BBCode parser with complex formatters loaded source file.
 
     Args:
-        source_path (pathlib.Path): Path to source file
+        source_path (Path): Path to source file
 
     Raises:
         exceptions.ConfigError: Source file not found
 
     Returns:
-        nsdu.bb_parser.BBParserCore: Loaded parser
+        BBParserCore: Parser with loaded formatters
     """
 
     try:
@@ -172,14 +171,16 @@ def build_complex_parser_from_source(source_path):
 
 
 class BBParser:
-    """Render NSCode tags from custom BBCode tags.
+    """Convert custom BBCode tags into NSCode tags."""
 
-    Args:
-        simple_formatter_config (dict|None): Simple formatter config
-        complex_formatter_source_path (str|None): Complex formatter file path
-    """
+    def __init__(self, simple_formatter_config: Union[dict, None], complex_formatter_source_path: Union[str, None]) -> None:
+        """Convert custom BBCode tags into NSCode tags.
 
-    def __init__(self, simple_formatter_config, complex_formatter_source_path):
+        Args:
+            simple_formatter_config (Union[dict, None]): Config for simple formatters
+            complex_formatter_source_path (Union[str, None]): Path to complex formatter source file
+        """
+
         self.simple_formatter_config = simple_formatter_config
         self.complex_formatter_source_path = complex_formatter_source_path
 
@@ -190,14 +191,17 @@ class BBParser:
 
         if self.complex_formatter_source_path is not None:
             self.complex_parser = build_complex_parser_from_source(
-                pathlib.Path(self.complex_formatter_source_path)
+                Path(self.complex_formatter_source_path)
             )
 
-    def format(self, text, **kwargs):
-        """Format BBCode text.
+    def format(self, text: str, **kwargs) -> str:
+        """Convert custom BBCode tags in provided text into NSCode tags.
 
         Args:
             text (str): Text
+
+        Returns:
+            str: Text with NSCode tags
         """
 
         formatted_text = text
