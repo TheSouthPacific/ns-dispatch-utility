@@ -1,4 +1,4 @@
-"""Adapter for the pynationstates NS API wrapper
+"""Wrappers for NationStates API calls.
 """
 
 import re
@@ -37,13 +37,13 @@ def raise_nsdu_exception(err: Exception) -> None:
 class LoginApi:
     """Wrapper for login-related NationStates API calls."""
 
-    def __init__(self, user_agent):
-        """Wrapper for login-related API calls.
+    def __init__(self, user_agent: str) -> None:
+        """Wrapper for login-related NationStates API calls.
 
         Args:
-            user_agent (_type_): _description_
+            user_agent (str): API call's user agent
         """
-        self.orig_api = nationstates.Nationstates(
+        self.original_api = nationstates.Nationstates(
             user_agent=user_agent, enable_beta=True
         )
 
@@ -61,7 +61,7 @@ class LoginApi:
             str: Autologin code
         """
 
-        nation = self.orig_api.nation(nation_name, password=password)
+        nation = self.original_api.nation(nation_name, password=password)
 
         try:
             resp = nation.get_shards("ping", full_response=True)
@@ -80,7 +80,7 @@ class LoginApi:
             exceptions.NationLoginError: Failed to log in to the nation
         """
 
-        nation = self.orig_api.nation(nation_name, autologin=autologin)
+        nation = self.original_api.nation(nation_name, autologin=autologin)
 
         try:
             nation.get_shards("ping")
@@ -92,11 +92,11 @@ class LoginApi:
 class DispatchApi:
     """Wrapper for dispatch-related NationStates API calls."""
 
-    def __init__(self, user_agent):
-        """Wrapper around pynationstates for dispatch functions.
+    def __init__(self, user_agent: str) -> None:
+        """Wrapper for dispatch-related NationStates API calls.
 
         Args:
-            user_agent (str): User agent
+            user_agent (str): API call's user agent
         """
         self.orig_api = nationstates.Nationstates(
             user_agent=user_agent, enable_beta=True
@@ -113,7 +113,9 @@ class DispatchApi:
 
         self.owner_nation = self.orig_api.nation(nation_name, autologin=autologin)
 
-    def create_dispatch(self, title, text, category, subcategory):
+    def create_dispatch(
+        self, title: str, text: str, category: str, subcategory: str
+    ) -> str:
         """Create a dispatch.
 
         Args:
@@ -137,7 +139,9 @@ class DispatchApi:
         except nationstates.exceptions.APIError as err:
             raise_nsdu_exception(err)
 
-    def edit_dispatch(self, dispatch_id, title, text, category, subcategory):
+    def edit_dispatch(
+        self, dispatch_id: str, title: str, text: str, category: str, subcategory: str
+    ) -> None:
         """Edit a dispatch.
 
         Args:
@@ -159,7 +163,7 @@ class DispatchApi:
         except nationstates.exceptions.APIError as err:
             raise_nsdu_exception(err)
 
-    def remove_dispatch(self, dispatch_id):
+    def remove_dispatch(self, dispatch_id: str) -> None:
         """Delete a dispatch.
 
         Args:

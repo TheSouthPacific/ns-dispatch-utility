@@ -3,7 +3,7 @@
 
 import logging
 
-from nsdu import dispatch_api
+from nsdu import ns_api
 from nsdu import renderer
 from nsdu import info
 from nsdu import exceptions
@@ -67,7 +67,7 @@ class DispatchUpdater:
         template_load_func,
         template_vars,
     ):
-        self.dispatch_api = dispatch_api.DispatchApi(user_agent=user_agent)
+        self.dispatch_api = ns_api.DispatchApi(user_agent=user_agent)
         self.renderer = renderer.DispatchRenderer(
             template_load_func,
             simple_formatter_config,

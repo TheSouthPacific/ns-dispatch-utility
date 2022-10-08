@@ -13,7 +13,7 @@ from typing import Any, Mapping, Sequence
 
 from nsdu import info
 from nsdu import exceptions
-from nsdu import dispatch_api
+from nsdu import ns_api
 from nsdu import loader
 from nsdu import updater_api
 from nsdu import utils
@@ -250,7 +250,7 @@ class CredOperations(OperationWrapper):
     def __init__(
         self,
         cred_loader_manager: loader.CredLoaderManager,
-        login_api: dispatch_api.LoginApi,
+        login_api: ns_api.LoginApi,
     ) -> None:
         """A wrapper for credential operations such as adding credential.
 
@@ -327,7 +327,7 @@ def setup_cred_operations(
     singleloader_builder.load_loader(config["plugins"]["cred_loader"])
     cred_loader_manager.init_loader()
 
-    login_api = dispatch_api.LoginApi(config["general"]["user_agent"])
+    login_api = ns_api.LoginApi(config["general"]["user_agent"])
 
     return CredOperations(cred_loader_manager, login_api)
 
