@@ -40,8 +40,7 @@ class BBRegistry:
 
     @classmethod
     def init_complex_formatters(cls):
-        """Initialize complex formatters and give them config.
-        """
+        """Initialize complex formatters and give them config."""
 
         inited_formatters = []
         for formatter_info in cls.complex_formatters:
@@ -79,7 +78,9 @@ class BBParserCore:
 
         self.parser.add_simple_formatter(tag_name, format_string, **kwargs)
 
-    def add_complex_formatter(self, tag_name: str, render_func: Callable[..., str], **kwargs):
+    def add_complex_formatter(
+        self, tag_name: str, render_func: Callable[..., str], **kwargs
+    ):
         """Add a complex formatter.
 
         Args:
@@ -95,7 +96,9 @@ class BBParserCore:
         return self.parser.format(text, **kwargs)
 
 
-def build_simple_parser_from_config(config: Mapping[str, Mapping[str, str]]) -> BBParserCore:
+def build_simple_parser_from_config(
+    config: Mapping[str, Mapping[str, str]]
+) -> BBParserCore:
     """Build a BBCode parser with simple formatters loaded from config.
 
     Args:
@@ -173,7 +176,11 @@ def build_complex_parser_from_source(source_path: Path) -> BBParserCore:
 class BBParser:
     """Convert custom BBCode tags into NSCode tags."""
 
-    def __init__(self, simple_formatter_config: Union[dict, None], complex_formatter_source_path: Union[str, None]) -> None:
+    def __init__(
+        self,
+        simple_formatter_config: Union[dict, None],
+        complex_formatter_source_path: Union[str, None],
+    ) -> None:
         """Convert custom BBCode tags into NSCode tags.
 
         Args:

@@ -2,6 +2,7 @@
 """
 
 import logging
+from typing import Any, Callable, Mapping, Sequence, Tuple, Union
 
 from nsdu import ns_api
 from nsdu import renderer
@@ -12,7 +13,7 @@ from nsdu import exceptions
 logger = logging.getLogger(__name__)
 
 
-def get_category_number(category, subcategory):
+def get_category_number(category: str, subcategory: str) -> Tuple[str, str]:
     """Get category and subcategory number if they are descriptive name.
 
     Args:
@@ -47,26 +48,28 @@ def get_category_number(category, subcategory):
 
 
 class DispatchUpdater:
-    """API for rendering and updating dispatches.
-
-    Args:
-        user_agent (str): User agent
-        template_filter_paths (list): Paths to template filter source files
-        simple_formatter_config (dict): Simple BBCode formatter config
-        complex_formatter_source_path (str): Path to complex BBCode formatter source file
-        template_load_func (Function): A callback that accepts dispatch name and returns its template
-        template_vars (dict): Variables for templates
-    """
+    """Renders dispatches from templates and uploads them to NationStates."""
 
     def __init__(
         self,
-        user_agent,
-        template_filter_paths,
-        simple_formatter_config,
-        complex_formatter_source_path,
-        template_load_func,
-        template_vars,
-    ):
+        user_agent: str,
+        template_filter_paths: Sequence[str],
+        simple_formatter_config: Mapping[str, Mapping[str, str]],
+        complex_formatter_source_path: str,
+        template_load_func: Callable[[str], str],
+        template_vars: Mapping[str, Any],
+    ) -> None:
+        """Renders dispatches from templates and uploads them to NationStates.
+
+        Args:
+            user_agent (str): User agent for NationStates API calls
+            template_filter_paths (Sequence[str]): List of paths to template filter source files
+            simple_formatter_config (Mapping[str, Mapping[str, str]]): Simple BBCode formatter config
+            complex_formatter_source_path (str): Path to complex BBCode formatter source file
+            template_load_func (Callable[[str], str]): A callable that receives a dispatch name and returns its template
+            template_vars (Mapping[str, Any]): Template variables
+        """
+
         self.dispatch_api = ns_api.DispatchApi(user_agent=user_agent)
         self.renderer = renderer.DispatchRenderer(
             template_load_func,
@@ -76,7 +79,7 @@ class DispatchUpdater:
             template_vars,
         )
 
-    def set_owner_nation(self, nation_name, autologin):
+    def set_owner_nation(self, nation_name: str, autologin: str) -> None:
         """Set the nation to do dispatch operations on.
 
         Args:
@@ -86,7 +89,7 @@ class DispatchUpdater:
 
         self.dispatch_api.set_owner_nation(nation_name, autologin)
 
-    def get_rendered_dispatch_text(self, name):
+    def get_rendered_dispatch_text(self, name: str) -> str:
         """Get rendered text of a dispatch.
 
         Args:
@@ -98,7 +101,9 @@ class DispatchUpdater:
 
         return self.renderer.render(name)
 
-    def create_dispatch(self, name, title, category, subcategory):
+    def create_dispatch(
+        self, name: str, title: str, category: str, subcategory: str
+    ) -> None:
         """Create a dispatch.
 
         Args:
@@ -118,7 +123,9 @@ class DispatchUpdater:
         )
         return new_dispatch_id
 
-    def edit_dispatch(self, name, dispatch_id, title, category, subcategory):
+    def edit_dispatch(
+        self, name: str, dispatch_id: str, title: str, category: str, subcategory: str
+    ) -> None:
         """Edit a dispatch.
 
         Args:
@@ -139,7 +146,7 @@ class DispatchUpdater:
             subcategory=subcategory_num,
         )
 
-    def remove_dispatch(self, dispatch_id):
+    def remove_dispatch(self, dispatch_id: str) -> None:
         """Delete a dispatch.
 
         Args:
