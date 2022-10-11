@@ -14,17 +14,18 @@ logger = logging.getLogger(__name__)
 
 
 def get_category_number(category: str, subcategory: str) -> Tuple[str, str]:
-    """Get category and subcategory number if they are descriptive name.
+    """Get the number of a dispatch category or subcategory name.
+    If the provided names are numbers, just return the numbers as is.
 
     Args:
-        category (str): Category
-        subcategory (str): Subcategory
+        category (str): Category name or number
+        subcategory (str): Subcategory name or number
 
     Raises:
-        exceptions.DispatchUpdatingError: Could not find (sub)category number from name
+        exceptions.DispatchUpdatingError: Could not find (sub)category number from provided name
 
     Returns:
-        str, str: Category and subcategory number
+        Tuple[str, str]: Category and subcategory number
     """
 
     if category.isalpha() and subcategory.isalpha():
@@ -48,7 +49,7 @@ def get_category_number(category: str, subcategory: str) -> Tuple[str, str]:
 
 
 class DispatchUpdater:
-    """Renders dispatches from templates and uploads them to NationStates."""
+    """Render dispatches from templates and uploads them to NationStates."""
 
     def __init__(
         self,
@@ -109,8 +110,8 @@ class DispatchUpdater:
         Args:
             name (str): Name
             title (str): Title
-            category (str): Category
-            subcategory (str): Subcategory
+            category (str): Category name or number
+            subcategory (str): Subcategory name or number
 
         Returns:
             str: Id of new dispatch
@@ -132,8 +133,8 @@ class DispatchUpdater:
             name (str): Name
             dispatch_id (str): Id
             title (str): Title
-            category (str): Category
-            subcategory (str): Subcategory
+            category (str): Category name or number
+            subcategory (str): Subcategory name or number
         """
 
         text = self.get_rendered_dispatch_text(name)
