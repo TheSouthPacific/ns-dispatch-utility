@@ -852,7 +852,9 @@ def init_dispatch_loader(config):
     )
     # pylint: disable=maybe-no-member
     google_api = (
-        discovery.build("sheets", "v4", credentials=google_api_creds, cache_discovery=False)
+        discovery.build(
+            "sheets", "v4", credentials=google_api_creds, cache_discovery=False
+        )
         .spreadsheets()
         .values()
     )
