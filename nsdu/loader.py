@@ -159,12 +159,12 @@ class CredLoaderManager(PersistentLoaderManager):
 
 
 def load_module_from_entry_points(
-    entry_points: Sequence[import_metadata.EntryPoints], name: Sequence[str]
+    entry_points: Sequence[import_metadata.EntryPoint], name: Sequence[str]
 ) -> Union[ModuleType, None]:
     """Load a module found via package metadata entry points.
 
     Args:
-        entry_points (list): Package entry points
+        entry_points (Sequence[import_metadata.EntryPoint]): Package entry points
         name (str): Entry point's name
 
     Returns:
@@ -178,12 +178,12 @@ def load_module_from_entry_points(
 
 
 def load_all_modules_from_entry_points(
-    entry_points: Sequence[import_metadata.EntryPoints], names: Sequence[str]
+    entry_points: Sequence[import_metadata.EntryPoint], names: Sequence[str]
 ) -> list[ModuleType]:
     """Load all modules with provided names via package entry points.
 
     Args:
-        entry_points (Sequence[import_metadata.EntryPoints]): Package entry points
+        entry_points (Sequence[import_metadata.EntryPoint]): Package entry points
         names (Sequence[str]): Entry point names
 
     Returns:
@@ -204,14 +204,14 @@ class LoaderManagerBuilder(ABC):
         self,
         default_dir_path: Path,
         custom_dir_path: Path,
-        entry_points: Sequence[import_metadata.EntryPoints],
+        entry_points: Sequence[import_metadata.EntryPoint],
     ) -> None:
         """Base class for loader manager builders.
 
         Args:
             default_dir_path (Path): Path to default loader directory
             custom_dir_path (Path): Path to custom loader directory
-            entry_points (Sequence[import_metadata.EntryPoints]): Package entry points
+            entry_points (Sequence[import_metadata.EntryPoint]): Package entry points
         """
 
         self.default_dir_path = default_dir_path
