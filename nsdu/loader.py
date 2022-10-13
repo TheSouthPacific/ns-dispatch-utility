@@ -2,7 +2,7 @@
 """
 
 from abc import ABC
-from ctypes import Union
+from typing import Union
 import importlib.metadata as import_metadata
 from types import ModuleType
 from typing import Any, Mapping, Sequence
