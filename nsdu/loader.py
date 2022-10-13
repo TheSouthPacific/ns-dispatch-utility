@@ -1,10 +1,13 @@
-"""Load and run plugins.
+"""Load loader plugins and expose interfaces to use them.
 """
 
 from abc import ABC
-from typing import Sequence
+from ctypes import Union
+import importlib.metadata as import_metadata
+from types import ModuleType
+from typing import Any, Mapping, Sequence
 import collections
-import pathlib
+from pathlib import Path
 
 import pluggy
 
@@ -15,42 +18,53 @@ from nsdu import utils
 
 
 class LoaderManager:
-    """Manager for loaded loaders.
+    """Manager for loaded loaders."""
 
-    Args:
-        proj_name (str): Pluggy project name for this plugin type
-        loader_config (dict): Loaders' configuration
-    """
+    def __init__(self, proj_name: str, loader_config: Mapping[str, Any]) -> None:
+        """Manager for loaded loaders.
 
-    def __init__(self, proj_name, loader_config):
+        Args:
+            proj_name (str): Pluggy project name for this loader plugin type
+            loader_config (Mapping[str, Any]): Loaders' configuration
+        """
+
         self.manager = pluggy.PluginManager(proj_name)
         self.manager.add_hookspecs(loader_api)
         self.loader_config = loader_config
 
-    def load_loader(self, module):
-        """Load source of loader.
+    def load_loader(self, module) -> None:
+        """Load the Python module of a loader.
 
         Args:
-            module: Module that contains the source
+            module: Python module of the loader
         """
 
         self.manager.register(module)
 
-    def get_loaded_loaders(self):
+    def get_loaded_loaders(self) -> set:
+        """Get all loaded loaders.
+
+        Returns:
+            set: Loaded loaders
+        """
+
         return self.manager.get_plugins()
 
 
 class PersistentLoaderManager(LoaderManager):
-    """Manager for loaders that maintain state for the entire duration of the app.
+    """Manager for loaders that live for the entire run of the app."""
 
-    Args:
-        Same as Loader class
-    """
+    def __init__(self, proj_name: str, loader_config: Mapping[str, Any]) -> None:
+        """Manager for loaders that live for the entire run of the app.
 
-    def __init__(self, proj_name, loader_config):
+        Args:
+            proj_name (str): Pluggy project name for this loader plugin type
+            loader_config (Mapping[str, Any]): Loaders' configuration
+        """
+
         super().__init__(proj_name, loader_config)
-        # Loader instance to reuse the same database connection
-        # across hook calls.
+        # The instance of the loader class is stored here after
+        # it is loaded for access throughout the app's run time.
         self._loader = None
 
     def init_loader(self):
@@ -144,15 +158,17 @@ class CredLoaderManager(PersistentLoaderManager):
         )
 
 
-def load_module_from_entry_points(entry_points, name):
+def load_module_from_entry_points(
+    entry_points: Sequence[import_metadata.EntryPoints], name: Sequence[str]
+) -> Union[ModuleType, None]:
     """Load a module found via package metadata entry points.
 
     Args:
-        entry_points (list): List of entry points
+        entry_points (list): Package entry points
         name (str): Entry point's name
 
     Returns:
-        Loaded Python module
+        Union[Any, None]: Loaded Python module or None if fails
     """
 
     for entry_point in entry_points:
@@ -161,15 +177,17 @@ def load_module_from_entry_points(entry_points, name):
     return None
 
 
-def load_all_modules_from_entry_points(entry_points, names):
-    """Load all modules with name in names via package metadata entry points.
+def load_all_modules_from_entry_points(
+    entry_points: Sequence[import_metadata.EntryPoints], names: Sequence[str]
+) -> list[ModuleType]:
+    """Load all modules with provided names via package entry points.
 
     Args:
-        entry_points (list): List of entry points
-        names (list): List of entry points' names
+        entry_points (Sequence[import_metadata.EntryPoints]): Package entry points
+        names (Sequence[str]): Entry point names
 
     Returns:
-        Loaded Python module
+        list[Any]: Loaded Python modules
     """
 
     modules = {}
@@ -180,21 +198,28 @@ def load_all_modules_from_entry_points(entry_points, names):
 
 
 class LoaderManagerBuilder(ABC):
-    """Base class for loader manager builders.
+    """Base class for loader manager builders."""
 
-    Args:
-        default_dir_path (pathlib.Path): Default loader directory
-        custom_dir_path (pathlib.Path): User-confiured loader directory
-        entry_points (list): List of entry points
-    """
+    def __init__(
+        self,
+        default_dir_path: Path,
+        custom_dir_path: Path,
+        entry_points: Sequence[import_metadata.EntryPoints],
+    ) -> None:
+        """Base class for loader manager builders.
 
-    def __init__(self, default_dir_path, custom_dir_path, entry_points):
+        Args:
+            default_dir_path (Path): Path to default loader directory
+            custom_dir_path (Path): Path to custom loader directory
+            entry_points (Sequence[import_metadata.EntryPoints]): Package entry points
+        """
+
         self.default_dir_path = default_dir_path
         self.custom_dir_path = custom_dir_path
         self.entry_points = entry_points
         self.loader_manager = None
 
-    def set_loader_manager(self, loader_manager: LoaderManager):
+    def set_loader_manager(self, loader_manager: LoaderManager) -> None:
         """Set loader manager to build.
 
         Args:
@@ -243,14 +268,14 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
 
         try:
             loader_module = utils.load_module(
-                pathlib.Path(self.custom_dir_path / name).with_suffix(".py")
+                Path(self.custom_dir_path / name).with_suffix(".py")
             )
         except FileNotFoundError:
             raise exceptions.LoaderNotFound
         self.loader_manager.load_loader(loader_module)
 
     def load_from_entry_points(self, name: str) -> None:
-        """Load a loader into loader manager from package metadata entry points.
+        """Load a loader into loader manager from package entry points.
 
         Args:
             name (str): Loader name
@@ -294,11 +319,11 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
 class MultiLoadersManagerBuilder(LoaderManagerBuilder):
     """Load many loaders into a loader manager."""
 
-    def load_into_manager(self, loader_modules: dict) -> None:
+    def load_into_manager(self, loader_modules: Mapping[str, ModuleType]) -> None:
         """Load loader modules into loader manager.
 
         Args:
-            loader_modules (list): Loader modules
+            loader_modules (Mapping[str, ModuleType]): Loader modules
         """
 
         for module in loader_modules.values():
@@ -389,7 +414,7 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
             loader_names (Sequence[str]): Names of loaders to load
 
         Raises:
-            exceptions.LoaderNotFound: No builder could find some loaders
+            exceptions.LoaderNotFound: Some loaders could not be found
         """
 
         methods = [

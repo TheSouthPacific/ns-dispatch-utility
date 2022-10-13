@@ -1,4 +1,4 @@
-""" Utilities.
+"""Utility functions.
 """
 
 import os
@@ -6,7 +6,9 @@ import shutil
 import inspect
 import logging
 import importlib
-import pathlib
+from pathlib import Path
+from types import ModuleType
+from typing import Callable, Mapping, Union
 
 import toml
 
@@ -17,30 +19,30 @@ from nsdu import exceptions
 logger = logging.getLogger(__name__)
 
 
-def get_config_from_toml(config_path):
-    """Get configuration from TOML file.
+def get_config_from_toml(config_path: Union[str, Path]) -> dict:
+    """Get configuration from a TOML file as a dictionary.
 
     Args:
-        config_path (pathlib.Path|str): Path to config file (user expanded)
+        config_path (Union[str, Path]): Path to a TOML file. The user symbol will be expanded
 
     Returns:
-        dict: Config
+        dict: Configuration
     """
 
-    return toml.load(pathlib.Path(config_path).expanduser())
+    return toml.load(Path(config_path).expanduser())
 
 
-def get_config_from_env(config_path):
-    """Get configuration from environment variable.
+def get_config_from_env(config_path: Path) -> dict:
+    """Get configuration from a TOML file provided via an environment variable.
 
     Args:
-        config_path (pathlib.Path): Path to config file
+        config_path (Path): Path to a TOML file
 
     Raises:
-        exceptions.ConfigError: Could not find config file
+        exceptions.ConfigError: Could not find the TOML file
 
     Returns:
-        dict: Config
+        dict: Configuration
     """
 
     try:
@@ -51,20 +53,22 @@ def get_config_from_env(config_path):
         ) from err
 
 
-def get_config_from_default(config_dir, default_config_path, config_name):
-    """Get config from default location.
+def get_config_from_default(
+    config_dir: Path, default_config_path: Path, config_name: Path
+) -> dict:
+    """Get configuration from file at default location.
     Create default config file if there is none.
 
     Args:
-        config_dir (pathlib.Path): [description]
-        default_config_path (pathlib.Path): [description]
-        config_name (pathlib.Path): [description]
+        config_dir (Path): Path to the default config directory
+        default_config_path (Path): Path to sample config directory
+        config_name (Path): Name of config file
 
     Raises:
         exceptions.ConfigError: Could not find config file
 
     Returns:
-        dict: Config
+        dict: Configuration
     """
 
     config_path = config_dir / config_name
@@ -80,7 +84,7 @@ def get_config_from_default(config_dir, default_config_path, config_name):
         ) from err
 
 
-def get_general_config():
+def get_general_config() -> dict:
     """Get general configuration from default path
     or path defined via environment variable.
 
@@ -90,7 +94,7 @@ def get_general_config():
 
     env_var = os.getenv(info.CONFIG_ENVVAR)
     if env_var is not None:
-        return get_config_from_env(pathlib.Path(env_var))
+        return get_config_from_env(Path(env_var))
 
     info.CONFIG_DIR.mkdir(exist_ok=True)
     return get_config_from_default(
@@ -98,12 +102,11 @@ def get_general_config():
     )
 
 
-def get_dispatch_info(dispatch_config):
+def get_dispatch_info(dispatch_config: Mapping) -> dict:
     """Return dispatch information for use as context in the template renderer.
 
     Args:
-        dispatch_config (dict): Dispatch configuration.
-        id_store (IDStore): Dispatch ID store.
+        dispatch_config (Mapping): Dispatch configuration.
 
     Returns:
         dict: Dispatch information.
@@ -118,23 +121,31 @@ def get_dispatch_info(dispatch_config):
     return dispatch_info
 
 
-def get_functions_from_module(path):
-    """Get functions from a module file (.py).
+def get_functions_from_module(path: str) -> list[Callable]:
+    """Get all functions from a Python module file.
 
     Args:
-        path (str): Path to module file (.py).
+        path (str): Path to the module file
+
+    Returns:
+        list[Callable]: Functions
     """
 
     module = load_module(path)
     return inspect.getmembers(module, inspect.isfunction)
 
 
-def load_module(path):
-    """Load module from a file.
+def load_module(path: Path) -> ModuleType:
+    """Load Python module at the provided path.
 
     Args:
-        path (pathlib.Path): Directory containing module file
-        name (str): Name of module file
+        path (Path): Path to the module file
+
+    Raises:
+        FileNotFoundError: Could not find the module file
+
+    Returns:
+        ModuleType: Loaded module
     """
 
     spec = importlib.util.spec_from_file_location(path.name, path.expanduser())
@@ -146,14 +157,14 @@ def load_module(path):
     raise FileNotFoundError
 
 
-def canonical_nation_name(name):
-    """Canonicalize nation name into lower case form.
+def canonical_nation_name(name: str) -> str:
+    """Canonicalize nation name into lower case form with no underscore.
 
     Args:
         name (str): Name
 
     Returns:
-        str: Lower case nation name
+        str: Canonical nation name
     """
 
     return name.lower().replace("_", " ")

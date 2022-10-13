@@ -2,7 +2,7 @@
 """
 
 import logging
-from typing import Any, Callable, Mapping, Sequence, Tuple, Union
+from typing import Any, Callable, Mapping, Sequence, Tuple
 
 from nsdu import ns_api
 from nsdu import renderer
