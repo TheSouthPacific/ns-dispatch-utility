@@ -11,20 +11,19 @@ python = "^3.9"
 nationstates = "^3.0.2"
 toml = "^0.10.2"
 bbcode = "^1.1.0"
-Jinja2 = "^2.11.3"
+Jinja2 = "^3.1.2"
 appdirs = "^1.4.4"
-pluggy = "^0.13.1"
+pluggy = "^1.0.0"
 google-api-python-client = "^2.15.0"
 google-auth-httplib2 = "^0.1.0"
 google-auth-oauthlib = "^0.4.5"
-MarkupSafe = "2.0.1"
 
 [tool.poetry.dev-dependencies]
-pytest = "^6.2.3"
-coverage = "^5.5"
-pytest-cov = "^2.11.1"
-pylint = "^2.9.3"
-black = "^22.6.0"
+pytest = "^7.2.0"
+coverage = "^6.5.0"
+pytest-cov = "^4.0.0"
+pylint = "^2.15.5"
+black = "^22.10.0"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
