@@ -69,18 +69,18 @@ class AuthApi:
         except nationstates.exceptions.Forbidden as err:
             raise exceptions.NationLoginError from err
 
-    def verify_autologin_code(self, nation_name: str, autologin: str) -> bool:
+    def verify_autologin_code(self, nation_name: str, autologin_code: str) -> bool:
         """Verify if an autologin code can log in to the provided nation.
 
         Args:
             nation_name (str): Nation's name
-            autologin (str): Nation's autologin code
+            autologin_code (str): Nation's autologin code
 
         Raises:
             exceptions.NationLoginError: Failed to log in to the nation
         """
 
-        nation = self.original_api.nation(nation_name, autologin=autologin)
+        nation = self.original_api.nation(nation_name, autologin=autologin_code)
 
         try:
             nation.get_shards("ping")
