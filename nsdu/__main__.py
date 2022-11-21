@@ -153,6 +153,9 @@ class DispatchOperations(OperationWrapper):
             except exceptions.NationLoginError:
                 logger.error('Could not log in to nation "%s".', owner_nation)
                 continue
+            except KeyError:
+                logger.error('Nation "%s" has no login credential.', owner_nation)
+                continue
 
             if not names:
                 for name in dispatch_config.keys():
@@ -271,14 +274,14 @@ class CredOperations(OperationWrapper):
         """
 
         try:
-            x_autologin = self.login_api.get_autologin_code(nation_name, password)
-            self.cred_loader_manager.add_cred(nation_name, x_autologin)
+            autologin_code = self.login_api.get_autologin_code(nation_name, password)
+            self.cred_loader_manager.add_cred(nation_name, autologin_code)
         except exceptions.NationLoginError:
             raise exceptions.CredOperationError(
                 f'Could not log in to the nation "{nation_name}" with that password.'
             )
 
-    def add_autologin_cred(self, nation_name: str, autologin: str) -> None:
+    def add_autologin_cred(self, nation_name: str, autologin_code: str) -> None:
         """Add a new credential that uses autologin code.
 
         Args:
@@ -286,9 +289,9 @@ class CredOperations(OperationWrapper):
             autologin (str): Autologin code
         """
 
-        is_correct = self.login_api.verify_autologin_code(nation_name, autologin)
+        is_correct = self.login_api.verify_autologin_code(nation_name, autologin_code)
         if is_correct:
-            self.cred_loader_manager.add_cred(nation_name, autologin)
+            self.cred_loader_manager.add_cred(nation_name, autologin_code)
         else:
             raise exceptions.CredOperationError(
                 f'Could not log in to the nation "{nation_name}" with that autologin code (use --add-password if you are adding passwords).'
@@ -377,7 +380,7 @@ def run_add_password_creds(
 
     try:
         for i in range(0, len(cli_args.add_password), 2):
-            operations.add_password_cred(cli_args.add[i], cli_args.add[i + 1])
+            operations.add_password_cred(cli_args.add_password[i], cli_args.add_password[i + 1])
     except exceptions.CredOperationError as err:
         print(err)
         return
@@ -420,6 +423,7 @@ def run_remove_cred(operations: CredOperations, cli_args: argparse.Namespace) ->
     for nation_name in cli_args.remove:
         try:
             operations.remove_cred(nation_name)
+            print(f'Removed login credential of "{nation_name}"')
         except exceptions.CredNotFound:
             print(f'Nation "{nation_name}" not found.')
             break
@@ -446,7 +450,7 @@ def run(config: Mapping[str, Any], cli_args: argparse.Namespace) -> None:
     if cli_args.subparser_name == "cred":
         if hasattr(cli_args, "add") and cli_args.add is not None:
             run_add_autologin_creds(operations, cli_args)
-        elif hasattr(cli_args, "add-password") and cli_args.add is not None:
+        elif hasattr(cli_args, "add_password") and cli_args.add_password is not None:
             run_add_password_creds(operations, cli_args)
         elif hasattr(cli_args, "remove") and cli_args.remove is not None:
             run_remove_cred(operations, cli_args)
@@ -509,6 +513,8 @@ def main():
     except exceptions.ConfigError as err:
         print(err)
         return
+
+    logger.info('NSDU %s started.', info.APP_VERSION)
 
     try:
         run(config, cli_args)
