@@ -1,2 +1,2 @@
 def filter3(a):
-    return '<{}>'.format(a)
+    return "<{}>".format(a)

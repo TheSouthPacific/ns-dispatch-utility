@@ -380,7 +380,9 @@ def run_add_password_creds(
 
     try:
         for i in range(0, len(cli_args.add_password), 2):
-            operations.add_password_cred(cli_args.add_password[i], cli_args.add_password[i + 1])
+            operations.add_password_cred(
+                cli_args.add_password[i], cli_args.add_password[i + 1]
+            )
     except exceptions.CredOperationError as err:
         print(err)
         return
@@ -514,7 +516,7 @@ def main():
         print(err)
         return
 
-    logger.info('NSDU %s started.', info.APP_VERSION)
+    logger.info("NSDU %s started.", info.APP_VERSION)
 
     try:
         run(config, cli_args)

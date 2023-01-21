@@ -5,7 +5,7 @@
 from nsdu import loader_api
 
 
-class CredLoaderTest1():
+class CredLoaderTest1:
     def __init__(self, config):
         self.config = config
         self.creds = {}

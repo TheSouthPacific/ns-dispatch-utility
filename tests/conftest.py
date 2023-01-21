@@ -10,11 +10,11 @@ import pytest
 def toml_files(tmp_path):
     """Generate TOML config files for testing."""
 
-    def gen_toml_files(files={'test.toml': {'sec': {'key': 'val'}}}):
+    def gen_toml_files(files={"test.toml": {"sec": {"key": "val"}}}):
         f_path = None
         for name, config in files.items():
             f_path = tmp_path / name
-            with open(f_path, 'w') as f:
+            with open(f_path, "w") as f:
                 toml.dump(config, f)
 
         if len(files) == 1:
@@ -26,10 +26,9 @@ def toml_files(tmp_path):
 
 @pytest.fixture
 def text_files(tmp_path):
-    """Create text files for testing.
-    """
+    """Create text files for testing."""
 
-    def gen_text_files(files={'test.txt': 'Foo Bar'}):
+    def gen_text_files(files={"test.txt": "Foo Bar"}):
         f_path = None
         for name, text in files.items():
             f_path = tmp_path / name
@@ -44,14 +43,13 @@ def text_files(tmp_path):
 
 @pytest.fixture
 def json_files(tmp_path):
-    """Create JSON files for testing.
-    """
+    """Create JSON files for testing."""
 
-    def gen_json_files(files={'test.json': {'key': 'value'}}):
+    def gen_json_files(files={"test.json": {"key": "value"}}):
         f_path = None
         for name, content in files.items():
             f_path = tmp_path / name
-            with open(f_path, 'w') as f:
+            with open(f_path, "w") as f:
                 json.dump(content, f)
 
         if len(files) == 1:
