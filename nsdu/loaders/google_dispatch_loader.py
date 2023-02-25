@@ -1,12 +1,15 @@
 """Load dispatches from Google spreadsheets.
 """
 
+from dataclasses import dataclass
 import collections
 import copy
 from datetime import datetime
 from datetime import timezone
+import itertools
 import re
 import logging
+from typing import Mapping, Sequence
 
 from google.oauth2 import service_account
 from googleapiclient import discovery
@@ -40,6 +43,14 @@ RESULT_TIME_FORMAT = "%Y/%m/%d %H:%M:%S %Z"
 
 logger = logging.getLogger(__name__)
 
+CellData = list[list[str]]
+
+
+@dataclass(frozen=True)
+class SheetRange:
+    spreadsheet_id: str
+    range_value: str
+
 
 class GoogleSpreadsheetApiAdapter:
     """Adapter for Google Spreadsheet API.
@@ -52,8 +63,8 @@ class GoogleSpreadsheetApiAdapter:
         self.sheet_api = sheet_api
 
     @staticmethod
-    def execute(request):
-        """Execute request.
+    def execute(request) -> dict:
+        """Execute API request.
 
         Args:
             request: API request
@@ -62,93 +73,64 @@ class GoogleSpreadsheetApiAdapter:
             exceptions.LoaderError: API error
 
         Returns:
-            dict: Response
+            dict: API response
         """
 
         try:
             return request.execute()
         except HttpError as err:
             raise exceptions.LoaderError(
-                "Google API Error {}: {}".format(err.status_code, err.error_details)
+                "Google API error {}: {}".format(err.status_code, err.error_details)
             )
 
-    def get_rows_in_range(self, spreadsheet_id, sheet_range):
-        """Get cell values of a range in a spreadsheet.
+    def get_cell_data(
+        self, range: Sequence[SheetRange] | SheetRange
+    ) -> dict[SheetRange, CellData] | CellData:
+        """Get call data from spreadsheet ranges.
 
         Args:
-            spreadsheet_id (str): Spreadsheet Id
-            sheet_range (str): Range name
-        Returns:
-            List: Row values
-        """
-
-        req = self.sheet_api.get(
-            spreadsheetId=spreadsheet_id, range=sheet_range, valueRenderOption="FORMULA"
-        )
-        resp = GoogleSpreadsheetApiAdapter.execute(req)
-        logger.debug(
-            'Downloaded spreadsheet "%s" with range "%s": "%r"',
-            spreadsheet_id,
-            sheet_range,
-            resp,
-        )
-
-        if "values" not in resp:
-            return []
-        return resp["values"]
-
-    def get_rows_in_many_ranges(self, spreadsheet_id, sheet_ranges):
-        """Get cell values of many ranges in a spreadsheet.
-
-        Args:
-            spreadsheet_id (str): Spreadsheet Id
-            sheet_ranges (list): Range names
+            range (Sequence[SheetRange] | SheetRange): Range(s) to get
 
         Returns:
-            dict: Row values keyed by range name
+            dict[SheetRange, CellData]: Cell data
         """
 
-        req = self.sheet_api.batchGet(
-            spreadsheetId=spreadsheet_id,
-            ranges=sheet_ranges,
-            valueRenderOption="FORMULA",
-        )
-        resp = GoogleSpreadsheetApiAdapter.execute(req)
-        logger.debug(
-            'Downloaded spreadsheet "%s" with many ranges: "%r"', spreadsheet_id, resp
-        )
+        cell_data: dict[SheetRange, CellData] = {}
 
-        result = {}
-        for value_range in resp["valueRanges"]:
-            sheet_range = value_range["range"]
-            if "values" not in value_range:
-                result[sheet_range] = []
-            else:
-                result[sheet_range] = value_range["values"]
+        if isinstance(range, SheetRange):
+            ranges = [range]
+        else:
+            ranges = range
 
-        return result
+        spreadsheets = itertools.groupby(ranges, lambda range: range.spreadsheet_id)
+        for spreadsheet_id, ranges in spreadsheets:
+            range_values = list(map(lambda range: range.range_value, ranges))
 
-    def get_rows_in_many_spreadsheets(self, spreadsheets):
-        """Get cell values of many spreadsheets.
-
-        Args:
-            spreadsheets (list): Dicts containing spreadsheet id and ranges
-
-        Returns:
-            dict: Row values in ranges keyed by spreadsheet id
-        """
-
-        result = {}
-        for spreadsheet in spreadsheets:
-            row_values = self.get_rows_in_many_ranges(
-                spreadsheet["spreadsheet_id"], spreadsheet["ranges"]
+            req = self.sheet_api.batchGet(
+                spreadsheetId=spreadsheet_id,
+                ranges=range_values,
+                valueRenderOption="FORMULA",
             )
-            spreadsheet_id = spreadsheet["spreadsheet_id"]
-            result[spreadsheet_id] = row_values
+            resp = GoogleSpreadsheetApiAdapter.execute(req)
+            logger.debug(
+                'Pulled values from ranges "%r" of spreadsheet "%s": "%r"',
+                range,
+                spreadsheet_id,
+                resp,
+            )
 
-        return result
+            range_data = {
+                SheetRange(spreadsheet_id, range["range"]): range.get("values", [])
+                for range in resp["valueRanges"]
+            }
 
-    def update_rows_in_many_ranges(self, spreadsheet_id, new_data):
+            cell_data.update(range_data)
+
+        if isinstance(range, SheetRange):
+            return cell_data[range]
+        return cell_data
+
+    def update_cell_data(self, new_cell_data: Mapping[SheetRange, CellData]) -> None:
         """Update cell values of many ranges in a spreadsheet.
 
         Args:
@@ -156,26 +138,24 @@ class GoogleSpreadsheetApiAdapter:
             new_data (dict): New row values
         """
 
-        data = []
-        for range_name, range_data in new_data.items():
-            data.append(
-                {"range": range_name, "majorDimension": "ROWS", "values": range_data}
+        spreadsheets = itertools.groupby(
+            new_cell_data.keys(), lambda range: range.spreadsheet_id
+        )
+        for spreadsheet_id, ranges in spreadsheets:
+            new_data = list(map(
+                lambda range: {
+                    "range": range.range_value,
+                    "majorDimension": "ROWS",
+                    "values": new_cell_data[range],
+                },
+                ranges,
+            ))
+            body = {"valueInputOption": "USER_ENTERED", "data": new_data}
+            req = self.sheet_api.batchUpdate(spreadsheetId=spreadsheet_id, body=body)
+            GoogleSpreadsheetApiAdapter.execute(req)
+            logger.debug(
+                'Updated cell data of spreadsheet "%s": %r', spreadsheet_id, body
             )
-
-        body = {"valueInputOption": "USER_ENTERED", "data": data}
-        req = self.sheet_api.batchUpdate(spreadsheetId=spreadsheet_id, body=body)
-        GoogleSpreadsheetApiAdapter.execute(req)
-        logger.debug("Updated spreadsheet ranges: %r", body)
-
-    def update_rows_in_many_spreadsheets(self, new_data):
-        """Update cell values in many spreadsheets.
-
-        Args:
-            new_data (list): Dicts of new row values keyed by spreadsheet id
-        """
-
-        for spreadsheet_id, new_values in new_data.items():
-            self.update_rows_in_many_ranges(spreadsheet_id, new_values)
 
 
 SuccessResult = collections.namedtuple(
@@ -860,11 +840,11 @@ def init_dispatch_loader(config):
     )
     spreadsheet_api = GoogleSpreadsheetApiAdapter(google_api)
 
-    owner_nation_rows = spreadsheet_api.get_rows_in_range(
+    owner_nation_rows = spreadsheet_api.get_cell_values_of_range(
         config["owner_nation_sheet"]["spreadsheet_id"],
         config["owner_nation_sheet"]["range"],
     )
-    category_setup_rows = spreadsheet_api.get_rows_in_range(
+    category_setup_rows = spreadsheet_api.get_cell_values_of_range(
         config["category_setup_sheet"]["spreadsheet_id"],
         config["category_setup_sheet"]["range"],
     )
