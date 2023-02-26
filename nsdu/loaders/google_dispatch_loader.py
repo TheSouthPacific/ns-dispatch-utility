@@ -43,13 +43,15 @@ RESULT_TIME_FORMAT = "%Y/%m/%d %H:%M:%S %Z"
 
 logger = logging.getLogger(__name__)
 
-CellData = list[list[str]]
+CellValue = str | int | float
+
+CellData = list[list[CellValue]]
 
 
 @dataclass(frozen=True)
-class SheetRange:
-    """Describe the spreadsheet ID and range name of a range.
-    """
+class CellRange:
+    """Describe the spreadsheet ID and range name of a range."""
+
     spreadsheet_id: str
     range_name: str
 
@@ -86,20 +88,20 @@ class GoogleSpreadsheetApiAdapter:
             )
 
     def get_cell_data(
-        self, range: Sequence[SheetRange] | SheetRange
-    ) -> dict[SheetRange, CellData] | CellData:
+        self, range: Sequence[CellRange] | CellRange
+    ) -> dict[CellRange, CellData] | CellData:
         """Get call data from spreadsheet range(s).
 
         Args:
-            range (Sequence[SheetRange] | SheetRange): Range(s) to get
+            range (Sequence[CellRange] | CellRange): Range(s) to get
 
         Returns:
-            dict[SheetRange, CellData]: Cell data
+            dict[CellRange, CellData]: Cell data
         """
 
-        cell_data: dict[SheetRange, CellData] = {}
+        cell_data: dict[CellRange, CellData] = {}
 
-        if isinstance(range, SheetRange):
+        if isinstance(range, CellRange):
             ranges = [range]
         else:
             ranges = range
@@ -122,21 +124,21 @@ class GoogleSpreadsheetApiAdapter:
             )
 
             range_data = {
-                SheetRange(spreadsheet_id, range["range"]): range.get("values", [])
+                CellRange(spreadsheet_id, range["range"]): range.get("values", [])
                 for range in resp["valueRanges"]
             }
 
             cell_data.update(range_data)
 
-        if isinstance(range, SheetRange):
+        if isinstance(range, CellRange):
             return cell_data[range]
         return cell_data
 
-    def update_cell_data(self, new_cell_data: Mapping[SheetRange, CellData]) -> None:
+    def update_cell_data(self, new_cell_data: Mapping[CellRange, CellData]) -> None:
         """Update cell data of spreadsheet range(s).
 
         Args:
-            new_cell_data (Mapping[SheetRange, CellData]): New cell data
+            new_cell_data (Mapping[CellRange, CellData]): New cell data
         """
 
         spreadsheets = itertools.groupby(
@@ -160,10 +162,11 @@ class GoogleSpreadsheetApiAdapter:
                 'Updated cell data of spreadsheet "%s": %r', spreadsheet_id, body
             )
 
+
 @dataclass(frozen=True)
 class Result(ABC):
-    """Describes an operation result.
-    """
+    """Describes an operation result."""
+
     dispatch_name: str
     action: str
     result_time: datetime
@@ -176,8 +179,7 @@ class Result(ABC):
 
 @dataclass(frozen=True)
 class SuccessResult(Result):
-    """Describes a successful operation result.
-    """
+    """Describes a successful operation result."""
 
     @property
     def user_message(self) -> str:
@@ -187,8 +189,8 @@ class SuccessResult(Result):
 
 @dataclass(frozen=True)
 class FailureResult(Result):
-    """Describes a failure operation result.
-    """
+    """Describes a failure operation result."""
+
     details: str | None
 
     @property
@@ -228,7 +230,7 @@ class ResultRecorder:
         dispatch_name: str,
         action: str,
         details: str | Exception | None = None,
-        result_time: datetime | None = None
+        result_time: datetime | None = None,
     ) -> None:
         """Report a failed operation.
 
@@ -245,7 +247,9 @@ class ResultRecorder:
         if result_time is None:
             result_time = datetime.now(tz=timezone.utc)
 
-        self.results[dispatch_name] = FailureResult(dispatch_name, action, result_time, details)
+        self.results[dispatch_name] = FailureResult(
+            dispatch_name, action, result_time, details
+        )
 
 
 class CategorySetups:
@@ -299,61 +303,92 @@ class CategorySetups:
         return self.categories[setup_id], self.subcategories[setup_id]
 
 
-class OwnerNations:
-    """Information about owner nations.
+SpreadsheetIds = Sequence[str]
+
+
+class OwnerNationData:
+    """Contains information about dispatch owner nations.
 
     Args:
-        owner_nation_names (dict): Owner nation names
-        permitted_spreadsheets (dict): Permitted spreadsheets of an owner
+        owner_nation_names (Mapping[str, str]): Owner nation names
+        allowed_spreadsheet_ids (Mapping[str, SpreadsheetIds])  : Allowed spreadsheets of each owner
     """
 
-    def __init__(self, owner_nation_names, permitted_spreadsheets):
+    def __init__(
+        self,
+        owner_nation_names: Mapping[str, str],
+        allowed_spreadsheet_ids: Mapping[str, SpreadsheetIds],
+    ) -> None:
         self.owner_nation_names = owner_nation_names
-        self.permitted_spreadsheets = permitted_spreadsheets
+        self.allowed_spreadsheet_ids = allowed_spreadsheet_ids
 
     @classmethod
-    def load_from_rows(cls, rows):
-        """Load owner nations from sheet.
+    def load_from_cell_data(cls, cell_data: CellData):
+        """Load owner nation data from spreadsheet cell data.
 
         Args:
-            rows (list): Sheet rows
+            cell_data (CellData): Cell data
 
         Returns:
-            OwnerNations: An instance
+            OwnerNationData
         """
 
-        owner_nation_names = {}
-        permitted_spreadsheets = {}
-        # In case of similar IDs, the latest one is used
-        for row in rows:
-            owner_id = row[0]
-            owner_nation_names[owner_id] = row[1]
-            permitted_spreadsheets[owner_id] = row[2].split(",")
+        owner_nation_names: dict[str, str] = {}
+        allowed_spreadsheet_ids: dict[str, SpreadsheetIds] = {}
+        # If there are similar IDs, the latest one is used
+        for row in cell_data:
+            owner_id = str(row[0])
+            owner_nation_name = row[1]
+            allowed_spreadsheets = row[2]
 
-        return cls(owner_nation_names, permitted_spreadsheets)
+            if not isinstance(owner_nation_name, str):
+                raise TypeError(
+                    f'"{owner_nation_name}" is an invalid owner nation name'
+                )
 
-    def get_owner_nation_name(self, owner_id, spreadsheet_id):
-        """Get owner nation name from owner id.
+            if not isinstance(allowed_spreadsheets, str):
+                raise TypeError(
+                    f'"{allowed_spreadsheets}" is an invalid spreadsheet ID list'
+                )
+
+            owner_nation_names[owner_id] = owner_nation_name
+            allowed_spreadsheet_ids[owner_id] = allowed_spreadsheets.split(",")
+
+        return cls(owner_nation_names, allowed_spreadsheet_ids)
+
+    def get_owner_nation_name(self, owner_id: str) -> str:
+        """Get owner nation name from owner ID.
 
         Args:
-            owner_id (str): Owner nation id
-            spreadsheet_id (str): Spreadsheet id
+            owner_id (int): Owner nation ID
 
         Raises:
             KeyError: Owner nation does not exist
-            ValueError: Owner nation is not allowed for this spreadsheet
 
         Returns:
             str: Owner nation name
         """
 
         if owner_id not in self.owner_nation_names:
-            raise KeyError
-
-        if spreadsheet_id not in self.permitted_spreadsheets[owner_id]:
-            raise ValueError
+            raise KeyError(f'Could not find any nation with owner ID "{owner_id}"')
 
         return self.owner_nation_names[owner_id]
+
+    def check_spreadsheet_permission(self, owner_id: str, spreadsheet_id: str) -> bool:
+        """Check if the provided owner ID can be used with the provided spreadsheet ID.
+
+        Args:
+            owner_id (str): Owner ID
+            spreadsheet_id (str): Spreadsheet ID
+
+        Returns:
+            bool: True if allowed
+        """
+
+        if owner_id not in self.allowed_spreadsheet_ids:
+            raise KeyError(f'Could not find any nation with owner ID "{owner_id}"')
+
+        return spreadsheet_id in self.allowed_spreadsheet_ids[owner_id]
 
 
 def load_utility_templates_from_spreadsheets(spreadsheets):
@@ -737,7 +772,7 @@ class GoogleDispatchLoader:
     ):
         self.spreadsheet_api = spreadsheet_api
 
-        owner_nations = OwnerNations.load_from_rows(owner_nation_rows)
+        owner_nations = OwnerNationData.load_from_cell_data(owner_nation_rows)
         category_setups = CategorySetups.load_from_rows(category_setup_rows)
 
         self.utility_templates = load_utility_templates_from_spreadsheets(
@@ -831,13 +866,13 @@ def init_dispatch_loader(config: Mapping):
     spreadsheet_api = GoogleSpreadsheetApiAdapter(google_api)
 
     owner_nation_rows = spreadsheet_api.get_cell_data(
-        SheetRange(
+        CellRange(
             config["owner_nation_sheet"]["spreadsheet_id"],
             config["owner_nation_sheet"]["range"],
         )
     )
     category_setup_rows = spreadsheet_api.get_cell_data(
-        SheetRange(
+        CellRange(
             config["category_setup_sheet"]["spreadsheet_id"],
             config["category_setup_sheet"]["range"],
         )

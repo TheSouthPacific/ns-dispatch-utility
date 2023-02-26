@@ -19,7 +19,7 @@ class TestGoogleSpreadsheetApiAdapter:
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
-        range = loader.SheetRange("1234abcd", "Foo!A1:F")
+        range = loader.CellRange("1234abcd", "Foo!A1:F")
 
         result = api.get_cell_data(range)
 
@@ -36,7 +36,7 @@ class TestGoogleSpreadsheetApiAdapter:
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
-        ranges = [loader.SheetRange("1234abcd", "Foo!A1:F")]
+        ranges = [loader.CellRange("1234abcd", "Foo!A1:F")]
 
         result = api.get_cell_data(ranges)
 
@@ -51,7 +51,7 @@ class TestGoogleSpreadsheetApiAdapter:
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
-        range = loader.SheetRange("1234abcd", "Foo!A1:F")
+        range = loader.CellRange("1234abcd", "Foo!A1:F")
 
         result = api.get_cell_data(range)
 
@@ -66,7 +66,7 @@ class TestGoogleSpreadsheetApiAdapter:
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
-        ranges = [loader.SheetRange("1234abcd", "Foo!A1:F")]
+        ranges = [loader.CellRange("1234abcd", "Foo!A1:F")]
 
         result = api.get_cell_data(ranges)
 
@@ -76,7 +76,7 @@ class TestGoogleSpreadsheetApiAdapter:
         google_api = mock.Mock()
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
-        new_cell_data = {loader.SheetRange("1234abcd", "Foo!A1:F"): [["hello"]]}
+        new_cell_data = {loader.CellRange("1234abcd", "Foo!A1:F"): [["hello"]]}
 
         api.update_cell_data(new_cell_data)
 
@@ -98,9 +98,14 @@ class TestResult:
         assert result_obj.user_message == "Created on 2023/01/01 00:00:00 "
 
     def test_get_failure_user_message_returns_formatted_user_message(self):
-        result_obj = loader.FailureResult("name1", "create", datetime(2023, 1, 1), "Some details")
+        result_obj = loader.FailureResult(
+            "name1", "create", datetime(2023, 1, 1), "Some details"
+        )
 
-        assert result_obj.user_message == "Failed to create on 2023/01/01 00:00:00 \nError: Some details"
+        assert (
+            result_obj.user_message
+            == "Failed to create on 2023/01/01 00:00:00 \nError: Some details"
+        )
 
 
 class TestResultReporter:
@@ -126,21 +131,33 @@ class TestResultReporter:
 
         assert isinstance(result, loader.FailureResult) and not result.details
 
-    def test_report_failure_with_text_details_adds_failure_result_with_text_details(self):
+    def test_report_failure_with_text_details_adds_failure_result_with_text_details(
+        self,
+    ):
         reporter = loader.ResultRecorder()
 
         reporter.report_failure("foo", "create", "Some details", datetime(2023, 1, 1))
         result = reporter.get_result("foo")
 
-        assert isinstance(result, loader.FailureResult) and result.details == "Some details"
+        assert (
+            isinstance(result, loader.FailureResult)
+            and result.details == "Some details"
+        )
 
-    def test_report_failure_with_exception_details_adds_failure_result_with_exception_msg(self):
+    def test_report_failure_with_exception_details_adds_failure_result_with_exception_msg(
+        self,
+    ):
         reporter = loader.ResultRecorder()
 
-        reporter.report_failure("foo", "create", Exception("Some details"), datetime(2023, 1, 1))
+        reporter.report_failure(
+            "foo", "create", Exception("Some details"), datetime(2023, 1, 1)
+        )
         result = reporter.get_result("foo")
 
-        assert isinstance(result, loader.FailureResult) and result.details == "Some details"
+        assert (
+            isinstance(result, loader.FailureResult)
+            and result.details == "Some details"
+        )
 
     def test_report_failure_uses_current_time_if_no_result_time_is_passed(self):
         reporter = loader.ResultRecorder()
@@ -177,32 +194,81 @@ class TestCategorySetups:
             category_setups.get_category_subcategory_name(100)
 
 
-class TestOwnerNations:
+class TestOwnerNationData:
     def test_get_owner_nation_name_returns_name(self):
-        rows = [[1, "Testopia", "foofoo,barbar,coocoo"], [2, "Monopia", "zoo"]]
-        owner_nations = loader.OwnerNations.load_from_rows(rows)
+        owner_nation_names = {"id1": "nation1"}
+        allowed_spreadsheet_ids = {"id1": ["s1"]}
 
-        assert owner_nations.get_owner_nation_name(1, "barbar") == "Testopia"
+        owner_nations = loader.OwnerNationData(
+            owner_nation_names, allowed_spreadsheet_ids
+        )
+
+        assert owner_nations.get_owner_nation_name("id1") == "nation1"
 
     def test_get_non_existent_owner_nation_name_raises_exception(self):
-        rows = [[1, "Testopia", "foofoo,barbar,coocoo"], [2, "Monopia", "zoo"]]
-        owner_nations = loader.OwnerNations.load_from_rows(rows)
+        owner_nations = loader.OwnerNationData({}, {})
 
         with pytest.raises(KeyError):
-            owner_nations.get_owner_nation_name(100, "barbar")
-
-    def test_get_unpermitted_owner_nation_name_raises_exception(self):
-        rows = [[1, "Testopia", "foofoo,barbar,coocoo"], [2, "Monopia", "zoo"]]
-        owner_nations = loader.OwnerNations.load_from_rows(rows)
-
-        with pytest.raises(ValueError):
-            owner_nations.get_owner_nation_name(1, "illegalsheet")
+            owner_nations.get_owner_nation_name("id1")
 
     def test_get_owner_nation_name_returns_name_of_last_identical_id(self):
-        rows = [[1, "Testopia", "foofoo,barbar,coocoo"], [1, "Monopia", "zoo"]]
-        owner_nations = loader.OwnerNations.load_from_rows(rows)
+        owner_nation_names = {"id1": "nation1", "id1": "nation2"}
+        allowed_spreadsheet_ids = {"id1": ["s1"], "id1": ["s2"]}
 
-        assert owner_nations.get_owner_nation_name(1, "zoo") == "Monopia"
+        owner_nations = loader.OwnerNationData(
+            owner_nation_names, allowed_spreadsheet_ids
+        )
+
+        assert owner_nations.get_owner_nation_name("id1") == "nation2"
+
+    def test_check_permission_on_allowed_spreadsheet_returns_true(self):
+        owner_nation_names = {"id1": "nation1"}
+        allowed_spreadsheet_ids = {"id1": ["s1"]}
+
+        owner_nations = loader.OwnerNationData(
+            owner_nation_names, allowed_spreadsheet_ids
+        )
+
+        assert owner_nations.check_spreadsheet_permission("id1", "s1")
+
+    def test_check_permission_on_non_allowed_spreadsheet_returns_false(self):
+        owner_nation_names = {"id1": "nation1"}
+        allowed_spreadsheet_ids = {"id1": ["s1"]}
+
+        owner_nations = loader.OwnerNationData(
+            owner_nation_names, allowed_spreadsheet_ids
+        )
+
+        assert not owner_nations.check_spreadsheet_permission("id1", "s2")
+
+    def test_check_permission_on_non_existent_owner_id_raises_exception(self):
+        owner_nations = loader.OwnerNationData({}, {})
+
+        with pytest.raises(KeyError):
+            owner_nations.check_spreadsheet_permission("id1", "s1")
+
+    def test_load_owner_nation_data_from_cell_data(self):
+        cell_data = [["id1", "nation1", "s1,s2"]]
+
+        owner_nations = loader.OwnerNationData.load_from_cell_data(cell_data)
+
+        assert owner_nations.owner_nation_names == {
+            "id1": "nation1"
+        } and owner_nations.allowed_spreadsheet_ids == {"id1": ["s1", "s2"]}
+
+    def test_load_owner_nation_data_with_non_str_nation_name_raises_exception(self):
+        cell_data = [["id1", 1, "s1,s2"]]
+
+        with pytest.raises(TypeError):
+            loader.OwnerNationData.load_from_cell_data(cell_data)
+
+    def test_load_owner_nation_data_with_non_str_spreadsheet_id_list_raises_exception(
+        self,
+    ):
+        cell_data = [["id1", "nation1", 1]]
+
+        with pytest.raises(TypeError):
+            loader.OwnerNationData.load_from_cell_data(cell_data)
 
 
 class TestExtractNameFromHyperlink:
@@ -366,7 +432,7 @@ class TestDispatchData:
 
 @pytest.fixture
 def owner_nations():
-    return loader.OwnerNations({1: "testopia"}, {1: ["abcd1234", "xyzt1234"]})
+    return loader.OwnerNationData({1: "testopia"}, {1: ["abcd1234", "xyzt1234"]})
 
 
 @pytest.fixture
