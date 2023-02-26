@@ -167,31 +167,39 @@ class TestResultReporter:
         assert reporter.get_result("foo").result_time
 
 
-class TestCategorySetups:
-    def test_get_category_subcategory_names_returns_name(self):
-        rows = [[1, "Meta", "Gameplay"]]
-        category_setups = loader.CategorySetups.load_from_rows(rows)
+class TestCategorySetupData:
+    def test_get_category_subcategory_name_returns_name(self):
+        categories = {"id1": "Meta"}
+        subcategories = {"id1": "Gameplay"}
+        setups = loader.CategorySetupData(categories, subcategories)
 
-        category_name, subcategory_name = category_setups.get_category_subcategory_name(
-            1
-        )
+        category_name, subcategory_name = setups.get_category_subcategory_name("id1")
+
         assert category_name == "Meta" and subcategory_name == "Gameplay"
 
-    def test_get_category_subcategory_names_returns_name_of_last_idential_id(self):
-        rows = [[1, "Meta", "Gameplay"], [1, "Meta", "Reference"]]
-        category_setups = loader.CategorySetups.load_from_rows(rows)
-
-        category_name, subcategory_name = category_setups.get_category_subcategory_name(
-            1
-        )
-        assert category_name == "Meta" and subcategory_name == "Reference"
-
-    def test_get_category_subcategory_non_existent_names_raises_exception(self):
-        rows = [[1, "Meta", "Gameplay"]]
-        category_setups = loader.CategorySetups.load_from_rows(rows)
+    def test_get_category_subcategory_of_non_existent_id_raises_exception(self):
+        category_setups = loader.CategorySetupData({}, {})
 
         with pytest.raises(KeyError):
-            category_setups.get_category_subcategory_name(100)
+            category_setups.get_category_subcategory_name("id1")
+
+    def test_load_category_setup_data_from_cell_data(self):
+        cell_data = [["id1", "Meta", "Gameplay"]]
+
+        category_setups = loader.CategorySetupData.load_from_cell_data(cell_data)
+
+        assert category_setups.categories == {
+            "id1": "Meta"
+        } and category_setups.subcategories == {"id1": "Gameplay"}
+
+    def test_load_category_setup_data_from_cell_data_uses_last_identical_setup_id(self):
+        cell_data = [["id1", "Meta", "Gameplay"], ["id1", "Overview", "Factbook"]]
+
+        category_setups = loader.CategorySetupData.load_from_cell_data(cell_data)
+
+        assert category_setups.categories == {
+            "id1": "Overview"
+        } and category_setups.subcategories == {"id1": "Factbook"}
 
 
 class TestOwnerNationData:
@@ -210,16 +218,6 @@ class TestOwnerNationData:
 
         with pytest.raises(KeyError):
             owner_nations.get_owner_nation_name("id1")
-
-    def test_get_owner_nation_name_returns_name_of_last_identical_id(self):
-        owner_nation_names = {"id1": "nation1", "id1": "nation2"}
-        allowed_spreadsheet_ids = {"id1": ["s1"], "id1": ["s2"]}
-
-        owner_nations = loader.OwnerNationData(
-            owner_nation_names, allowed_spreadsheet_ids
-        )
-
-        assert owner_nations.get_owner_nation_name("id1") == "nation2"
 
     def test_check_permission_on_allowed_spreadsheet_returns_true(self):
         owner_nation_names = {"id1": "nation1"}
@@ -256,19 +254,14 @@ class TestOwnerNationData:
             "id1": "nation1"
         } and owner_nations.allowed_spreadsheet_ids == {"id1": ["s1", "s2"]}
 
-    def test_load_owner_nation_data_with_non_str_nation_name_raises_exception(self):
-        cell_data = [["id1", 1, "s1,s2"]]
+    def test_load_owner_nation_data_from_cell_data_uses_last_identical_owner_id(self):
+        cell_data = [["id1", "nation1", "s1,s2"], ["id1", "nation2", "s2,s3"]]
 
-        with pytest.raises(TypeError):
-            loader.OwnerNationData.load_from_cell_data(cell_data)
+        owner_nations = loader.OwnerNationData.load_from_cell_data(cell_data)
 
-    def test_load_owner_nation_data_with_non_str_spreadsheet_id_list_raises_exception(
-        self,
-    ):
-        cell_data = [["id1", "nation1", 1]]
-
-        with pytest.raises(TypeError):
-            loader.OwnerNationData.load_from_cell_data(cell_data)
+        assert owner_nations.owner_nation_names == {
+            "id1": "nation2"
+        } and owner_nations.allowed_spreadsheet_ids == {"id1": ["s2", "s3"]}
 
 
 class TestExtractNameFromHyperlink:
@@ -437,7 +430,7 @@ def owner_nations():
 
 @pytest.fixture
 def category_setups():
-    return loader.CategorySetups({1: "meta"}, {1: "reference"})
+    return loader.CategorySetupData({1: "meta"}, {1: "reference"})
 
 
 class TestDispatchSheetRange:

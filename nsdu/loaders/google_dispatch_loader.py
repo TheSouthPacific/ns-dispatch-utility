@@ -252,54 +252,57 @@ class ResultRecorder:
         )
 
 
-class CategorySetups:
-    """Convert category setup sheet data to dict.
+class CategorySetupData:
+    """Contains information about dispatch category setup.
 
     Args:
-        categories (dict): Category names and setup id
-        subcategories (dict): Subcategory names and setup id
+        categories (Mapping[str, str]): Category names of setup IDs
+        subcategories (Mapping[str, str]): Subcategory names of setup IDs
     """
 
-    def __init__(self, categories, subcategories):
+    def __init__(self, categories: Mapping[str, str], subcategories: Mapping[str, str]):
         self.categories = categories
         self.subcategories = subcategories
 
     @classmethod
-    def load_from_rows(cls, rows):
-        """Create an instance from sheet's row data
+    def load_from_cell_data(cls, cell_data: CellData):
+        """Load category setup data from spreadsheet cell data.
 
         Args:
-            rows (list): Row data
+            cell_data (CellData): Cell data
 
         Returns:
-            CategorySetups instance
+            CategorySetupData
         """
 
-        categories = {}
-        subcategories = {}
+        categories: dict[str, str] = {}
+        subcategories: dict[str, str] = {}
         # In case of similar IDs, the latest one is used
-        for row in rows:
-            setup_id = row[0]
-            categories[setup_id] = row[1]
-            subcategories[setup_id] = row[2]
+        for row in cell_data:
+            setup_id = str(row[0])
+            category_name = str(row[1])
+            subcategory_name = str(row[2])
+
+            categories[setup_id] = category_name
+            subcategories[setup_id] = subcategory_name
 
         return cls(categories, subcategories)
 
-    def get_category_subcategory_name(self, setup_id):
-        """Get category and subcategory name from setup id.
+    def get_category_subcategory_name(self, setup_id: str) -> tuple[str, str]:
+        """Get the category and subcategory name of a setup ID.
 
         Args:
-            setup_id (str): Setup id
+            setup_id (str): Setup ID
 
         Raises:
-            KeyError: Setup id does not exist
+            KeyError: Setup ID does not exist
 
         Returns:
-            (str, str): Category and subcategory name
+            tuple[str, str]: Category and subcategory name
         """
 
         if setup_id not in self.categories:
-            raise KeyError
+            raise KeyError(f"Could not find category setup ID {setup_id}")
         return self.categories[setup_id], self.subcategories[setup_id]
 
 
@@ -338,18 +341,8 @@ class OwnerNationData:
         # If there are similar IDs, the latest one is used
         for row in cell_data:
             owner_id = str(row[0])
-            owner_nation_name = row[1]
-            allowed_spreadsheets = row[2]
-
-            if not isinstance(owner_nation_name, str):
-                raise TypeError(
-                    f'"{owner_nation_name}" is an invalid owner nation name'
-                )
-
-            if not isinstance(allowed_spreadsheets, str):
-                raise TypeError(
-                    f'"{allowed_spreadsheets}" is an invalid spreadsheet ID list'
-                )
+            owner_nation_name = str(row[1])
+            allowed_spreadsheets = str(row[2])
 
             owner_nation_names[owner_id] = owner_nation_name
             allowed_spreadsheet_ids[owner_id] = allowed_spreadsheets.split(",")
@@ -773,7 +766,7 @@ class GoogleDispatchLoader:
         self.spreadsheet_api = spreadsheet_api
 
         owner_nations = OwnerNationData.load_from_cell_data(owner_nation_rows)
-        category_setups = CategorySetups.load_from_rows(category_setup_rows)
+        category_setups = CategorySetupData.load_from_cell_data(category_setup_rows)
 
         self.utility_templates = load_utility_templates_from_spreadsheets(
             utility_template_spreadsheets
