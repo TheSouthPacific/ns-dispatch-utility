@@ -1,15 +1,15 @@
 """Load dispatches from Google spreadsheets.
 """
 
+from abc import ABC, abstractmethod
 from dataclasses import dataclass
-import collections
 import copy
 from datetime import datetime
 from datetime import timezone
 import itertools
 import re
 import logging
-from typing import Mapping, Sequence
+from typing import Mapping, Optional, Sequence
 
 from google.oauth2 import service_account
 from googleapiclient import discovery
@@ -48,19 +48,21 @@ CellData = list[list[str]]
 
 @dataclass(frozen=True)
 class SheetRange:
+    """Describe the spreadsheet ID and range name of a range.
+    """
     spreadsheet_id: str
-    range_value: str
+    range_name: str
 
 
 class GoogleSpreadsheetApiAdapter:
     """Adapter for Google Spreadsheet API.
 
     Args:
-        sheet_api: Google Spreadsheet API
+        api: Google Spreadsheet API
     """
 
-    def __init__(self, sheet_api):
-        self.sheet_api = sheet_api
+    def __init__(self, api):
+        self._api = api
 
     @staticmethod
     def execute(request) -> dict:
@@ -86,7 +88,7 @@ class GoogleSpreadsheetApiAdapter:
     def get_cell_data(
         self, range: Sequence[SheetRange] | SheetRange
     ) -> dict[SheetRange, CellData] | CellData:
-        """Get call data from spreadsheet ranges.
+        """Get call data from spreadsheet range(s).
 
         Args:
             range (Sequence[SheetRange] | SheetRange): Range(s) to get
@@ -104,9 +106,9 @@ class GoogleSpreadsheetApiAdapter:
 
         spreadsheets = itertools.groupby(ranges, lambda range: range.spreadsheet_id)
         for spreadsheet_id, ranges in spreadsheets:
-            range_values = list(map(lambda range: range.range_value, ranges))
+            range_values = list(map(lambda range: range.range_name, ranges))
 
-            req = self.sheet_api.batchGet(
+            req = self._api.batchGet(
                 spreadsheetId=spreadsheet_id,
                 ranges=range_values,
                 valueRenderOption="FORMULA",
@@ -131,130 +133,119 @@ class GoogleSpreadsheetApiAdapter:
         return cell_data
 
     def update_cell_data(self, new_cell_data: Mapping[SheetRange, CellData]) -> None:
-        """Update cell values of many ranges in a spreadsheet.
+        """Update cell data of spreadsheet range(s).
 
         Args:
-            spreadsheet_id (str): Spreadsheet Id
-            new_data (dict): New row values
+            new_cell_data (Mapping[SheetRange, CellData]): New cell data
         """
 
         spreadsheets = itertools.groupby(
             new_cell_data.keys(), lambda range: range.spreadsheet_id
         )
         for spreadsheet_id, ranges in spreadsheets:
-            new_data = list(map(
-                lambda range: {
-                    "range": range.range_value,
-                    "majorDimension": "ROWS",
-                    "values": new_cell_data[range],
-                },
-                ranges,
-            ))
+            new_data = list(
+                map(
+                    lambda range: {
+                        "range": range.range_name,
+                        "majorDimension": "ROWS",
+                        "values": new_cell_data[range],
+                    },
+                    ranges,
+                )
+            )
             body = {"valueInputOption": "USER_ENTERED", "data": new_data}
-            req = self.sheet_api.batchUpdate(spreadsheetId=spreadsheet_id, body=body)
+            req = self._api.batchUpdate(spreadsheetId=spreadsheet_id, body=body)
             GoogleSpreadsheetApiAdapter.execute(req)
             logger.debug(
                 'Updated cell data of spreadsheet "%s": %r', spreadsheet_id, body
             )
 
+@dataclass(frozen=True)
+class Result(ABC):
+    """Describes an operation result.
+    """
+    dispatch_name: str
+    action: str
+    result_time: datetime
 
-SuccessResult = collections.namedtuple(
-    "SuccessResult", ["name", "action", "result_time"]
-)
-FailureResult = collections.namedtuple(
-    "FailureResult", ["name", "action", "details", "result_time"]
-)
-Message = collections.namedtuple("Message", ["is_failure", "text"])
+    @property
+    @abstractmethod
+    def user_message(self) -> str:
+        pass
 
 
-class ResultReporter:
-    """Manages the results of spreadsheet and dispatch update operations."""
+@dataclass(frozen=True)
+class SuccessResult(Result):
+    """Describes a successful operation result.
+    """
+
+    @property
+    def user_message(self) -> str:
+        time_string = self.result_time.strftime(RESULT_TIME_FORMAT)
+        return SUCCESS_MESSAGE_FORMATS[self.action].format(time=time_string)
+
+
+@dataclass(frozen=True)
+class FailureResult(Result):
+    """Describes a failure operation result.
+    """
+    details: str | None
+
+    @property
+    def user_message(self) -> str:
+        time_string = self.result_time.strftime(RESULT_TIME_FORMAT)
+        message = FAILURE_MESSAGE_FORMATS[self.action].format(time=time_string)
+        message += FAILURE_DETAILS_FORMAT.format(details=self.details)
+        return message
+
+
+class ResultRecorder:
+    """Records the results of spreadsheet and dispatch update operations."""
 
     def __init__(self):
-        self.results = {}
+        self.results: dict[str, SuccessResult | FailureResult] = {}
 
-    def report_success(self, name, action, result_time=None):
+    def get_result(self, dispatch_name: str) -> SuccessResult | FailureResult:
+        return self.results[dispatch_name]
+
+    def report_success(
+        self, dispatch_name: str, action: str, result_time: datetime | None = None
+    ) -> None:
         """Report a successful operation.
 
         Args:
-            name (str): Dispatch name
-            action (str): Action
-            result_time (datetime.datetime) Time the operation happened. Use current time if this is None.
+            dispatch_name (str): Dispatch name
+            action (str): Dispatch action
+            result_time (datetime | None) The time the operation happened. Use current time if None.
         """
 
         if result_time is None:
             result_time = datetime.now(tz=timezone.utc)
-        self.results[name] = SuccessResult(name, action, result_time)
+        self.results[dispatch_name] = SuccessResult(dispatch_name, action, result_time)
 
-    def report_failure(self, name, action, details, result_time=None):
+    def report_failure(
+        self,
+        dispatch_name: str,
+        action: str,
+        details: str | Exception | None = None,
+        result_time: datetime | None = None
+    ) -> None:
         """Report a failed operation.
 
         Args:
-            name (str): Dispatch name
-            action (str): Action
-            details (str): Error details
-            result_time (datetime.datetime) Time the operation happened. Use current time if this is None.
+            dispatch_name (str): Dispatch name
+            action (str): Dispatch action
+            details (str | Exception | None): Error details
+            result_time (datetime.datetime) Time the operation happened. Use current time if None.
         """
 
         if isinstance(details, Exception):
             details = str(details)
+
         if result_time is None:
             result_time = datetime.now(tz=timezone.utc)
-        self.results[name] = FailureResult(name, action, details, result_time)
 
-    @staticmethod
-    def format_success_message(action, result_time):
-        """Format success messages.
-
-        Args:
-            action (str): Action
-            result_time (datetime.datetime): Time the operation happened
-
-        Returns:
-            str: Formatted message
-        """
-
-        current_time = result_time.strftime(RESULT_TIME_FORMAT)
-        return SUCCESS_MESSAGE_FORMATS[action].format(time=current_time)
-
-    @staticmethod
-    def format_failure_message(action, details, result_time=None):
-        """Format failure messages.
-
-        Args:
-            action (str): Action
-            details (str): Error details
-            result_time (datetime.datetime): Time the operation happened
-
-        Returns:
-            str: Formatted message
-        """
-
-        current_time = result_time.strftime(RESULT_TIME_FORMAT)
-        message = FAILURE_MESSAGE_FORMATS[action].format(time=current_time)
-        message += FAILURE_DETAILS_FORMAT.format(details=details)
-        return message
-
-    def get_message(self, name):
-        """Get user message for an operation result of a dispatch.
-
-        Args:
-            name (str): Dispatch name
-
-        Returns:
-            str: Message
-        """
-
-        result = self.results[name]
-        if isinstance(result, SuccessResult):
-            message_text = ResultReporter.format_success_message(
-                result.action, result.result_time
-            )
-            return Message(is_failure=False, text=message_text)
-        message_text = ResultReporter.format_failure_message(
-            result.action, result.details, result.result_time
-        )
-        return Message(is_failure=True, text=message_text)
+        self.results[dispatch_name] = FailureResult(dispatch_name, action, result_time, details)
 
 
 class CategorySetups:
@@ -384,15 +375,14 @@ def load_utility_templates_from_spreadsheets(spreadsheets):
     return utility_templates
 
 
-def extract_dispatch_id_from_hyperlink(cell_value):
-    """Get dispatch id from HYPERLINK function in the cell value of the name column.
+def extract_dispatch_id_from_hyperlink(cell_value: str) -> str | None:
+    """Extract dispatch ID from the HYPERLINK function in the dispatch name cell.
 
     Args:
-        cell_value (str): Cell value of name column
+        cell_value (str): Dispatch name cell value
 
     Returns:
-        tuple: Dispatch id
-        None: No dispatch id
+        str | None: Dispatch ID
     """
 
     result = re.search(HYPERLINK_REGEX, cell_value, flags=re.IGNORECASE)
@@ -402,11 +392,11 @@ def extract_dispatch_id_from_hyperlink(cell_value):
     return result.group(1)
 
 
-def extract_name_from_hyperlink(cell_value):
-    """Get dispatch name from HYPERLINK function in the cell value of the name column.
+def extract_name_from_hyperlink(cell_value: str) -> str:
+    """Extract dispatch name from the HYPERLINK function in the dispatch name cell.
 
     Args:
-        cell_value (str): Cell value of name column
+        cell_value (str): Dispatch name cell value
 
     Returns:
         str: Dispatch name
@@ -419,8 +409,8 @@ def extract_name_from_hyperlink(cell_value):
     return result.group(2)
 
 
-def get_hyperlink(name, dispatch_id):
-    """Get a hyperlink sheet function based on dispatch name and id.
+def create_hyperlink(name: str, dispatch_id: str) -> str:
+    """Create a hyperlink sheet function based on dispatch name and ID.
 
     Args:
         name (str): Dispatch name
@@ -432,17 +422,17 @@ def get_hyperlink(name, dispatch_id):
     return HYPERLINK_BUILD_FORMAT.format(name=name, dispatch_id=dispatch_id)
 
 
-class DispatchSheetRange:
-    """A sheet range that contains dispatches.
+class RangeDispatchData:
+    """Dispatch data of a spreadsheet range.
 
     Args:
         row_values (list): Row values
-        result_reporter (ResultReporter): Result reporter instance
+        result_recorder (ResultReporter): Result reporter
     """
 
-    def __init__(self, row_values, result_reporter):
-        self.row_values = row_values
-        self.result_reporter = result_reporter
+    def __init__(self, cell_data: CellData, result_recorder: ResultRecorder):
+        self.cell_data = cell_data
+        self.result_recorder = result_recorder
 
     def get_dispatches_as_dict(self, owner_nations, category_setups, spreadsheet_id):
         """Get dispatches in this range as a dict of dispatch config
@@ -458,7 +448,7 @@ class DispatchSheetRange:
         """
 
         dispatch_data = {}
-        for row in self.row_values:
+        for row in self.cell_data:
             if len(row) < 6:
                 continue
 
@@ -470,7 +460,7 @@ class DispatchSheetRange:
             if not action:
                 continue
             if action not in ("create", "edit", "remove"):
-                self.result_reporter.report_failure(name, action, "Invalid action")
+                self.result_recorder.report_failure(name, action, "Invalid action")
                 continue
 
             try:
@@ -478,12 +468,12 @@ class DispatchSheetRange:
                     row[2], spreadsheet_id
                 )
             except KeyError:
-                self.result_reporter.report_failure(
+                self.result_recorder.report_failure(
                     name, action, "This owner nation does not exist."
                 )
                 continue
             except ValueError:
-                self.result_reporter.report_failure(
+                self.result_recorder.report_failure(
                     name, action, "This spreadsheet does not allow this owner nation."
                 )
                 continue
@@ -493,7 +483,7 @@ class DispatchSheetRange:
                     row[3]
                 )
             except KeyError:
-                self.result_reporter.report_failure(
+                self.result_recorder.report_failure(
                     name, action, "This category setup does not exist."
                 )
                 continue
@@ -525,7 +515,7 @@ class DispatchSheetRange:
             list: New row values.
         """
 
-        new_row_values = copy.deepcopy(self.row_values)
+        new_row_values = copy.deepcopy(self.cell_data)
         for row in new_row_values:
             # SKip rows with empty title or template cell
             if len(row) < 6:
@@ -538,12 +528,12 @@ class DispatchSheetRange:
             name = extract_name_from_hyperlink(row[0])
 
             try:
-                user_message = self.result_reporter.get_message(name)
+                result = self.result_recorder.get_result(name)
                 try:
-                    row[6] = user_message.text
+                    row[6] = result.user_message
                 except IndexError:
-                    row.append(user_message.text)
-                if user_message.is_failure:
+                    row.append(result.user_message)
+                if isinstance(result, FailureResult):
                     continue
             except KeyError:
                 continue
@@ -552,7 +542,7 @@ class DispatchSheetRange:
                 row[0] = name
                 row[1] = ""
             elif new_dispatch_data[name]["action"] == "create":
-                row[0] = get_hyperlink(name, new_dispatch_data[name]["ns_id"])
+                row[0] = create_hyperlink(name, new_dispatch_data[name]["ns_id"])
                 row[1] = "edit"
 
         return new_row_values
@@ -563,16 +553,16 @@ class DispatchSpreadsheet:
 
     Args:
         sheet_ranges (list): Ranges of this spreadsheet
-        result_reporter (ResultReporter): Result reporter instance
+        result_recorder (ResultReporter): Result reporter instance
     """
 
-    def __init__(self, sheet_ranges, result_reporter):
+    def __init__(self, sheet_ranges, result_recorder):
         self.values_of_ranges = {}
         for sheet_range, range_values in sheet_ranges.items():
-            self.values_of_ranges[sheet_range] = DispatchSheetRange(
-                range_values, result_reporter
+            self.values_of_ranges[sheet_range] = RangeDispatchData(
+                range_values, result_recorder
             )
-        self.result_reporter = result_reporter
+        self.result_recorder = result_recorder
 
     def get_dispatches_as_dict(self, owner_nations, category_setups, spreadsheet_id):
         """Extract dispatch data from configured ranges in this spreadsheet.
@@ -619,17 +609,17 @@ class DispatchSpreadsheets:
 
     Args:
         spreadsheets (str): Spreadsheet data
-        result_reporter (ResultReporter): Result reporter instance
+        result_recorder (ResultReporter): Result reporter instance
     """
 
-    def __init__(self, spreadsheets, result_reporter):
+    def __init__(self, spreadsheets, result_recorder):
         self.spreadsheets = {}
         for spreadsheet_id, sheet_ranges in spreadsheets.items():
             self.spreadsheets[spreadsheet_id] = DispatchSpreadsheet(
-                sheet_ranges, result_reporter
+                sheet_ranges, result_recorder
             )
 
-        self.result_reporter = result_reporter
+        self.result_recorder = result_recorder
 
     def get_dispatches_as_dict(self, owner_nations, category_setups):
         """Extract dispatch data from spreadsheets.
@@ -754,10 +744,10 @@ class GoogleDispatchLoader:
             utility_template_spreadsheets
         )
 
-        self.result_reporter = ResultReporter()
+        self.result_recorder = ResultRecorder()
 
         self.converter = DispatchSpreadsheets(
-            dispatch_spreadsheets, self.result_reporter
+            dispatch_spreadsheets, self.result_recorder
         )
         extracted_data = self.converter.get_dispatches_as_dict(
             owner_nations, category_setups
@@ -809,9 +799,9 @@ class GoogleDispatchLoader:
         """
 
         if result == "success":
-            self.result_reporter.report_success(name, action, result_time)
+            self.result_recorder.report_success(name, action, result_time)
         else:
-            self.result_reporter.report_failure(name, action, result, result_time)
+            self.result_recorder.report_failure(name, action, result, result_time)
 
     def update_spreadsheets(self):
         """Update spreadsheets."""
@@ -824,7 +814,7 @@ class GoogleDispatchLoader:
 
 
 @loader_api.dispatch_loader
-def init_dispatch_loader(config):
+def init_dispatch_loader(config: Mapping):
     config = config["google_dispatchloader"]
 
     google_api_creds = service_account.Credentials.from_service_account_file(
@@ -840,18 +830,22 @@ def init_dispatch_loader(config):
     )
     spreadsheet_api = GoogleSpreadsheetApiAdapter(google_api)
 
-    owner_nation_rows = spreadsheet_api.get_cell_values_of_range(
-        config["owner_nation_sheet"]["spreadsheet_id"],
-        config["owner_nation_sheet"]["range"],
+    owner_nation_rows = spreadsheet_api.get_cell_data(
+        SheetRange(
+            config["owner_nation_sheet"]["spreadsheet_id"],
+            config["owner_nation_sheet"]["range"],
+        )
     )
-    category_setup_rows = spreadsheet_api.get_cell_values_of_range(
-        config["category_setup_sheet"]["spreadsheet_id"],
-        config["category_setup_sheet"]["range"],
+    category_setup_rows = spreadsheet_api.get_cell_data(
+        SheetRange(
+            config["category_setup_sheet"]["spreadsheet_id"],
+            config["category_setup_sheet"]["range"],
+        )
     )
-    utility_template_spreadsheets = spreadsheet_api.get_rows_in_many_spreadsheets(
+    utility_template_spreadsheets = spreadsheet_api.get_cell_data(
         config["utility_template_spreadsheets"]
     )
-    dispatch_spreadsheets = spreadsheet_api.get_rows_in_many_spreadsheets(
+    dispatch_spreadsheets = spreadsheet_api.get_cell_data(
         config["dispatch_spreadsheets"]
     )
 
@@ -865,25 +859,25 @@ def init_dispatch_loader(config):
 
 
 @loader_api.dispatch_loader
-def get_dispatch_config(loader):
+def get_dispatch_config(loader: GoogleDispatchLoader):
     return loader.get_dispatch_config()
 
 
 @loader_api.dispatch_loader
-def get_dispatch_template(loader, name):
-    return loader.get_dispatch_template(name)
+def get_dispatch_template(loader: GoogleDispatchLoader, dispatch_name: str):
+    return loader.get_dispatch_template(dispatch_name)
 
 
 @loader_api.dispatch_loader
-def after_update(loader, name, action, result, result_time):
+def after_update(loader: GoogleDispatchLoader, name, action, result, result_time):
     loader.report_result(name, action, result, result_time)
 
 
 @loader_api.dispatch_loader
-def add_dispatch_id(loader, name, dispatch_id):
-    loader.add_dispatch_id(name, dispatch_id)
+def add_dispatch_id(loader: GoogleDispatchLoader, dispatch_name: str, dispatch_id: str):
+    loader.add_dispatch_id(dispatch_name, dispatch_id)
 
 
 @loader_api.dispatch_loader
-def cleanup_dispatch_loader(loader):
+def cleanup_dispatch_loader(loader: GoogleDispatchLoader):
     loader.update_spreadsheets()

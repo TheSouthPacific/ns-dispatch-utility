@@ -36,11 +36,11 @@ class TestGoogleSpreadsheetApiAdapter:
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
-        range = [loader.SheetRange("1234abcd", "Foo!A1:F")]
+        ranges = [loader.SheetRange("1234abcd", "Foo!A1:F")]
 
-        result = api.get_cell_data(range)
+        result = api.get_cell_data(ranges)
 
-        assert result == {range[0]: [["hello"]]}
+        assert result == {ranges[0]: [["hello"]]}
 
     def test_get_cell_data_of_empty_range_returns_empty_list(self):
         resp = {
@@ -56,6 +56,21 @@ class TestGoogleSpreadsheetApiAdapter:
         result = api.get_cell_data(range)
 
         assert not result
+
+    def test_get_cell_data_of_empty_ranges_returns_empty_list(self):
+        resp = {
+            "spreadsheetId": "1234abcd",
+            "valueRanges": [{"range": "Foo!A1:F", "majorDimension": "ROWS"}],
+        }
+        request = mock.Mock(execute=mock.Mock(return_value=resp))
+        google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
+        api = loader.GoogleSpreadsheetApiAdapter(google_api)
+
+        ranges = [loader.SheetRange("1234abcd", "Foo!A1:F")]
+
+        result = api.get_cell_data(ranges)
+
+        assert result == {ranges[0]: []}
 
     def test_update_cell_data_of_many_ranges(self):
         google_api = mock.Mock()
@@ -76,71 +91,63 @@ class TestGoogleSpreadsheetApiAdapter:
         )
 
 
+class TestResult:
+    def test_get_success_user_message_returns_formatted_user_message(self):
+        result_obj = loader.SuccessResult("name1", "create", datetime(2023, 1, 1))
+
+        assert result_obj.user_message == "Created on 2023/01/01 00:00:00 "
+
+    def test_get_failure_user_message_returns_formatted_user_message(self):
+        result_obj = loader.FailureResult("name1", "create", datetime(2023, 1, 1), "Some details")
+
+        assert result_obj.user_message == "Failed to create on 2023/01/01 00:00:00 \nError: Some details"
+
+
 class TestResultReporter:
-    def test_format_success_message_returns_formatted_messages(self):
-        result_time = datetime.fromisoformat("2021-01-01T00:00:00")
-        r = loader.ResultReporter.format_success_message("create", result_time)
-
-        assert r == "Created on 2021/01/01 00:00:00 "
-
-    def test_format_failure_message_returns_formatted_messages(self):
-        result_time = datetime.fromisoformat("2021-01-01T00:00:00")
-        r = loader.ResultReporter.format_failure_message(
-            "create", "Some details", result_time
-        )
-
-        assert r == "Failed to create on 2021/01/01 00:00:00 \nError: Some details"
-
-    def test_report_success_adds_success_report(self):
-        reporter = loader.ResultReporter()
+    def test_report_success_adds_success_result(self):
+        reporter = loader.ResultRecorder()
 
         reporter.report_success("foo", "create", datetime.now())
 
-        assert reporter.results["foo"].action == "create"
+        assert reporter.get_result("foo").action == "create"
 
-    def test_report_success_uses_current_time_if_no_result_time_is_provided(self):
-        reporter = loader.ResultReporter()
+    def test_report_success_uses_current_time_if_no_result_time_is_passed(self):
+        reporter = loader.ResultRecorder()
 
         reporter.report_success("foo", "create")
 
-        assert isinstance(reporter.results["foo"].result_time, datetime)
+        assert reporter.get_result("foo").result_time
 
-    def test_report_failure_adds_failure_report(self):
-        reporter = loader.ResultReporter()
+    def test_report_failure_with_no_details_adds_failure_result_with_no_details(self):
+        reporter = loader.ResultRecorder()
 
-        reporter.report_failure("foo", "create", "Some details", datetime.now())
-        r = reporter.results["foo"]
+        reporter.report_failure("foo", "create", None, datetime(2023, 1, 1))
+        result = reporter.get_result("foo")
 
-        assert r.action == "create" and r.details == "Some details"
+        assert isinstance(result, loader.FailureResult) and not result.details
 
-    def test_report_failure_uses_current_time_if_no_result_time_is_provided(self):
-        reporter = loader.ResultReporter()
+    def test_report_failure_with_text_details_adds_failure_result_with_text_details(self):
+        reporter = loader.ResultRecorder()
 
-        reporter.report_failure("foo", "create", "Some details")
-        r = reporter.results["foo"]
+        reporter.report_failure("foo", "create", "Some details", datetime(2023, 1, 1))
+        result = reporter.get_result("foo")
 
-        assert r.action == "create" and r.details == "Some details"
-        assert isinstance(reporter.results["foo"].result_time, datetime)
+        assert isinstance(result, loader.FailureResult) and result.details == "Some details"
 
-    def test_get_message_of_successful_result_returns_formatted_message(self):
-        reporter = loader.ResultReporter()
-        result_time = datetime.fromisoformat("2021-01-01T00:00:00")
-        reporter.report_success("foo", "create", result_time)
+    def test_report_failure_with_exception_details_adds_failure_result_with_exception_msg(self):
+        reporter = loader.ResultRecorder()
 
-        r1 = reporter.get_message("foo")
+        reporter.report_failure("foo", "create", Exception("Some details"), datetime(2023, 1, 1))
+        result = reporter.get_result("foo")
 
-        assert "Created on 2021/01/01 00:00:00 " in r1.text
-        assert not r1.is_failure
+        assert isinstance(result, loader.FailureResult) and result.details == "Some details"
 
-    def test_get_message_of_failure_result_returns_formatted_message(self):
-        reporter = loader.ResultReporter()
-        result_time = datetime.fromisoformat("2021-01-01T00:00:00")
-        reporter.report_failure("foo", "edit", "Some details", result_time)
+    def test_report_failure_uses_current_time_if_no_result_time_is_passed(self):
+        reporter = loader.ResultRecorder()
 
-        r1 = reporter.get_message("foo")
+        reporter.report_failure("foo", "create", details="Some details")
 
-        assert r1.text == "Failed to edit on 2021/01/01 00:00:00 \nError: Some details"
-        assert r1.is_failure
+        assert reporter.get_result("foo").result_time
 
 
 class TestCategorySetups:
@@ -371,7 +378,7 @@ class TestDispatchSheetRange:
     def test_extract_dispatch_data_valid_action_returns_data(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -383,7 +390,7 @@ class TestDispatchSheetRange:
                 "",
             ]
         ]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
@@ -402,9 +409,9 @@ class TestDispatchSheetRange:
     def test_extract_dispatch_data_returns_data_of_no_id_rows(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [["name1", "create", 1, 1, "Title 1", "Text 1", ""]]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
@@ -422,9 +429,9 @@ class TestDispatchSheetRange:
     def test_extract_dispatch_data_skips_rows_with_not_enough_cells(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [["name1", "create", 1, 1, "Title 1"]]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
@@ -433,9 +440,9 @@ class TestDispatchSheetRange:
     def test_extract_dispatch_data_skips_rows_with_empty_name(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [["name1", "create", 1, 1, "Title 1"]]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
@@ -444,7 +451,7 @@ class TestDispatchSheetRange:
     def test_extract_dispatch_data_skips_over_invalid_action_dispatch(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -456,17 +463,17 @@ class TestDispatchSheetRange:
                 "",
             ]
         ]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
         assert r == {}
-        result_reporter.report_failure.assert_called()
+        result_recorder.report_failure.assert_called()
 
     def test_extract_dispatch_data_skips_over_empty_action_dispatch(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -478,7 +485,7 @@ class TestDispatchSheetRange:
                 "",
             ]
         ]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
@@ -487,7 +494,7 @@ class TestDispatchSheetRange:
     def test_extract_dispatch_data_skips_over_non_existent_owner_dispatch(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -499,17 +506,17 @@ class TestDispatchSheetRange:
                 "",
             ]
         ]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
         assert r == {}
-        result_reporter.report_failure.assert_called()
+        result_recorder.report_failure.assert_called()
 
     def test_extract_dispatch_data_skips_over_unpermitted_owner_dispatch(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -521,17 +528,17 @@ class TestDispatchSheetRange:
                 "",
             ]
         ]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "ijkl1234")
 
         assert r == {}
-        result_reporter.report_failure.assert_called()
+        result_recorder.report_failure.assert_called()
 
     def test_extract_dispatch_data_skips_over_non_existent_category_setup_dispatch(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -543,17 +550,17 @@ class TestDispatchSheetRange:
                 "",
             ]
         ]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
         assert r == {}
-        result_reporter.report_failure.assert_called()
+        result_recorder.report_failure.assert_called()
 
     def test_extract_dispatch_data_should_not_stop_on_skipped_rows(
         self, owner_nations, category_setups
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [
             ["", "", 1, 1, "Title 1", "Text 1", ""],
             [
@@ -566,7 +573,7 @@ class TestDispatchSheetRange:
                 "",
             ],
         ]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
@@ -583,8 +590,8 @@ class TestDispatchSheetRange:
         }
 
     def test_get_new_values_of_edited_dispatch(self):
-        message = loader.Message(is_failure=False, text="Test message")
-        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        message = loader.ResultMessage(is_failure=False, text="Test message")
+        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -596,7 +603,7 @@ class TestDispatchSheetRange:
                 "Old message",
             ]
         ]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
         new_dispatch_data = {
             "name1": {
                 "owner_nation": "testopia",
@@ -625,10 +632,10 @@ class TestDispatchSheetRange:
         assert r == expected
 
     def test_get_new_values_of_created_dispatch_changes_action_to_edit(self):
-        message = loader.Message(is_failure=False, text="Test message")
-        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        message = loader.ResultMessage(is_failure=False, text="Test message")
+        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [["name1", "create", 1, 1, "Title 1", "Text 1", "Old message"]]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
         new_dispatch_data = {
             "name1": {
                 "owner_nation": "testopia",
@@ -659,8 +666,8 @@ class TestDispatchSheetRange:
     def test_get_new_values_of_removed_dispatch_changes_action_to_empty_removes_hyperlink(
         self,
     ):
-        message = loader.Message(is_failure=False, text="Test message")
-        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        message = loader.ResultMessage(is_failure=False, text="Test message")
+        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -672,7 +679,7 @@ class TestDispatchSheetRange:
                 "Old message",
             ]
         ]
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
         new_dispatch_data = {
             "name1": {
                 "owner_nation": "testopia",
@@ -691,10 +698,10 @@ class TestDispatchSheetRange:
         assert r == expected
 
     def test_get_new_values_keeps_empty_action_rows_same(self):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [["name1", "", 1, 1, "Title 1", "Text 1", "Old message"]]
         new_dispatch_data = {}
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -702,11 +709,11 @@ class TestDispatchSheetRange:
         assert r == expected
 
     def test_get_new_values_failure_result_message_adds_message(self):
-        message = loader.Message(is_failure=True, text="Error message")
-        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        message = loader.ResultMessage(is_failure=True, text="Error message")
+        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [["name1", "create", 1, 1, "Title 1", "Text 1", "Old message"]]
         new_dispatch_data = {}
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -714,10 +721,10 @@ class TestDispatchSheetRange:
         assert r == expected
 
     def test_get_new_values_skips_row_on_non_existent_result_message(self):
-        result_reporter = mock.Mock(get_message=mock.Mock(side_effect=KeyError))
+        result_recorder = mock.Mock(get_message=mock.Mock(side_effect=KeyError))
         row_values = [["name1", "create", 1, 1, "Title 1", "Text 1", "Old message"]]
         new_dispatch_data = {}
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -725,10 +732,10 @@ class TestDispatchSheetRange:
         assert r == expected
 
     def test_get_new_values_keeps_rows_with_not_enough_cells_same(self):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         row_values = [["name1", "create", 1, 1, "Title 1"]]
         new_dispatch_data = {}
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -736,8 +743,8 @@ class TestDispatchSheetRange:
         assert r == expected
 
     def test_get_new_values_adds_missing_result_message_cell(self):
-        message = loader.Message(is_failure=False, text="Test message")
-        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        message = loader.ResultMessage(is_failure=False, text="Test message")
+        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [["name1", "create", 1, 1, "Title 1", "Text 1"]]
         new_dispatch_data = {
             "name1": {
@@ -750,7 +757,7 @@ class TestDispatchSheetRange:
                 "subcategory": "reference",
             }
         }
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -768,8 +775,8 @@ class TestDispatchSheetRange:
         assert r == expected
 
     def test_get_new_values_should_not_stop_on_skipped_rows(self):
-        message = loader.Message(is_failure=False, text="Test message")
-        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        message = loader.ResultMessage(is_failure=False, text="Test message")
+        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
         row_values = [
             ["", "", 1, 1, "Title 1", "Text 1"],
             [
@@ -792,7 +799,7 @@ class TestDispatchSheetRange:
                 "subcategory": "reference",
             }
         }
-        obj = loader.DispatchSheetRange(row_values, result_reporter)
+        obj = loader.RangeDispatchData(row_values, result_recorder)
 
         r = obj.get_new_values(new_dispatch_data)
 
@@ -839,7 +846,7 @@ class TestDispatchSpreadsheet:
     def test_extract_dispatch_data_returns_data(
         self, owner_nations, category_setups, dispatch_data
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         sheet_ranges = {
             "Sheet1!A3:F": [
                 [
@@ -864,15 +871,15 @@ class TestDispatchSpreadsheet:
                 ]
             ],
         }
-        obj = loader.DispatchSpreadsheet(sheet_ranges, result_reporter)
+        obj = loader.DispatchSpreadsheet(sheet_ranges, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
 
         assert r == dispatch_data
 
     def test_get_new_values_returns_new_values(self, dispatch_data):
-        message = loader.Message(is_failure=False, text="Test message")
-        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        message = loader.ResultMessage(is_failure=False, text="Test message")
+        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
         sheet_ranges = {
             "Sheet1!A3:F": [
                 [
@@ -898,7 +905,7 @@ class TestDispatchSpreadsheet:
             ],
         }
 
-        obj = loader.DispatchSpreadsheet(sheet_ranges, result_reporter)
+        obj = loader.DispatchSpreadsheet(sheet_ranges, result_recorder)
 
         r = obj.get_new_values(dispatch_data)
 
@@ -922,7 +929,7 @@ class TestDispatchSpreadsheets:
     def test_extract_dispatch_data_returns_data(
         self, owner_nations, category_setups, dispatch_data
     ):
-        result_reporter = mock.Mock()
+        result_recorder = mock.Mock()
         range1 = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -949,15 +956,15 @@ class TestDispatchSpreadsheets:
             "abcd1234": {"Sheet1!A3:F": range1},
             "xyzt1234": {"Sheet2!A3:F": range2},
         }
-        obj = loader.DispatchSpreadsheets(spreadsheets, result_reporter)
+        obj = loader.DispatchSpreadsheets(spreadsheets, result_recorder)
 
         r = obj.get_dispatches_as_dict(owner_nations, category_setups)
 
         assert r == dispatch_data
 
     def test_get_new_values_returns_new_values(self, dispatch_data):
-        message = loader.Message(is_failure=False, text="Test message")
-        result_reporter = mock.Mock(get_message=mock.Mock(return_value=message))
+        message = loader.ResultMessage(is_failure=False, text="Test message")
+        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
         range1 = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -984,7 +991,7 @@ class TestDispatchSpreadsheets:
             "abcd1234": {"Sheet1!A3:F": range1},
             "xyzt1234": {"Sheet2!A3:F": range2},
         }
-        obj = loader.DispatchSpreadsheets(spreadsheets, result_reporter)
+        obj = loader.DispatchSpreadsheets(spreadsheets, result_recorder)
 
         r = obj.get_new_values(dispatch_data)
 
