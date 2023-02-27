@@ -104,7 +104,7 @@ class DispatchUpdater:
 
     def create_dispatch(
         self, name: str, title: str, category: str, subcategory: str
-    ) -> None:
+    ) -> str:
         """Create a dispatch.
 
         Args:
