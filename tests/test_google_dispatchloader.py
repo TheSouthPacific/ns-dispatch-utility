@@ -425,456 +425,255 @@ class TestDispatchData:
 
 @pytest.fixture
 def owner_nations():
-    return loader.OwnerNationData({1: "testopia"}, {1: ["abcd1234", "xyzt1234"]})
+    return loader.OwnerNationData({"1": "nation1"}, {"1": ["s1"]})
 
 
 @pytest.fixture
 def category_setups():
-    return loader.CategorySetupData({1: "meta"}, {1: "reference"})
+    return loader.CategorySetupData({"1": "meta"}, {"1": "gameplay"})
 
 
-class TestDispatchSheetRange:
-    def test_extract_dispatch_data_valid_action_returns_data(
+class TestParseDispatchDataRow:
+    def test_ns_id_exists_returns_dispatch_obj_with_ns_id(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "",
-            ]
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            1,
+            1,
+            "Title",
+            "Text",
         ]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
+        dispatch = loader.parse_dispatch_data_row(
+            row_data, spreadsheet_id, owner_nations, category_setups
+        )
 
-        assert r == {
-            "name1": {
-                "owner_nation": "testopia",
-                "ns_id": "1234",
-                "action": "edit",
-                "title": "Title 1",
-                "template": "Text 1",
-                "category": "meta",
-                "subcategory": "reference",
-            }
-        }
+        assert dispatch == loader.Dispatch(
+            "1234", "edit", "nation1", "Title", "meta", "gameplay", "Text"
+        )
 
-    def test_extract_dispatch_data_returns_data_of_no_id_rows(
+    def test_no_ns_id_returns_dispatch_obj_with_no_ns_id(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [["name1", "create", 1, 1, "Title 1", "Text 1", ""]]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
+        spreadsheet_id = "s1"
+        row_data = ["name1", "edit", 1, 1, "Title", "Text"]
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
+        dispatch = loader.parse_dispatch_data_row(
+            row_data, spreadsheet_id, owner_nations, category_setups
+        )
 
-        assert r == {
-            "name1": {
-                "owner_nation": "testopia",
-                "action": "create",
-                "title": "Title 1",
-                "template": "Text 1",
-                "category": "meta",
-                "subcategory": "reference",
-            }
-        }
+        assert not dispatch.ns_id
 
-    def test_extract_dispatch_data_skips_rows_with_not_enough_cells(
+    def test_empty_dispatch_name_raises_skip_exception(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [["name1", "create", 1, 1, "Title 1"]]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
+        spreadsheet_id = "s1"
+        row_data = ["", "edit", 1, 1, "Title", "Text"]
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
+        with pytest.raises(loader.SkipRow):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
 
-        assert r == {}
+    def test_empty_action_raises_skip_exception(self, owner_nations, category_setups):
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "",
+            1,
+            1,
+            "Title",
+            "Text",
+        ]
 
-    def test_extract_dispatch_data_skips_rows_with_empty_name(
+        with pytest.raises(loader.SkipRow):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
+
+    def test_invalid_action_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [["name1", "create", 1, 1, "Title 1"]]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "something invalid",
+            1,
+            1,
+            "Title",
+            "Text",
+        ]
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
+        with pytest.raises(loader.InvalidDispatchDataError):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
 
-        assert r == {}
-
-    def test_extract_dispatch_data_skips_over_invalid_action_dispatch(
+    def test_not_enough_filled_cells_with_valid_action_and_name_raises_invalid_exception(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "invalid action",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "",
-            ]
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            1,
+            1,
         ]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
+        with pytest.raises(loader.InvalidDispatchDataError):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
 
-        assert r == {}
-        result_recorder.report_failure.assert_called()
-
-    def test_extract_dispatch_data_skips_over_empty_action_dispatch(
+    def test_empty_owner_id_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "",
-            ]
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            "",
+            1,
+            "Title",
+            "Text",
         ]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
+        with pytest.raises(loader.InvalidDispatchDataError):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
 
-        assert r == {}
-
-    def test_extract_dispatch_data_skips_over_non_existent_owner_dispatch(
+    def test_owner_id_not_found_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                20,
-                1,
-                "Title 1",
-                "Text 1",
-                "",
-            ]
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            2,
+            1,
+            "Title",
+            "Text",
         ]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
+        with pytest.raises(loader.InvalidDispatchDataError):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
 
-        assert r == {}
-        result_recorder.report_failure.assert_called()
-
-    def test_extract_dispatch_data_skips_over_unpermitted_owner_dispatch(
+    def test_owner_id_not_permitted_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "",
-            ]
+        spreadsheet_id = "s2"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            1,
+            1,
+            "Title",
+            "Text",
         ]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "ijkl1234")
+        with pytest.raises(loader.InvalidDispatchDataError):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
 
-        assert r == {}
-        result_recorder.report_failure.assert_called()
-
-    def test_extract_dispatch_data_skips_over_non_existent_category_setup_dispatch(
+    def test_empty_category_setup_id_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                20,
-                "Title 1",
-                "Text 1",
-                "",
-            ]
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            1,
+            "",
+            "Title",
+            "Text",
         ]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
+        with pytest.raises(loader.InvalidDispatchDataError):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
 
-        assert r == {}
-        result_recorder.report_failure.assert_called()
-
-    def test_extract_dispatch_data_should_not_stop_on_skipped_rows(
+    def test_category_setup_id_not_found_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        result_recorder = mock.Mock()
-        row_values = [
-            ["", "", 1, 1, "Title 1", "Text 1", ""],
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name2")',
-                "edit",
-                1,
-                1,
-                "Title 2",
-                "Text 2",
-                "",
-            ],
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            1,
+            2,
+            "Title",
+            "Text",
         ]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
 
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
+        with pytest.raises(loader.InvalidDispatchDataError):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
 
-        assert r == {
-            "name2": {
-                "owner_nation": "testopia",
-                "ns_id": "1234",
-                "action": "edit",
-                "title": "Title 2",
-                "template": "Text 2",
-                "category": "meta",
-                "subcategory": "reference",
-            }
-        }
-
-    def test_get_new_values_of_edited_dispatch(self):
-        message = loader.ResultMessage(is_failure=False, text="Test message")
-        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
-        row_values = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "Old message",
-            ]
-        ]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
-        new_dispatch_data = {
-            "name1": {
-                "owner_nation": "testopia",
-                "ns_id": "1234",
-                "action": "edit",
-                "title": "Title 1",
-                "template": "Text 1",
-                "category": "meta",
-                "subcategory": "reference",
-            }
-        }
-
-        r = obj.get_new_values(new_dispatch_data)
-
-        expected = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "Test message",
-            ]
-        ]
-        assert r == expected
-
-    def test_get_new_values_of_created_dispatch_changes_action_to_edit(self):
-        message = loader.ResultMessage(is_failure=False, text="Test message")
-        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
-        row_values = [["name1", "create", 1, 1, "Title 1", "Text 1", "Old message"]]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
-        new_dispatch_data = {
-            "name1": {
-                "owner_nation": "testopia",
-                "ns_id": "1234",
-                "action": "create",
-                "title": "Title 1",
-                "template": "Text 1",
-                "category": "meta",
-                "subcategory": "reference",
-            }
-        }
-
-        r = obj.get_new_values(new_dispatch_data)
-
-        expected = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "Test message",
-            ]
-        ]
-        assert r == expected
-
-    def test_get_new_values_of_removed_dispatch_changes_action_to_empty_removes_hyperlink(
-        self,
+    def test_title_not_found_raises_invalid_data_exception(
+        self, owner_nations, category_setups
     ):
-        message = loader.ResultMessage(is_failure=False, text="Test message")
-        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
-        row_values = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "create",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "Old message",
-            ]
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            1,
+            1,
+            "",
+            "Text",
         ]
-        obj = loader.RangeDispatchData(row_values, result_recorder)
-        new_dispatch_data = {
-            "name1": {
-                "owner_nation": "testopia",
-                "ns_id": "1234",
-                "action": "remove",
-                "title": "Title 1",
-                "template": "Text 1",
-                "category": "meta",
-                "subcategory": "reference",
-            }
-        }
 
-        r = obj.get_new_values(new_dispatch_data)
+        with pytest.raises(loader.InvalidDispatchDataError):
+            loader.parse_dispatch_data_row(
+                row_data, spreadsheet_id, owner_nations, category_setups
+            )
 
-        expected = [["name1", "", 1, 1, "Title 1", "Text 1", "Test message"]]
-        assert r == expected
-
-    def test_get_new_values_keeps_empty_action_rows_same(self):
-        result_recorder = mock.Mock()
-        row_values = [["name1", "", 1, 1, "Title 1", "Text 1", "Old message"]]
-        new_dispatch_data = {}
-        obj = loader.RangeDispatchData(row_values, result_recorder)
-
-        r = obj.get_new_values(new_dispatch_data)
-
-        expected = [["name1", "", 1, 1, "Title 1", "Text 1", "Old message"]]
-        assert r == expected
-
-    def test_get_new_values_failure_result_message_adds_message(self):
-        message = loader.ResultMessage(is_failure=True, text="Error message")
-        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
-        row_values = [["name1", "create", 1, 1, "Title 1", "Text 1", "Old message"]]
-        new_dispatch_data = {}
-        obj = loader.RangeDispatchData(row_values, result_recorder)
-
-        r = obj.get_new_values(new_dispatch_data)
-
-        expected = [["name1", "create", 1, 1, "Title 1", "Text 1", "Error message"]]
-        assert r == expected
-
-    def test_get_new_values_skips_row_on_non_existent_result_message(self):
-        result_recorder = mock.Mock(get_message=mock.Mock(side_effect=KeyError))
-        row_values = [["name1", "create", 1, 1, "Title 1", "Text 1", "Old message"]]
-        new_dispatch_data = {}
-        obj = loader.RangeDispatchData(row_values, result_recorder)
-
-        r = obj.get_new_values(new_dispatch_data)
-
-        expected = [["name1", "create", 1, 1, "Title 1", "Text 1", "Old message"]]
-        assert r == expected
-
-    def test_get_new_values_keeps_rows_with_not_enough_cells_same(self):
-        result_recorder = mock.Mock()
-        row_values = [["name1", "create", 1, 1, "Title 1"]]
-        new_dispatch_data = {}
-        obj = loader.RangeDispatchData(row_values, result_recorder)
-
-        r = obj.get_new_values(new_dispatch_data)
-
-        expected = [["name1", "create", 1, 1, "Title 1"]]
-        assert r == expected
-
-    def test_get_new_values_adds_missing_result_message_cell(self):
-        message = loader.ResultMessage(is_failure=False, text="Test message")
-        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
-        row_values = [["name1", "create", 1, 1, "Title 1", "Text 1"]]
-        new_dispatch_data = {
-            "name1": {
-                "owner_nation": "testopia",
-                "ns_id": "1234",
-                "action": "create",
-                "title": "Title 1",
-                "template": "Text 1",
-                "category": "meta",
-                "subcategory": "reference",
-            }
-        }
-        obj = loader.RangeDispatchData(row_values, result_recorder)
-
-        r = obj.get_new_values(new_dispatch_data)
-
-        expected = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "Test message",
-            ]
+    def test_content_not_found_uses_empty_string_on_content_field(
+        self, owner_nations, category_setups
+    ):
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            1,
+            1,
+            "Title",
         ]
-        assert r == expected
 
-    def test_get_new_values_should_not_stop_on_skipped_rows(self):
-        message = loader.ResultMessage(is_failure=False, text="Test message")
-        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
-        row_values = [
-            ["", "", 1, 1, "Title 1", "Text 1"],
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name2")',
-                "edit",
-                1,
-                1,
-                "Title 2",
-                "Text 2",
-            ],
+        dispatch = loader.parse_dispatch_data_row(
+            row_data, spreadsheet_id, owner_nations, category_setups
+        )
+
+        assert dispatch.content == ""
+
+    def test_can_parse_extra_useless_cells(self, owner_nations, category_setups):
+        spreadsheet_id = "s1"
+        row_data = [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            "edit",
+            1,
+            1,
+            "Title",
+            "Text",
+            "something",
+            "else",
         ]
-        new_dispatch_data = {
-            "name2": {
-                "owner_nation": "testopia",
-                "ns_id": "1234",
-                "action": "create",
-                "title": "Title 1",
-                "template": "Text 1",
-                "category": "meta",
-                "subcategory": "reference",
-            }
-        }
-        obj = loader.RangeDispatchData(row_values, result_recorder)
 
-        r = obj.get_new_values(new_dispatch_data)
+        dispatch = loader.parse_dispatch_data_row(
+            row_data, spreadsheet_id, owner_nations, category_setups
+        )
 
-        expected = [
-            ["", "", 1, 1, "Title 1", "Text 1"],
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name2")',
-                "edit",
-                1,
-                1,
-                "Title 2",
-                "Text 2",
-                "Test message",
-            ],
-        ]
-        assert r == expected
+        assert dispatch == loader.Dispatch(
+            "1234", "edit", "nation1", "Title", "meta", "gameplay", "Text"
+        )
 
 
 @pytest.fixture
@@ -899,177 +698,6 @@ def dispatch_data():
             "subcategory": "reference",
         },
     }
-
-
-class TestDispatchSpreadsheet:
-    def test_extract_dispatch_data_returns_data(
-        self, owner_nations, category_setups, dispatch_data
-    ):
-        result_recorder = mock.Mock()
-        sheet_ranges = {
-            "Sheet1!A3:F": [
-                [
-                    '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                    "edit",
-                    1,
-                    1,
-                    "Title 1",
-                    "Text 1",
-                    "Old message",
-                ]
-            ],
-            "Sheet2!A3:F": [
-                [
-                    '=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
-                    "remove",
-                    1,
-                    1,
-                    "Title 2",
-                    "Text 2",
-                    "Old message",
-                ]
-            ],
-        }
-        obj = loader.DispatchSpreadsheet(sheet_ranges, result_recorder)
-
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups, "abcd1234")
-
-        assert r == dispatch_data
-
-    def test_get_new_values_returns_new_values(self, dispatch_data):
-        message = loader.ResultMessage(is_failure=False, text="Test message")
-        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
-        sheet_ranges = {
-            "Sheet1!A3:F": [
-                [
-                    '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                    "edit",
-                    1,
-                    1,
-                    "Title 1",
-                    "Text 1",
-                    "Old message",
-                ]
-            ],
-            "Sheet2!A3:F": [
-                [
-                    '=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
-                    "remove",
-                    1,
-                    1,
-                    "Title 2",
-                    "Text 2",
-                    "Old message",
-                ]
-            ],
-        }
-
-        obj = loader.DispatchSpreadsheet(sheet_ranges, result_recorder)
-
-        r = obj.get_new_values(dispatch_data)
-
-        assert r == {
-            "Sheet1!A3:F": [
-                [
-                    '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                    "edit",
-                    1,
-                    1,
-                    "Title 1",
-                    "Text 1",
-                    "Test message",
-                ]
-            ],
-            "Sheet2!A3:F": [["name2", "", 1, 1, "Title 2", "Text 2", "Test message"]],
-        }
-
-
-class TestDispatchSpreadsheets:
-    def test_extract_dispatch_data_returns_data(
-        self, owner_nations, category_setups, dispatch_data
-    ):
-        result_recorder = mock.Mock()
-        range1 = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "Old message",
-            ]
-        ]
-        range2 = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
-                "remove",
-                1,
-                1,
-                "Title 2",
-                "Text 2",
-                "Old message",
-            ]
-        ]
-        spreadsheets = {
-            "abcd1234": {"Sheet1!A3:F": range1},
-            "xyzt1234": {"Sheet2!A3:F": range2},
-        }
-        obj = loader.DispatchSpreadsheets(spreadsheets, result_recorder)
-
-        r = obj.get_dispatches_as_dict(owner_nations, category_setups)
-
-        assert r == dispatch_data
-
-    def test_get_new_values_returns_new_values(self, dispatch_data):
-        message = loader.ResultMessage(is_failure=False, text="Test message")
-        result_recorder = mock.Mock(get_message=mock.Mock(return_value=message))
-        range1 = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "Old message",
-            ]
-        ]
-        range2 = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name2")',
-                "remove",
-                1,
-                1,
-                "Title 2",
-                "Text 2",
-                "Old message",
-            ]
-        ]
-        spreadsheets = {
-            "abcd1234": {"Sheet1!A3:F": range1},
-            "xyzt1234": {"Sheet2!A3:F": range2},
-        }
-        obj = loader.DispatchSpreadsheets(spreadsheets, result_recorder)
-
-        r = obj.get_new_values(dispatch_data)
-
-        range1_expected = [
-            [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-                "edit",
-                1,
-                1,
-                "Title 1",
-                "Text 1",
-                "Test message",
-            ]
-        ]
-        range2_expected = [["name2", "", 1, 1, "Title 2", "Text 2", "Test message"]]
-        assert r == {
-            "abcd1234": {"Sheet1!A3:F": range1_expected},
-            "xyzt1234": {"Sheet2!A3:F": range2_expected},
-        }
 
 
 class TestGoogleDispatchLoader:
