@@ -42,7 +42,7 @@ template_var_paths = ['~/ns_dispatches/vars.json']
 [loader_config.json_credloader]
 # cred_path = '~/ns_dispatches/nations.json'
 
-[loader_config.google_dispatchloader]
+[loader_config.google_dispatch_loader]
 google_cred_path = '~/ns_dispatches/google_creds.json'
 owner_nation_sheet = {spreadsheet_id = '1234abcdefgh', range='Owner!A3:C'}
 category_setup_sheet = {spreadsheet_id = '1234abcdefgh', range='CategorySetup!A3:B'}
