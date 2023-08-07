@@ -824,3 +824,37 @@ class TestGoogleDispatchLoader:
         ]
         new_spreadsheets = {loader.SheetRange("abcd1234", "Sheet1!A3:F"): new_range}
         spreadsheet_api.update_cells.assert_called_with(new_spreadsheets)
+
+
+class TestFlattenDispatchSheetConfig:
+    def test_empty_config_returns_empty_list(self):
+        config = []
+
+        result = loader.flatten_dispatch_spreadsheet_config(config)
+
+        assert result == []
+
+    def test_many_spreadsheets_with_empty_range_returns_empty_list(self):
+        config = [
+            {"spreadsheet_id": "s1", "ranges": []},
+            {"spreadsheet_id": "s2", "ranges": []},
+        ]
+
+        result = loader.flatten_dispatch_spreadsheet_config(config)
+
+        assert result == []
+
+    def test_many_spreadsheets_with_many_ranges_returns_flatten_list(self):
+        config = [
+            {"spreadsheet_id": "s1", "ranges": ["r1", "r2"]},
+            {"spreadsheet_id": "s2", "ranges": ["r3", "r4"]},
+        ]
+
+        result = loader.flatten_dispatch_spreadsheet_config(config)
+
+        assert result == [
+            loader.SheetRange("s1", "r1"),
+            loader.SheetRange("s1", "r2"),
+            loader.SheetRange("s2", "r3"),
+            loader.SheetRange("s2", "r4"),
+        ]

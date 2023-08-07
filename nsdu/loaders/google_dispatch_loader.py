@@ -871,6 +871,14 @@ class GoogleDispatchLoader:
         logger.info("Updated Google spreadsheets.")
 
 
+def flatten_dispatch_spreadsheet_config(config: Sequence[Any]) -> Sequence[SheetRange]:
+    return [
+        SheetRange(spreadsheet["spreadsheet_id"], range)
+        for spreadsheet in config
+        for range in spreadsheet["ranges"]
+    ]
+
+
 @loader_api.dispatch_loader
 def init_dispatch_loader(config: Mapping):
     config = config["google_dispatch_loader"]
@@ -904,7 +912,7 @@ def init_dispatch_loader(config: Mapping):
         config["utility_template_spreadsheets"]
     )
     dispatch_spreadsheets = spreadsheet_api.get_data_from_ranges(
-        config["dispatch_spreadsheets"]
+        flatten_dispatch_spreadsheet_config(config["dispatch_spreadsheets"])
     )
 
     return GoogleDispatchLoader(
