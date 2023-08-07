@@ -8,7 +8,6 @@ from dataclasses import dataclass
 import copy
 from datetime import datetime
 from datetime import timezone
-from enum import Enum
 import itertools
 import re
 import logging
@@ -119,7 +118,7 @@ class GoogleSpreadsheetApiAdapter:
             resp = GoogleSpreadsheetApiAdapter.execute(req)
             logger.debug(
                 'Pulled values from ranges "%r" of spreadsheet "%s": "%r"',
-                range,
+                cell_ranges,
                 spreadsheet_id,
                 resp,
             )
@@ -142,7 +141,8 @@ class GoogleSpreadsheetApiAdapter:
         Returns:
             RangeData: Cell data
         """
-        return self.get_data_from_ranges([range])[range]
+        result = self.get_data_from_ranges([range])
+        return next(iter(result.values()))
 
     def update_cells(
         self, new_range_cell_data: Mapping[SheetRange, RangeCellData]
@@ -658,11 +658,16 @@ def generate_new_dispatch_data_rows(
 
         name = extract_name_from_hyperlink(row[0])
 
-        result = operation_results[name]
+        try:
+            result = operation_results[name]
+        except KeyError:
+            continue
+
         try:
             row[6] = result.user_message
         except IndexError:
             row.append(result.user_message)
+
         if isinstance(result, FailureOperationResult):
             continue
 
@@ -871,7 +876,7 @@ class GoogleDispatchLoader:
         logger.info("Updated Google spreadsheets.")
 
 
-def flatten_dispatch_spreadsheet_config(config: Sequence[Any]) -> Sequence[SheetRange]:
+def flatten_spreadsheet_config(config: Sequence[Any]) -> Sequence[SheetRange]:
     return [
         SheetRange(spreadsheet["spreadsheet_id"], range)
         for spreadsheet in config
@@ -909,10 +914,10 @@ def init_dispatch_loader(config: Mapping):
         )
     )
     utility_template_range_cell_data = spreadsheet_api.get_data_from_ranges(
-        config["utility_template_spreadsheets"]
+        flatten_spreadsheet_config(config["utility_template_spreadsheets"])
     )
     dispatch_spreadsheets = spreadsheet_api.get_data_from_ranges(
-        flatten_dispatch_spreadsheet_config(config["dispatch_spreadsheets"])
+        flatten_spreadsheet_config(config["dispatch_spreadsheets"])
     )
 
     return GoogleDispatchLoader(
@@ -930,8 +935,8 @@ def get_dispatch_config(loader: GoogleDispatchLoader):
 
 
 @loader_api.dispatch_loader
-def get_dispatch_template(loader: GoogleDispatchLoader, dispatch_name: str):
-    return loader.get_dispatch_template(dispatch_name)
+def get_dispatch_template(loader: GoogleDispatchLoader, name: str):
+    return loader.get_dispatch_template(name)
 
 
 @loader_api.dispatch_loader
@@ -940,8 +945,8 @@ def after_update(loader: GoogleDispatchLoader, name, action, result, result_time
 
 
 @loader_api.dispatch_loader
-def add_dispatch_id(loader: GoogleDispatchLoader, dispatch_name: str, dispatch_id: str):
-    loader.add_dispatch_id(dispatch_name, dispatch_id)
+def add_dispatch_id(loader: GoogleDispatchLoader, name: str, dispatch_id: str):
+    loader.add_dispatch_id(name, dispatch_id)
 
 
 @loader_api.dispatch_loader

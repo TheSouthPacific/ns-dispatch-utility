@@ -19,7 +19,6 @@ class TestGoogleSpreadsheetApiAdapter:
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
         range = loader.SheetRange("1234abcd", "Foo!A1:F")
-
         result = api.get_data_from_range(range)
 
         assert result == [["hello"]]
@@ -36,7 +35,6 @@ class TestGoogleSpreadsheetApiAdapter:
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
         ranges = [loader.SheetRange("1234abcd", "Foo!A1:F")]
-
         result = api.get_data_from_ranges(ranges)
 
         assert result == {ranges[0]: [["hello"]]}
@@ -51,7 +49,6 @@ class TestGoogleSpreadsheetApiAdapter:
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
         range = loader.SheetRange("1234abcd", "Foo!A1:F")
-
         result = api.get_data_from_range(range)
 
         assert not result
@@ -66,7 +63,6 @@ class TestGoogleSpreadsheetApiAdapter:
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
         ranges = [loader.SheetRange("1234abcd", "Foo!A1:F")]
-
         result = api.get_data_from_ranges(ranges)
 
         assert result == {ranges[0]: []}
@@ -76,7 +72,6 @@ class TestGoogleSpreadsheetApiAdapter:
         api = loader.GoogleSpreadsheetApiAdapter(google_api)
 
         new_cell_data = {loader.SheetRange("1234abcd", "Foo!A1:F"): [["hello"]]}
-
         api.update_cells(new_cell_data)
 
         expected_body = {
@@ -830,7 +825,7 @@ class TestFlattenDispatchSheetConfig:
     def test_empty_config_returns_empty_list(self):
         config = []
 
-        result = loader.flatten_dispatch_spreadsheet_config(config)
+        result = loader.flatten_spreadsheet_config(config)
 
         assert result == []
 
@@ -840,7 +835,7 @@ class TestFlattenDispatchSheetConfig:
             {"spreadsheet_id": "s2", "ranges": []},
         ]
 
-        result = loader.flatten_dispatch_spreadsheet_config(config)
+        result = loader.flatten_spreadsheet_config(config)
 
         assert result == []
 
@@ -850,7 +845,7 @@ class TestFlattenDispatchSheetConfig:
             {"spreadsheet_id": "s2", "ranges": ["r3", "r4"]},
         ]
 
-        result = loader.flatten_dispatch_spreadsheet_config(config)
+        result = loader.flatten_spreadsheet_config(config)
 
         assert result == [
             loader.SheetRange("s1", "r1"),
