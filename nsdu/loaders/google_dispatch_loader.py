@@ -1,25 +1,22 @@
 """Load dispatches from Google spreadsheets.
 """
 
+import copy
+import dataclasses
+import itertools
+import logging
+import re
 from abc import ABC, abstractmethod
 from collections import UserDict
-import dataclasses
 from dataclasses import dataclass
-import copy
-from datetime import datetime
-from datetime import timezone
-import itertools
-import re
-import logging
+from datetime import datetime, timezone
 from typing import Any, Callable, Mapping, Sequence
 
 from google.oauth2 import service_account
 from googleapiclient import discovery
 from googleapiclient.http import HttpError
 
-from nsdu import exceptions
-from nsdu import loader_api
-
+from nsdu import exceptions, loader_api
 
 GOOGLE_API_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 HYPERLINK_REGEX = (
