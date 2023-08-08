@@ -4,6 +4,7 @@ from unittest import mock
 import freezegun
 import pytest
 
+from nsdu.loader_api import Dispatch, DispatchOperation
 from nsdu.loaders import google_dispatch_loader as loader
 
 
@@ -89,7 +90,7 @@ class TestGoogleSheetsApiAdapter:
 class TestOperationResult:
     def test_get_success_result_message_returns_formatted_message(self):
         result = loader.SuccessOpResult(
-            "name", loader.DispatchOperation.CREATE, datetime(2023, 1, 1)
+            "name", DispatchOperation.CREATE, datetime(2023, 1, 1)
         )
 
         assert (
@@ -99,7 +100,7 @@ class TestOperationResult:
     def test_get_failure_result_message_returns_formatted_message(self):
         result = loader.FailureOpResult(
             "name",
-            loader.DispatchOperation.CREATE,
+            DispatchOperation.CREATE,
             datetime(2023, 1, 1),
             "Some details.",
         )
@@ -114,18 +115,18 @@ class TestOperationResultStore:
     def test_report_success_adds_success_result(self):
         obj = loader.OpResultStore()
 
-        obj.report_success("n", loader.DispatchOperation.CREATE, datetime(2023, 1, 1))
+        obj.report_success("n", DispatchOperation.CREATE, datetime(2023, 1, 1))
         result = obj["n"]
 
         assert result == loader.SuccessOpResult(
-            "n", loader.DispatchOperation.CREATE, datetime(2023, 1, 1)
+            "n", DispatchOperation.CREATE, datetime(2023, 1, 1)
         )
 
     @freezegun.freeze_time("2023-01-01")
     def test_report_success_with_no_result_time_uses_current_time_as_result_time(self):
         obj = loader.OpResultStore()
 
-        obj.report_success("n", loader.DispatchOperation.CREATE)
+        obj.report_success("n", DispatchOperation.CREATE)
         result = obj["n"].result_time
 
         assert result == datetime(2023, 1, 1, tzinfo=timezone.utc)
@@ -133,9 +134,7 @@ class TestOperationResultStore:
     def test_report_failure_with_no_details_adds_no_details_failure_result(self):
         obj = loader.OpResultStore()
 
-        obj.report_failure(
-            "n", loader.DispatchOperation.CREATE, None, datetime(2023, 1, 1)
-        )
+        obj.report_failure("n", DispatchOperation.CREATE, None, datetime(2023, 1, 1))
         result = obj["n"]
 
         assert isinstance(result, loader.FailureOpResult) and result.details is None
@@ -145,9 +144,7 @@ class TestOperationResultStore:
     ):
         obj = loader.OpResultStore()
 
-        obj.report_failure(
-            "n", loader.DispatchOperation.CREATE, "d", datetime(2023, 1, 1)
-        )
+        obj.report_failure("n", DispatchOperation.CREATE, "d", datetime(2023, 1, 1))
         result = obj["n"]
 
         assert isinstance(result, loader.FailureOpResult) and result.details == "d"
@@ -158,7 +155,7 @@ class TestOperationResultStore:
         obj = loader.OpResultStore()
 
         obj.report_failure(
-            "n", loader.DispatchOperation.CREATE, Exception("d"), datetime(2023, 1, 1)
+            "n", DispatchOperation.CREATE, Exception("d"), datetime(2023, 1, 1)
         )
         result = obj["n"]
 
@@ -178,7 +175,7 @@ class TestOperationResultStore:
     def test_report_failure_with_no_result_time_uses_current_time_as_result_time(self):
         obj = loader.OpResultStore()
 
-        obj.report_failure("n", loader.DispatchOperation.CREATE, details="d")
+        obj.report_failure("n", DispatchOperation.CREATE, details="d")
         result = obj["n"].result_time
 
         assert result == datetime(2023, 1, 1, tzinfo=timezone.utc)
@@ -334,10 +331,10 @@ class TestParseUtilityTemplateCellRanges:
 class TestDispatchData:
     def test_get_canonical_dispatch_config_id_exists_returns_canonical_config(self):
         dispatch_data = {
-            "name1": loader.Dispatch(
+            "name1": Dispatch(
                 ns_id="12345",
                 owner_nation="testopia",
-                operation=loader.DispatchOperation.EDIT,
+                operation=DispatchOperation.EDIT,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -362,10 +359,10 @@ class TestDispatchData:
 
     def test_get_canonical_dispatch_config_id_not_exist_returns_canonical_config(self):
         dispatch_data = {
-            "name1": loader.Dispatch(
+            "name1": Dispatch(
                 ns_id=None,
                 owner_nation="testopia",
-                operation=loader.DispatchOperation.CREATE,
+                operation=DispatchOperation.CREATE,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -389,10 +386,10 @@ class TestDispatchData:
 
     def test_get_dispatch_template_returns_template_text(self):
         dispatch_data = {
-            "name1": loader.Dispatch(
+            "name1": Dispatch(
                 ns_id="12345",
                 owner_nation="testopia",
-                operation=loader.DispatchOperation.EDIT,
+                operation=DispatchOperation.EDIT,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -411,10 +408,10 @@ class TestDispatchData:
 
     def test_add_dispatch_id_adds_id_into_new_dispatch(self):
         dispatch_data = {
-            "name1": loader.Dispatch(
+            "name1": Dispatch(
                 ns_id=None,
                 owner_nation="testopia",
-                operation=loader.DispatchOperation.CREATE,
+                operation=DispatchOperation.CREATE,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -429,10 +426,10 @@ class TestDispatchData:
 
     def test_add_dispatch_id_overrides_old_id(self):
         dispatch_data = {
-            "name1": loader.Dispatch(
+            "name1": Dispatch(
                 ns_id="12345",
                 owner_nation="testopia",
-                operation=loader.DispatchOperation.EDIT,
+                operation=DispatchOperation.EDIT,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -474,9 +471,9 @@ class TestParseDispatchDataRow:
             row_data, spreadsheet_id, owner_nations, category_setups
         )
 
-        assert dispatch == loader.Dispatch(
+        assert dispatch == Dispatch(
             "1234",
-            loader.DispatchOperation.EDIT,
+            DispatchOperation.EDIT,
             "n",
             "t",
             "meta",
@@ -700,9 +697,9 @@ class TestParseDispatchDataRow:
             row_data, spreadsheet_id, owner_nations, category_setups
         )
 
-        assert dispatch == loader.Dispatch(
+        assert dispatch == Dispatch(
             "1234",
-            loader.DispatchOperation.EDIT,
+            DispatchOperation.EDIT,
             "n",
             "t",
             "meta",
@@ -879,7 +876,7 @@ class TestGoogleDispatchLoader:
         obj.add_dispatch_id("n", "1234")
         obj.report_result(
             "n",
-            loader.DispatchOperation.CREATE,
+            DispatchOperation.CREATE,
             "success",
             datetime(2023, 1, 1),
         )

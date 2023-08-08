@@ -1,12 +1,35 @@
 """API for loader plugins.
 """
 
+from dataclasses import dataclass
 from datetime import datetime
+from enum import Enum
 from typing import Any, Mapping
 
 import pluggy
 
 from nsdu import info
+
+
+class DispatchOperation(Enum):
+    """Dispatch operation type."""
+
+    CREATE = 1
+    EDIT = 2
+    DELETE = 3
+
+
+@dataclass(frozen=True)
+class Dispatch:
+    """Contains the metadata and content of a dispatch."""
+
+    ns_id: str | None
+    operation: DispatchOperation
+    owner_nation: str
+    title: str
+    category: str
+    subcategory: str
+    content: str
 
 
 dispatch_loader_specs = pluggy.HookspecMarker(info.DISPATCH_LOADER_PROJ)

@@ -10,7 +10,6 @@ from abc import ABC, abstractmethod
 from collections import UserDict
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from enum import Enum
 from typing import Any, Callable, Mapping, Sequence
 
 from google.oauth2 import service_account
@@ -18,6 +17,7 @@ from googleapiclient import discovery
 from googleapiclient.http import HttpError
 
 from nsdu import exceptions, loader_api
+from nsdu.loader_api import Dispatch, DispatchOperation
 
 GOOGLE_API_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -27,14 +27,6 @@ HYPERLINK_PATTERN = (
 HYPERLINK_FORMAT = (
     '=hyperlink("https://www.nationstates.net/page=dispatch/id={dispatch_id}","{name}")'
 )
-
-
-class DispatchOperation(Enum):
-    """Dispatch operation type."""
-
-    CREATE = 1
-    EDIT = 2
-    DELETE = 3
 
 
 SUCCESS_RESULT_MESSAGE_FORMAT = "{message}\nTime: {result_time}"
@@ -500,19 +492,6 @@ def create_hyperlink(name: str, dispatch_id: str) -> str:
         str: Hyperlink function
     """
     return HYPERLINK_FORMAT.format(name=name, dispatch_id=dispatch_id)
-
-
-@dataclass(frozen=True)
-class Dispatch:
-    """Contains the metadata and content of a dispatch."""
-
-    ns_id: str | None
-    operation: DispatchOperation
-    owner_nation: str
-    title: str
-    category: str
-    subcategory: str
-    content: str
 
 
 class InvalidDispatchDataError(GoogleDispatchLoaderError):
