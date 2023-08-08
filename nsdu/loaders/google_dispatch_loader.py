@@ -56,134 +56,160 @@ RESULT_TIME_FORMAT = "%Y/%m/%d %H:%M:%S %Z"
 
 logger = logging.getLogger(__name__)
 
-RowCellData = list[Any]
-RangeCellData = list[RowCellData]
+CellValue = Any
+RowCellValues = list[CellValue]
+RangeCellValues = list[RowCellValues]
 
 
 @dataclass(frozen=True)
 class SheetRange:
-    """Describe the spreadsheet ID and range name of a range."""
+    """Describes the spreadsheet ID and range value of a spreadsheet range."""
 
     spreadsheet_id: str
-    range_name: str
+    range_value: str
 
 
-MultiRangeCellData = Mapping[SheetRange, RangeCellData]
+MultiRangeCellValues = Mapping[SheetRange, RangeCellValues]
 
 
-class GoogleSpreadsheetApiAdapter:
-    """Adapter for Google Spreadsheet API.
+class GoogleDispatchLoaderError(exceptions.LoaderError):
+    """Base class for exceptions from this loader."""
+
+    pass
+
+
+class GoogleApiError(GoogleDispatchLoaderError):
+    """Exception for Google Sheets API errors."""
+
+    def __init__(self, status_code: int, details: Any) -> None:
+        """Exception for Google Sheets API errors.
+
+        Args:
+            status_code (int): HTTP status code
+            details (str): Error details
+        """
+        message = f"Google API error {status_code}: {details}"
+        super().__init__(message)
+
+        self.status_code = status_code
+        self.details = details
+
+
+class GoogleSheetsApiAdapter:
+    """Adapter for Google Sheets API client.
 
     Args:
-        api: Google Spreadsheet API
+        api (Any): Google Sheets API client object
     """
 
-    def __init__(self, api):
+    def __init__(self, api: Any):
         self._api = api
 
     @staticmethod
-    def execute(request) -> dict:
-        """Execute API request.
+    def execute(request: Any) -> Any:
+        """Execute a request from the Google Sheets API client.
 
         Args:
-            request: API request
+            request (Any): Request from the Google Sheets API client
 
         Raises:
-            exceptions.LoaderError: API error
+            GoogleApiError: API error
 
         Returns:
-            dict: API response
+            Any: API response
         """
 
         try:
             return request.execute()
         except HttpError as err:
-            raise exceptions.LoaderError(
-                "Google API error {}: {}".format(err.status_code, err.error_details)
-            )
+            raise GoogleApiError(err.status_code, err.error_details)
 
-    def get_data_from_ranges(
+    def get_values_of_ranges(
         self, ranges: Sequence[SheetRange]
-    ) -> dict[SheetRange, RangeCellData]:
-        """Get cell data from many spreadsheet ranges.
+    ) -> dict[SheetRange, RangeCellValues]:
+        """Get cell values of many spreadsheet ranges.
 
         Args:
-            ranges (Sequence[CellRange]): Ranges to get
+            ranges (Sequence[SheetRange]): Ranges to get
 
         Returns:
-            dict[CellRange, RangeData]: Cell data
+            dict[SheetRange, SheetRangeValues]: Cell values
         """
 
-        multi_range_cell_data: dict[SheetRange, RangeCellData] = {}
+        all_spreadsheets_cell_values: dict[SheetRange, RangeCellValues] = {}
 
         spreadsheets = itertools.groupby(ranges, lambda range: range.spreadsheet_id)
-        for spreadsheet_id, cell_ranges in spreadsheets:
-            cell_ranges = list(
-                map(lambda cell_range: cell_range.range_name, cell_ranges)
+        for spreadsheet_id, spreadsheet_ranges in spreadsheets:
+            range_values = list(
+                map(lambda cell_range: cell_range.range_value, spreadsheet_ranges)
             )
-
             req = self._api.batchGet(
                 spreadsheetId=spreadsheet_id,
-                ranges=cell_ranges,
+                ranges=range_values,
                 valueRenderOption="FORMULA",
             )
-            resp = GoogleSpreadsheetApiAdapter.execute(req)
+            resp = GoogleSheetsApiAdapter.execute(req)
             logger.debug(
-                'Pulled values from ranges "%r" of spreadsheet "%s": "%r"',
-                cell_ranges,
+                'API response for pulling cell values from ranges "%r" of spreadsheet "%s": "%r"',
+                range_values,
                 spreadsheet_id,
                 resp,
             )
 
-            range_cell_data = {
-                SheetRange(spreadsheet_id, range["range"]): range.get("values", [])
-                for range in resp["valueRanges"]
+            sheet_cell_values = {
+                SheetRange(spreadsheet_id, valueRange["range"]): valueRange.get(
+                    "values", []
+                )
+                for valueRange in resp["valueRanges"]
             }
+            all_spreadsheets_cell_values.update(sheet_cell_values)
 
-            multi_range_cell_data.update(range_cell_data)
+        return all_spreadsheets_cell_values
 
-        return multi_range_cell_data
-
-    def get_data_from_range(self, range: SheetRange) -> RangeCellData:
-        """Get cell data from a spreadsheet range.
+    def get_values_of_range(self, range: SheetRange) -> RangeCellValues:
+        """Get cell values of a spreadsheet range.
 
         Args:
-            ranges (CellRange): Range to get
+            range (CellRange): Range to get
 
         Returns:
-            RangeData: Cell data
+            RangeCellValues: Cell values
         """
-        result = self.get_data_from_ranges([range])
+
+        result = self.get_values_of_ranges([range])
         return next(iter(result.values()))
 
-    def update_cells(
-        self, new_range_cell_data: Mapping[SheetRange, RangeCellData]
+    def update_values_of_ranges(
+        self, new_values: Mapping[SheetRange, RangeCellValues]
     ) -> None:
-        """Update cell data of spreadsheet ranges.
+        """Update cell values of many spreadsheet ranges.
 
         Args:
-            new_range_cell_data (Mapping[CellRange, RangeData]): New cell data
+            new_values (Mapping[SheetRange, RangeCellValues]): New cell values
         """
 
         spreadsheets = itertools.groupby(
-            new_range_cell_data.keys(), lambda range: range.spreadsheet_id
+            new_values.keys(), lambda range: range.spreadsheet_id
         )
-        for spreadsheet_id, ranges in spreadsheets:
-            new_data = list(
+        for spreadsheet_id, spreadsheet_ranges in spreadsheets:
+            spreadsheet_new_values = list(
                 map(
                     lambda range: {
-                        "range": range.range_name,
+                        "range": range.range_value,
                         "majorDimension": "ROWS",
-                        "values": new_range_cell_data[range],
+                        "values": new_values[range],
                     },
-                    ranges,
+                    spreadsheet_ranges,
                 )
             )
-            body = {"valueInputOption": "USER_ENTERED", "data": new_data}
+            body = {"valueInputOption": "USER_ENTERED", "data": spreadsheet_new_values}
             req = self._api.batchUpdate(spreadsheetId=spreadsheet_id, body=body)
-            GoogleSpreadsheetApiAdapter.execute(req)
+            resp = GoogleSheetsApiAdapter.execute(req)
             logger.debug(
-                'Updated cell data of spreadsheet "%s": %r', spreadsheet_id, body
+                'API response for updating cell values of ranges "%r" from spreadsheet "%s": %r',
+                spreadsheet_ranges,
+                spreadsheet_id,
+                resp,
             )
 
 
@@ -298,7 +324,7 @@ class CategorySetupData:
         self.subcategories = subcategories
 
     @classmethod
-    def load_from_range_cell_data(cls, range_cell_data: RangeCellData):
+    def load_from_range_cell_data(cls, range_cell_data: RangeCellValues):
         """Load category setup data from spreadsheet cell data.
 
         Args:
@@ -359,7 +385,7 @@ class OwnerNationData:
         self.allowed_spreadsheet_ids = allowed_spreadsheet_ids
 
     @classmethod
-    def load_from_range_cell_data(cls, range_cell_data: RangeCellData):
+    def load_from_range_cell_data(cls, range_cell_data: RangeCellValues):
         """Load owner nation data from spreadsheet cell data.
 
         Args:
@@ -418,7 +444,7 @@ class OwnerNationData:
 
 
 def parse_utility_template_cell_ranges(
-    cell_data: Mapping[SheetRange, RangeCellData]
+    cell_data: Mapping[SheetRange, RangeCellValues]
 ) -> dict[str, str]:
     """Get utility template content from cell data of many sheet ranges.
 
@@ -432,7 +458,7 @@ def parse_utility_template_cell_ranges(
     utility_templates: dict[str, str] = {}
     for range in cell_data.values():
         for row in range:
-            utility_templates[row[0]] = row[1]
+            utility_templates[str(row[0])] = row[1]
 
     return utility_templates
 
@@ -497,7 +523,7 @@ class Dispatch:
     content: str
 
 
-class InvalidDispatchDataError(Exception):
+class InvalidDispatchDataError(GoogleDispatchLoaderError):
     """Exception for invalid values on dispatch sheet rows."""
 
     def __init__(self, operation: DispatchOperation | str, *args: object) -> None:
@@ -505,14 +531,14 @@ class InvalidDispatchDataError(Exception):
         self.operation = operation
 
 
-class SkipRow(Exception):
+class SkipRow(GoogleDispatchLoaderError):
     """Exception for dispatch sheet rows to skip when processing."""
 
     pass
 
 
 def parse_dispatch_data_row(
-    row_data: RowCellData,
+    row_data: RowCellValues,
     spreadsheet_id: str,
     owner_nations: OwnerNationData,
     category_setups: CategorySetupData,
@@ -592,7 +618,7 @@ ReportFailureCallback = Callable[
 
 
 def parse_dispatch_data_rows(
-    rows: RangeCellData,
+    rows: RangeCellValues,
     spreadsheet_id: str,
     owner_nations: OwnerNationData,
     category_setups: CategorySetupData,
@@ -634,7 +660,7 @@ def parse_dispatch_data_rows(
 
 
 def parse_dispatch_data_cell_ranges(
-    cell_data: MultiRangeCellData,
+    cell_data: MultiRangeCellValues,
     owner_nations: OwnerNationData,
     category_setups: CategorySetupData,
     report_failure: ReportFailureCallback,
@@ -665,10 +691,10 @@ def parse_dispatch_data_cell_ranges(
 
 
 def generate_new_dispatch_data_rows(
-    old_cell_data: RangeCellData,
+    old_cell_data: RangeCellValues,
     dispatch_data: Mapping[str, Dispatch],
     operation_results: Mapping[str, OpResult],
-) -> RangeCellData:
+) -> RangeCellValues:
     """Generate new dispatch data row values for a sheet range
     with updated dispatch IDs and status messages.
 
@@ -687,7 +713,7 @@ def generate_new_dispatch_data_rows(
         if (not (row[0] and row[1])) or len(row) < 6:
             continue
 
-        name = extract_name_from_hyperlink(row[0])
+        name = extract_name_from_hyperlink(str(row[0]))
 
         try:
             result = operation_results[name]
@@ -718,10 +744,10 @@ def generate_new_dispatch_data_rows(
 
 
 def generate_new_dispatch_cell_data(
-    old_cell_data: MultiRangeCellData,
+    old_cell_data: MultiRangeCellValues,
     dispatch_data: Mapping[str, Dispatch],
     operation_results: Mapping[str, OpResult],
-) -> MultiRangeCellData:
+) -> MultiRangeCellValues:
     """_summary_
 
     Args:
@@ -733,7 +759,7 @@ def generate_new_dispatch_cell_data(
         MultiRangeCellData: New dispatch cell data
     """
 
-    new_spreadsheet_data: Mapping[SheetRange, RangeCellData] = {}
+    new_spreadsheet_data: Mapping[SheetRange, RangeCellValues] = {}
     for range, range_cell_data in old_cell_data.items():
         new_range_cell_data = generate_new_dispatch_data_rows(
             range_cell_data, dispatch_data, operation_results
@@ -820,11 +846,11 @@ class GoogleDispatchLoader:
 
     def __init__(
         self,
-        spreadsheet_api: GoogleSpreadsheetApiAdapter,
-        dispatch_cell_data: Mapping[SheetRange, RangeCellData],
-        utility_template_cell_data: Mapping[SheetRange, RangeCellData],
-        owner_nation_spreadsheet_data: RangeCellData,
-        category_setup_spreadsheet_data: RangeCellData,
+        spreadsheet_api: GoogleSheetsApiAdapter,
+        dispatch_cell_data: Mapping[SheetRange, RangeCellValues],
+        utility_template_cell_data: Mapping[SheetRange, RangeCellValues],
+        owner_nation_spreadsheet_data: RangeCellValues,
+        category_setup_spreadsheet_data: RangeCellValues,
     ) -> None:
         self.spreadsheet_api = spreadsheet_api
         self.operation_result_recorder = OperationResultStore()
@@ -918,7 +944,7 @@ class GoogleDispatchLoader:
             self.dispatch_data,
             self.operation_result_recorder,
         )
-        self.spreadsheet_api.update_cells(new_dispatch_cell_data)
+        self.spreadsheet_api.update_values_of_ranges(new_dispatch_cell_data)
         logger.info("Updated Google spreadsheets.")
 
 
@@ -945,24 +971,24 @@ def init_dispatch_loader(config: Mapping):
         .spreadsheets()
         .values()
     )
-    spreadsheet_api = GoogleSpreadsheetApiAdapter(google_api)
+    spreadsheet_api = GoogleSheetsApiAdapter(google_api)
 
-    owner_nation_range_cell_data = spreadsheet_api.get_data_from_range(
+    owner_nation_range_cell_data = spreadsheet_api.get_values_of_range(
         SheetRange(
             config["owner_nation_sheet"]["spreadsheet_id"],
             config["owner_nation_sheet"]["range"],
         )
     )
-    category_setup_range_cell_data = spreadsheet_api.get_data_from_range(
+    category_setup_range_cell_data = spreadsheet_api.get_values_of_range(
         SheetRange(
             config["category_setup_sheet"]["spreadsheet_id"],
             config["category_setup_sheet"]["range"],
         )
     )
-    utility_template_range_cell_data = spreadsheet_api.get_data_from_ranges(
+    utility_template_range_cell_data = spreadsheet_api.get_values_of_ranges(
         flatten_spreadsheet_config(config["utility_template_spreadsheets"])
     )
-    dispatch_spreadsheets = spreadsheet_api.get_data_from_ranges(
+    dispatch_spreadsheets = spreadsheet_api.get_values_of_ranges(
         flatten_spreadsheet_config(config["dispatch_spreadsheets"])
     )
 

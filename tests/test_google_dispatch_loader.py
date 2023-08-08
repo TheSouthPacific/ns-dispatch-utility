@@ -7,83 +7,83 @@ import pytest
 from nsdu.loaders import google_dispatch_loader as loader
 
 
-class TestGoogleSpreadsheetApiAdapter:
-    def test_get_cell_data_of_a_range_returns_cell_data_of_one_range(self):
-        resp = {
-            "spreadsheetId": "1234abcd",
+class TestGoogleSheetsApiAdapter:
+    def test_get_values_of_a_range_returns_cell_values_of_that_range(self):
+        api_resp = {
+            "spreadsheetId": "s",
             "valueRanges": [
-                {"range": "Foo!A1:F", "majorDimension": "ROWS", "values": [["hello"]]}
+                {"range": "A!A1:F", "majorDimension": "ROWS", "values": [["v"]]}
             ],
         }
-        request = mock.Mock(execute=mock.Mock(return_value=resp))
+        request = mock.Mock(execute=mock.Mock(return_value=api_resp))
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
-        api = loader.GoogleSpreadsheetApiAdapter(google_api)
+        api = loader.GoogleSheetsApiAdapter(google_api)
 
-        range = loader.SheetRange("1234abcd", "Foo!A1:F")
-        result = api.get_data_from_range(range)
+        range = loader.SheetRange("s", "A!A1:F")
+        result = api.get_values_of_range(range)
 
-        assert result == [["hello"]]
+        assert result == [["v"]]
 
-    def test_get_cell_data_of_many_ranges_returns_cell_data_of_many_ranges(self):
-        resp = {
-            "spreadsheetId": "1234abcd",
+    def test_get_values_of_an_empty_range_returns_empty_list(self):
+        api_resp = {
+            "spreadsheetId": "s",
+            "valueRanges": [{"range": "A!A1:F", "majorDimension": "ROWS"}],
+        }
+        request = mock.Mock(execute=mock.Mock(return_value=api_resp))
+        google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
+        api = loader.GoogleSheetsApiAdapter(google_api)
+
+        range = loader.SheetRange("s", "A!A1:F")
+        result = api.get_values_of_range(range)
+
+        assert result == []
+
+    def test_get_values_of_many_ranges_returns_cell_values_of_those_ranges(self):
+        api_resp = {
+            "spreadsheetId": "s",
             "valueRanges": [
-                {"range": "Foo!A1:F", "majorDimension": "ROWS", "values": [["hello"]]}
+                {"range": "A!A1:F", "majorDimension": "ROWS", "values": [["v1"]]},
+                {"range": "B!A1:F", "majorDimension": "ROWS", "values": [["v2"]]},
             ],
         }
-        request = mock.Mock(execute=mock.Mock(return_value=resp))
+        request = mock.Mock(execute=mock.Mock(return_value=api_resp))
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
-        api = loader.GoogleSpreadsheetApiAdapter(google_api)
+        api = loader.GoogleSheetsApiAdapter(google_api)
 
-        ranges = [loader.SheetRange("1234abcd", "Foo!A1:F")]
-        result = api.get_data_from_ranges(ranges)
+        ranges = [loader.SheetRange("s", "A!A1:F"), loader.SheetRange("s", "B!A1:F")]
+        result = api.get_values_of_ranges(ranges)
 
-        assert result == {ranges[0]: [["hello"]]}
+        assert result == {ranges[0]: [["v1"]], ranges[1]: [["v2"]]}
 
-    def test_get_cell_data_of_empty_range_returns_empty_list(self):
-        resp = {
-            "spreadsheetId": "1234abcd",
-            "valueRanges": [{"range": "Foo!A1:F", "majorDimension": "ROWS"}],
+    def test_get_values_of_empty_ranges_returns_empty_list(self):
+        api_resp = {
+            "spreadsheetId": "s",
+            "valueRanges": [
+                {"range": "A!A1:F", "majorDimension": "ROWS"},
+                {"range": "B!A1:F", "majorDimension": "ROWS"},
+            ],
         }
-        request = mock.Mock(execute=mock.Mock(return_value=resp))
+        request = mock.Mock(execute=mock.Mock(return_value=api_resp))
         google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
-        api = loader.GoogleSpreadsheetApiAdapter(google_api)
+        api = loader.GoogleSheetsApiAdapter(google_api)
 
-        range = loader.SheetRange("1234abcd", "Foo!A1:F")
-        result = api.get_data_from_range(range)
+        ranges = [loader.SheetRange("s", "A!A1:F"), loader.SheetRange("s", "B!A1:F")]
+        result = api.get_values_of_ranges(ranges)
 
-        assert not result
+        assert result == {ranges[0]: [], ranges[1]: []}
 
-    def test_get_cell_data_of_empty_ranges_returns_empty_list(self):
-        resp = {
-            "spreadsheetId": "1234abcd",
-            "valueRanges": [{"range": "Foo!A1:F", "majorDimension": "ROWS"}],
-        }
-        request = mock.Mock(execute=mock.Mock(return_value=resp))
-        google_api = mock.Mock(batchGet=mock.Mock(return_value=request))
-        api = loader.GoogleSpreadsheetApiAdapter(google_api)
-
-        ranges = [loader.SheetRange("1234abcd", "Foo!A1:F")]
-        result = api.get_data_from_ranges(ranges)
-
-        assert result == {ranges[0]: []}
-
-    def test_update_cell_data_of_many_ranges(self):
+    def test_update_values_of_many_ranges_makes_correct_api_client_call(self):
         google_api = mock.Mock()
-        api = loader.GoogleSpreadsheetApiAdapter(google_api)
+        api = loader.GoogleSheetsApiAdapter(google_api)
 
-        new_cell_data = {loader.SheetRange("1234abcd", "Foo!A1:F"): [["hello"]]}
-        api.update_cells(new_cell_data)
+        new_values = {loader.SheetRange("s", "A!A1:F"): [["v"]]}
+        api.update_values_of_ranges(new_values)
 
         expected_body = {
             "valueInputOption": "USER_ENTERED",
-            "data": [
-                {"range": "Foo!A1:F", "majorDimension": "ROWS", "values": [["hello"]]}
-            ],
+            "data": [{"range": "A!A1:F", "majorDimension": "ROWS", "values": [["v"]]}],
         }
-        google_api.batchUpdate.assert_called_with(
-            spreadsheetId="1234abcd", body=expected_body
-        )
+        google_api.batchUpdate.assert_called_with(spreadsheetId="s", body=expected_body)
 
 
 class TestOperationResult:
@@ -121,7 +121,7 @@ class TestOperationResultStore:
             "n", loader.DispatchOperation.CREATE, datetime(2023, 1, 1)
         )
 
-    @freezegun.freeze_time('2023-01-01')
+    @freezegun.freeze_time("2023-01-01")
     def test_report_success_with_no_result_time_uses_current_time_as_result_time(self):
         obj = loader.OperationResultStore()
 
@@ -164,20 +164,22 @@ class TestOperationResultStore:
 
         assert isinstance(result, loader.FailureOpResult) and result.details == "d"
 
-    def test_report_failure_with_invalid_op_adds_failure_result_with_invalid_op_name(self):
+    def test_report_failure_with_invalid_op_adds_failure_result_with_invalid_op_name(
+        self,
+    ):
         obj = loader.OperationResultStore()
 
         obj.report_failure("n", "a", details="d")
-        result = obj['n'].operation
+        result = obj["n"].operation
 
         assert result == "a"
 
-    @freezegun.freeze_time('2023-01-01')
+    @freezegun.freeze_time("2023-01-01")
     def test_report_failure_with_no_result_time_uses_current_time_as_result_time(self):
         obj = loader.OperationResultStore()
 
         obj.report_failure("n", loader.DispatchOperation.CREATE, details="d")
-        result = obj['n'].result_time
+        result = obj["n"].result_time
 
         assert result == datetime(2023, 1, 1, tzinfo=timezone.utc)
 
@@ -706,7 +708,9 @@ class TestParseDispatchDataRow:
 
 
 class TestGoogleDispatchLoader:
-    def test_get_dispatch_config(self):
+    def test_get_dispatch_config_with_many_dispatches_returns_correct_dict_structure(
+        self,
+    ):
         range_data_1 = [
             ["name1", "create", 1, 1, "Title 1", "Text 1"],
             [
@@ -731,8 +735,8 @@ class TestGoogleDispatchLoader:
             ]
         ]
         dispatch_spreadsheets = {
-            loader.SheetRange("abcd1234", "Sheet1!A3:F"): range_data_1,
-            loader.SheetRange("xyzt1234", "Sheet2!A3:F"): range_data_2,
+            loader.SheetRange("abcd1234", "Sheet1!A1:F"): range_data_1,
+            loader.SheetRange("xyzt1234", "Sheet2!A1:F"): range_data_2,
         }
 
         owner_nation_rows = [[1, "Testopia", "abcd1234"], [2, "Cooltopia", "xyzt1234"]]
@@ -775,7 +779,7 @@ class TestGoogleDispatchLoader:
             },
         }
 
-    def test_get_dispatch_template_of_utility_template(self):
+    def test_get_utility_dispatch_template_returns_correct_template(self):
         range_data = [["layout1", "abcd"]]
         utility_template_ranges = {
             loader.SheetRange("abcd1234", "Layout!A1:B"): range_data
@@ -789,7 +793,7 @@ class TestGoogleDispatchLoader:
 
         assert result == "abcd"
 
-    def test_get_dispatch_template_of_normal_dispatch(self):
+    def test_get_normal_dispatch_template_returns_correct_template(self):
         range1 = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
@@ -801,7 +805,7 @@ class TestGoogleDispatchLoader:
                 "Edited on 2021/01/01 01:00:00 UTC",
             ]
         ]
-        dispatch_spreadsheets = {loader.SheetRange("abcd1234", "Sheet1!A3:F"): range1}
+        dispatch_spreadsheets = {loader.SheetRange("abcd1234", "Sheet1!A1:F"): range1}
 
         owner_nation_rows = [[1, "Testopia", "abcd1234"]]
         category_rows = [[1, "Meta", "Gameplay"]]
@@ -817,23 +821,26 @@ class TestGoogleDispatchLoader:
 
         assert result == "Hello World"
 
-    def test_update_spreadsheets_after_new_dispatch_created(self):
-        range1 = [["name1", "create", 1, 1, "Hello Title", "Hello World"]]
-        dispatch_spreadsheets = {loader.SheetRange("abcd1234", "Sheet1!A3:F"): range1}
-        owner_nation_rows = [[1, "Testopia", "abcd1234"]]
-        category_rows = [[1, "Meta", "Gameplay"]]
-        spreadsheet_api = mock.Mock(spec=loader.GoogleSpreadsheetApiAdapter)
+    def test_update_spreadsheets_after_new_dispatch_created_changes_its_operation_to_edit(
+        self,
+    ):
+        dispatch_cell_values = {
+            loader.SheetRange("s", "A!A1:F"): [["n", "create", 1, 1, "t", "c"]]
+        }
+        owner_nation_cell_values = [[1, "testopia", "s"]]
+        category_cell_values = [[1, "Meta", "Gameplay"]]
+        api = mock.Mock(spec=loader.GoogleSheetsApiAdapter)
         obj = loader.GoogleDispatchLoader(
-            spreadsheet_api,
-            dispatch_spreadsheets,
+            api,
+            dispatch_cell_values,
             {},
-            owner_nation_rows,
-            category_rows,
+            owner_nation_cell_values,
+            category_cell_values,
         )
 
-        obj.add_dispatch_id("name1", "1234")
+        obj.add_dispatch_id("n", "1234")
         obj.report_result(
-            "name1",
+            "n",
             loader.DispatchOperation.CREATE,
             "success",
             datetime(2023, 1, 1),
@@ -842,17 +849,17 @@ class TestGoogleDispatchLoader:
 
         new_range = [
             [
-                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
                 "edit",
                 1,
                 1,
-                "Hello Title",
-                "Hello World",
+                "t",
+                "c",
                 "Created successfully.\nTime: 2023/01/01 00:00:00 ",
             ]
         ]
-        new_spreadsheets = {loader.SheetRange("abcd1234", "Sheet1!A3:F"): new_range}
-        spreadsheet_api.update_cells.assert_called_with(new_spreadsheets)
+        new_spreadsheets = {loader.SheetRange("s", "A!A1:F"): new_range}
+        api.update_values_of_ranges.assert_called_with(new_spreadsheets)
 
 
 class TestFlattenDispatchSheetConfig:
