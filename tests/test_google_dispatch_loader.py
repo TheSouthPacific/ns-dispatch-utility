@@ -112,7 +112,7 @@ class TestOperationResult:
 
 class TestOperationResultStore:
     def test_report_success_adds_success_result(self):
-        obj = loader.OperationResultStore()
+        obj = loader.OpResultStore()
 
         obj.report_success("n", loader.DispatchOperation.CREATE, datetime(2023, 1, 1))
         result = obj["n"]
@@ -123,7 +123,7 @@ class TestOperationResultStore:
 
     @freezegun.freeze_time("2023-01-01")
     def test_report_success_with_no_result_time_uses_current_time_as_result_time(self):
-        obj = loader.OperationResultStore()
+        obj = loader.OpResultStore()
 
         obj.report_success("n", loader.DispatchOperation.CREATE)
         result = obj["n"].result_time
@@ -131,7 +131,7 @@ class TestOperationResultStore:
         assert result == datetime(2023, 1, 1, tzinfo=timezone.utc)
 
     def test_report_failure_with_no_details_adds_no_details_failure_result(self):
-        obj = loader.OperationResultStore()
+        obj = loader.OpResultStore()
 
         obj.report_failure(
             "n", loader.DispatchOperation.CREATE, None, datetime(2023, 1, 1)
@@ -143,7 +143,7 @@ class TestOperationResultStore:
     def test_report_failure_with_str_details_adds_failure_result_with_str_details(
         self,
     ):
-        obj = loader.OperationResultStore()
+        obj = loader.OpResultStore()
 
         obj.report_failure(
             "n", loader.DispatchOperation.CREATE, "d", datetime(2023, 1, 1)
@@ -155,7 +155,7 @@ class TestOperationResultStore:
     def test_report_failure_with_exception_details_adds_failure_result_with_exception_msg_details(
         self,
     ):
-        obj = loader.OperationResultStore()
+        obj = loader.OpResultStore()
 
         obj.report_failure(
             "n", loader.DispatchOperation.CREATE, Exception("d"), datetime(2023, 1, 1)
@@ -167,7 +167,7 @@ class TestOperationResultStore:
     def test_report_failure_with_invalid_op_adds_failure_result_with_invalid_op_name(
         self,
     ):
-        obj = loader.OperationResultStore()
+        obj = loader.OpResultStore()
 
         obj.report_failure("n", "a", details="d")
         result = obj["n"].operation
@@ -176,7 +176,7 @@ class TestOperationResultStore:
 
     @freezegun.freeze_time("2023-01-01")
     def test_report_failure_with_no_result_time_uses_current_time_as_result_time(self):
-        obj = loader.OperationResultStore()
+        obj = loader.OpResultStore()
 
         obj.report_failure("n", loader.DispatchOperation.CREATE, details="d")
         result = obj["n"].result_time
@@ -184,39 +184,43 @@ class TestOperationResultStore:
         assert result == datetime(2023, 1, 1, tzinfo=timezone.utc)
 
 
-class TestCategorySetupData:
+class TestCategorySetupStore:
     def test_get_category_subcategory_name_returns_name(self):
-        categories = {"id1": "Meta"}
-        subcategories = {"id1": "Gameplay"}
-        setups = loader.CategorySetupData(categories, subcategories)
+        setups = {"1": loader.CategorySetup("meta", "gameplay")}
+        obj = loader.CategorySetupStore(setups)
 
-        category_name, subcategory_name = setups.get_category_subcategory_name("id1")
+        result = obj["1"]
 
-        assert category_name == "Meta" and subcategory_name == "Gameplay"
+        assert result == loader.CategorySetup("meta", "gameplay")
 
     def test_get_category_subcategory_of_non_existent_id_raises_exception(self):
-        category_setups = loader.CategorySetupData({}, {})
+        category_setups = loader.CategorySetupStore({})
 
         with pytest.raises(KeyError):
-            category_setups.get_category_subcategory_name("id1")
+            category_setups["1"]
 
-    def test_load_category_setup_data_from_cell_data(self):
-        cell_data = [["id1", "Meta", "Gameplay"]]
+    def test_load_from_range_cell_values_gets_correct_setups(self):
+        cell_values = [[1, "meta", "gameplay"]]
 
-        category_setups = loader.CategorySetupData.load_from_range_cell_data(cell_data)
+        obj = loader.CategorySetupStore.load_from_range_cell_values(cell_values)
 
-        assert category_setups.categories == {
-            "id1": "Meta"
-        } and category_setups.subcategories == {"id1": "Gameplay"}
+        assert obj["1"] == loader.CategorySetup("meta", "gameplay")
 
-    def test_load_category_setup_data_from_cell_data_uses_last_identical_setup_id(self):
-        cell_data = [["id1", "Meta", "Gameplay"], ["id1", "Overview", "Factbook"]]
+    def test_load_from_range_cell_values_uses_last_conflicting_setup_id(self):
+        cell_values = [["1", "Meta", "Gameplay"], ["1", "overview", "factbook"]]
 
-        category_setups = loader.CategorySetupData.load_from_range_cell_data(cell_data)
+        obj = loader.CategorySetupStore.load_from_range_cell_values(cell_values)
 
-        assert category_setups.categories == {
-            "id1": "Overview"
-        } and category_setups.subcategories == {"id1": "Factbook"}
+        assert obj["1"] == loader.CategorySetup("overview", "factbook")
+
+    def test_load_from_range_cell_values_converts_category_subcategory_names_to_lower_case(
+        self,
+    ):
+        cell_values = [[1, "meta", "gameplay"]]
+
+        obj = loader.CategorySetupStore.load_from_range_cell_values(cell_values)
+
+        assert obj["1"] == loader.CategorySetup("meta", "gameplay")
 
 
 class TestOwnerNationData:
@@ -224,14 +228,14 @@ class TestOwnerNationData:
         owner_nation_names = {"id1": "nation1"}
         allowed_spreadsheet_ids = {"id1": ["s1"]}
 
-        owner_nations = loader.OwnerNationData(
+        owner_nations = loader.OwnerNationStore(
             owner_nation_names, allowed_spreadsheet_ids
         )
 
         assert owner_nations.get_owner_nation_name("id1") == "nation1"
 
     def test_get_non_existent_owner_nation_name_raises_exception(self):
-        owner_nations = loader.OwnerNationData({}, {})
+        owner_nations = loader.OwnerNationStore({}, {})
 
         with pytest.raises(KeyError):
             owner_nations.get_owner_nation_name("id1")
@@ -240,7 +244,7 @@ class TestOwnerNationData:
         owner_nation_names = {"id1": "nation1"}
         allowed_spreadsheet_ids = {"id1": ["s1"]}
 
-        owner_nations = loader.OwnerNationData(
+        owner_nations = loader.OwnerNationStore(
             owner_nation_names, allowed_spreadsheet_ids
         )
 
@@ -250,14 +254,14 @@ class TestOwnerNationData:
         owner_nation_names = {"id1": "nation1"}
         allowed_spreadsheet_ids = {"id1": ["s1"]}
 
-        owner_nations = loader.OwnerNationData(
+        owner_nations = loader.OwnerNationStore(
             owner_nation_names, allowed_spreadsheet_ids
         )
 
         assert not owner_nations.check_spreadsheet_permission("id1", "s2")
 
     def test_check_permission_on_non_existent_owner_id_raises_exception(self):
-        owner_nations = loader.OwnerNationData({}, {})
+        owner_nations = loader.OwnerNationStore({}, {})
 
         with pytest.raises(KeyError):
             owner_nations.check_spreadsheet_permission("id1", "s1")
@@ -265,7 +269,7 @@ class TestOwnerNationData:
     def test_load_owner_nation_data_from_cell_data(self):
         cell_data = [["id1", "nation1", "s1,s2"]]
 
-        owner_nations = loader.OwnerNationData.load_from_range_cell_data(cell_data)
+        owner_nations = loader.OwnerNationStore.load_from_range_cell_values(cell_data)
 
         assert owner_nations.owner_nation_names == {
             "id1": "nation1"
@@ -274,7 +278,7 @@ class TestOwnerNationData:
     def test_load_owner_nation_data_from_cell_data_uses_last_identical_owner_id(self):
         cell_data = [["id1", "nation1", "s1,s2"], ["id1", "nation2", "s2,s3"]]
 
-        owner_nations = loader.OwnerNationData.load_from_range_cell_data(cell_data)
+        owner_nations = loader.OwnerNationStore.load_from_range_cell_values(cell_data)
 
         assert owner_nations.owner_nation_names == {
             "id1": "nation2"
@@ -444,26 +448,26 @@ class TestDispatchData:
 
 @pytest.fixture
 def owner_nations():
-    return loader.OwnerNationData({"1": "nation1"}, {"1": ["s1"]})
+    return loader.OwnerNationStore({"1": "n"}, {"1": ["s"]})
 
 
 @pytest.fixture
 def category_setups():
-    return loader.CategorySetupData({"1": "meta"}, {"1": "gameplay"})
+    return loader.CategorySetupStore({"1": loader.CategorySetup("meta", "gameplay")})
 
 
 class TestParseDispatchDataRow:
     def test_ns_id_exists_returns_dispatch_obj_with_ns_id(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             1,
             1,
-            "Title",
-            "Text",
+            "t",
+            "c",
         ]
 
         dispatch = loader.parse_dispatch_data_row(
@@ -473,30 +477,30 @@ class TestParseDispatchDataRow:
         assert dispatch == loader.Dispatch(
             "1234",
             loader.DispatchOperation.EDIT,
-            "nation1",
-            "Title",
+            "n",
+            "t",
             "meta",
             "gameplay",
-            "Text",
+            "c",
         )
 
     def test_no_ns_id_returns_dispatch_obj_with_no_ns_id(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
-        row_data = ["name1", "edit", 1, 1, "Title", "Text"]
+        spreadsheet_id = "s"
+        row_data = ["n", "edit", 1, 1, "t", "c"]
 
         dispatch = loader.parse_dispatch_data_row(
             row_data, spreadsheet_id, owner_nations, category_setups
         )
 
-        assert not dispatch.ns_id
+        assert dispatch.ns_id is None
 
     def test_empty_dispatch_name_raises_skip_exception(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
-        row_data = ["", "edit", 1, 1, "Title", "Text"]
+        spreadsheet_id = "s"
+        row_data = ["", "edit", 1, 1, "t", "c"]
 
         with pytest.raises(loader.SkipRow):
             loader.parse_dispatch_data_row(
@@ -504,14 +508,14 @@ class TestParseDispatchDataRow:
             )
 
     def test_empty_action_raises_skip_exception(self, owner_nations, category_setups):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "",
             1,
             1,
-            "Title",
-            "Text",
+            "t",
+            "c",
         ]
 
         with pytest.raises(loader.SkipRow):
@@ -522,14 +526,14 @@ class TestParseDispatchDataRow:
     def test_invalid_action_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
-            "something invalid",
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
+            "invalid",
             1,
             1,
-            "Title",
-            "Text",
+            "t",
+            "c",
         ]
 
         with pytest.raises(loader.InvalidDispatchDataError):
@@ -540,9 +544,9 @@ class TestParseDispatchDataRow:
     def test_not_enough_filled_cells_with_valid_action_and_name_raises_invalid_exception(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             1,
             1,
@@ -556,14 +560,14 @@ class TestParseDispatchDataRow:
     def test_empty_owner_id_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             "",
             1,
-            "Title",
-            "Text",
+            "t",
+            "c",
         ]
 
         with pytest.raises(loader.InvalidDispatchDataError):
@@ -574,14 +578,14 @@ class TestParseDispatchDataRow:
     def test_owner_id_not_found_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             2,
             1,
-            "Title",
-            "Text",
+            "t",
+            "c",
         ]
 
         with pytest.raises(loader.InvalidDispatchDataError):
@@ -594,12 +598,12 @@ class TestParseDispatchDataRow:
     ):
         spreadsheet_id = "s2"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             1,
             1,
-            "Title",
-            "Text",
+            "t",
+            "c",
         ]
 
         with pytest.raises(loader.InvalidDispatchDataError):
@@ -610,14 +614,14 @@ class TestParseDispatchDataRow:
     def test_empty_category_setup_id_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             1,
             "",
-            "Title",
-            "Text",
+            "t",
+            "c",
         ]
 
         with pytest.raises(loader.InvalidDispatchDataError):
@@ -628,14 +632,14 @@ class TestParseDispatchDataRow:
     def test_category_setup_id_not_found_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             1,
             2,
-            "Title",
-            "Text",
+            "t",
+            "c",
         ]
 
         with pytest.raises(loader.InvalidDispatchDataError):
@@ -646,14 +650,14 @@ class TestParseDispatchDataRow:
     def test_title_not_found_raises_invalid_data_exception(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             1,
             1,
             "",
-            "Text",
+            "c",
         ]
 
         with pytest.raises(loader.InvalidDispatchDataError):
@@ -664,13 +668,13 @@ class TestParseDispatchDataRow:
     def test_content_not_found_uses_empty_string_on_content_field(
         self, owner_nations, category_setups
     ):
-        spreadsheet_id = "s1"
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             1,
             1,
-            "Title",
+            "c",
         ]
 
         dispatch = loader.parse_dispatch_data_row(
@@ -679,15 +683,15 @@ class TestParseDispatchDataRow:
 
         assert dispatch.content == ""
 
-    def test_can_parse_extra_useless_cells(self, owner_nations, category_setups):
-        spreadsheet_id = "s1"
+    def test_ignore_excess_cells(self, owner_nations, category_setups):
+        spreadsheet_id = "s"
         row_data = [
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","name1")',
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","n")',
             "edit",
             1,
             1,
-            "Title",
-            "Text",
+            "t",
+            "c",
             "something",
             "else",
         ]
@@ -699,12 +703,46 @@ class TestParseDispatchDataRow:
         assert dispatch == loader.Dispatch(
             "1234",
             loader.DispatchOperation.EDIT,
-            "nation1",
-            "Title",
+            "n",
+            "t",
             "meta",
             "gameplay",
-            "Text",
+            "c",
         )
+
+
+class TestFlattenDispatchSheetConfig:
+    def test_empty_config_returns_empty_list(self):
+        config = []
+
+        result = loader.flatten_spreadsheet_config(config)
+
+        assert result == []
+
+    def test_many_spreadsheets_with_empty_range_returns_empty_list(self):
+        config = [
+            {"spreadsheet_id": "s1", "ranges": []},
+            {"spreadsheet_id": "s2", "ranges": []},
+        ]
+
+        result = loader.flatten_spreadsheet_config(config)
+
+        assert result == []
+
+    def test_many_spreadsheets_with_many_ranges_returns_flatten_list(self):
+        config = [
+            {"spreadsheet_id": "s1", "ranges": ["r1", "r2"]},
+            {"spreadsheet_id": "s2", "ranges": ["r3", "r4"]},
+        ]
+
+        result = loader.flatten_spreadsheet_config(config)
+
+        assert result == [
+            loader.SheetRange("s1", "r1"),
+            loader.SheetRange("s1", "r2"),
+            loader.SheetRange("s2", "r3"),
+            loader.SheetRange("s2", "r4"),
+        ]
 
 
 class TestGoogleDispatchLoader:
@@ -757,15 +795,15 @@ class TestGoogleDispatchLoader:
                 "name1": {
                     "action": "create",
                     "title": "Title 1",
-                    "category": "Meta",
-                    "subcategory": "Gameplay",
+                    "category": "meta",
+                    "subcategory": "gameplay",
                 },
                 "name2": {
                     "action": "edit",
                     "ns_id": "1234",
                     "title": "Title 2",
-                    "category": "Meta",
-                    "subcategory": "Reference",
+                    "category": "meta",
+                    "subcategory": "reference",
                 },
             },
             "Cooltopia": {
@@ -773,8 +811,8 @@ class TestGoogleDispatchLoader:
                     "action": "remove",
                     "ns_id": "4321",
                     "title": "Title 3",
-                    "category": "Meta",
-                    "subcategory": "Gameplay",
+                    "category": "meta",
+                    "subcategory": "gameplay",
                 }
             },
         }
@@ -860,37 +898,3 @@ class TestGoogleDispatchLoader:
         ]
         new_spreadsheets = {loader.SheetRange("s", "A!A1:F"): new_range}
         api.update_values_of_ranges.assert_called_with(new_spreadsheets)
-
-
-class TestFlattenDispatchSheetConfig:
-    def test_empty_config_returns_empty_list(self):
-        config = []
-
-        result = loader.flatten_spreadsheet_config(config)
-
-        assert result == []
-
-    def test_many_spreadsheets_with_empty_range_returns_empty_list(self):
-        config = [
-            {"spreadsheet_id": "s1", "ranges": []},
-            {"spreadsheet_id": "s2", "ranges": []},
-        ]
-
-        result = loader.flatten_spreadsheet_config(config)
-
-        assert result == []
-
-    def test_many_spreadsheets_with_many_ranges_returns_flatten_list(self):
-        config = [
-            {"spreadsheet_id": "s1", "ranges": ["r1", "r2"]},
-            {"spreadsheet_id": "s2", "ranges": ["r3", "r4"]},
-        ]
-
-        result = loader.flatten_spreadsheet_config(config)
-
-        assert result == [
-            loader.SheetRange("s1", "r1"),
-            loader.SheetRange("s1", "r2"),
-            loader.SheetRange("s2", "r3"),
-            loader.SheetRange("s2", "r4"),
-        ]

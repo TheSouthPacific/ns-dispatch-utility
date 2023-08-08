@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 CellValue = Any
 RowCellValues = list[CellValue]
 RangeCellValues = list[RowCellValues]
+SpreadsheetIds = Sequence[str]
 
 
 @dataclass(frozen=True)
@@ -140,18 +141,18 @@ class GoogleSheetsApiAdapter:
 
         spreadsheets = itertools.groupby(ranges, lambda range: range.spreadsheet_id)
         for spreadsheet_id, spreadsheet_ranges in spreadsheets:
-            range_values = list(
+            range_cell_values = list(
                 map(lambda cell_range: cell_range.range_value, spreadsheet_ranges)
             )
             req = self._api.batchGet(
                 spreadsheetId=spreadsheet_id,
-                ranges=range_values,
+                ranges=range_cell_values,
                 valueRenderOption="FORMULA",
             )
             resp = GoogleSheetsApiAdapter.execute(req)
             logger.debug(
                 'API response for pulling cell values from ranges "%r" of spreadsheet "%s": "%r"',
-                range_values,
+                range_cell_values,
                 spreadsheet_id,
                 resp,
             )
@@ -262,7 +263,7 @@ class FailureOpResult(OpResult):
         )
 
 
-class OperationResultStore(UserDict[str, OpResult]):
+class OpResultStore(UserDict[str, OpResult]):
     """Stores the results of dispatch operations."""
 
     def report_success(
@@ -311,64 +312,55 @@ class OperationResultStore(UserDict[str, OpResult]):
         )
 
 
-class CategorySetupData:
-    """Contains information about dispatch category setup.
+@dataclass(frozen=True)
+class CategorySetup:
+    """Describes a dispatch category/subcategory setup."""
 
-    Args:
-        categories (Mapping[str, str]): Category names of setup IDs
-        subcategories (Mapping[str, str]): Subcategory names of setup IDs
-    """
+    category_name: str
+    subcategory_name: str
 
-    def __init__(self, categories: Mapping[str, str], subcategories: Mapping[str, str]):
-        self.categories = categories
-        self.subcategories = subcategories
+
+class CategorySetupStore(UserDict[str, CategorySetup]):
+    """Contains dispatch category/subcategory setups."""
+
+    def __init__(self, setups: Mapping[str, CategorySetup]):
+        """Contains dispatch category/subcategory setups.
+
+        Args:
+            setups (Mapping[str, CategorySetup]): Setups
+        """
+
+        self.data = dict(setups)
 
     @classmethod
-    def load_from_range_cell_data(cls, range_cell_data: RangeCellValues):
-        """Load category setup data from spreadsheet cell data.
+    def load_from_range_cell_values(cls, range_cell_values: RangeCellValues):
+        """Load category setups from cell values of a spreadsheet range.
 
         Args:
-            range_cell_data (RangeData): Cell data
+            range_cell_values (RangeCellValues): Cell values of a range
 
         Returns:
-            CategorySetupData
+            CategorySetups
         """
 
-        categories: dict[str, str] = {}
-        subcategories: dict[str, str] = {}
+        setups: dict[str, CategorySetup] = {}
         # In case of similar IDs, the latest one is used
-        for row in range_cell_data:
+        for row in range_cell_values:
             setup_id = str(row[0])
-            category_name = str(row[1])
-            subcategory_name = str(row[2])
+            category_name = str(row[1]).lower()
+            subcategory_name = str(row[2]).lower()
+            setups[setup_id] = CategorySetup(category_name, subcategory_name)
 
-            categories[setup_id] = category_name
-            subcategories[setup_id] = subcategory_name
+        return cls(setups)
 
-        return cls(categories, subcategories)
-
-    def get_category_subcategory_name(self, setup_id: str) -> tuple[str, str]:
-        """Get the category and subcategory name of a setup ID.
-
-        Args:
-            setup_id (str): Setup ID
-
-        Raises:
-            KeyError: Setup ID does not exist
-
-        Returns:
-            tuple[str, str]: Category and subcategory name
-        """
-
-        if setup_id not in self.categories:
+    def __getitem__(self, setup_id: str) -> CategorySetup:
+        try:
+            return super().__getitem__(setup_id)
+        except KeyError:
             raise KeyError(f"Could not find category setup ID {setup_id}")
-        return self.categories[setup_id], self.subcategories[setup_id]
 
 
-SpreadsheetIds = Sequence[str]
-
-
-class OwnerNationData:
+class OwnerNationStore:
     """Contains information about dispatch owner nations.
 
     Args:
@@ -385,11 +377,11 @@ class OwnerNationData:
         self.allowed_spreadsheet_ids = allowed_spreadsheet_ids
 
     @classmethod
-    def load_from_range_cell_data(cls, range_cell_data: RangeCellValues):
+    def load_from_range_cell_values(cls, range_cell_values: RangeCellValues):
         """Load owner nation data from spreadsheet cell data.
 
         Args:
-            range_cell_data (RangeData): Cell data
+            range_cell_values (RangeCellValues): Cell data
 
         Returns:
             OwnerNationData
@@ -398,7 +390,7 @@ class OwnerNationData:
         owner_nation_names: dict[str, str] = {}
         allowed_spreadsheet_ids: dict[str, SpreadsheetIds] = {}
         # If there are similar IDs, the latest one is used
-        for row in range_cell_data:
+        for row in range_cell_values:
             owner_id = str(row[0])
             owner_nation_name = str(row[1])
             allowed_spreadsheets = str(row[2])
@@ -444,19 +436,19 @@ class OwnerNationData:
 
 
 def parse_utility_template_cell_ranges(
-    cell_data: Mapping[SheetRange, RangeCellValues]
+    values: Mapping[SheetRange, RangeCellValues]
 ) -> dict[str, str]:
     """Get utility template content from cell data of many sheet ranges.
 
     Args:
-        cell_data (Mapping[SheetRange, RangeCellData]): Cell data of many sheet ranges
+        values (Mapping[SheetRange, RangeCellData]): Cell data of many sheet ranges
 
     Returns:
         dict: Utility templates keyed by name
     """
 
     utility_templates: dict[str, str] = {}
-    for range in cell_data.values():
+    for range in values.values():
         for row in range:
             utility_templates[str(row[0])] = row[1]
 
@@ -540,8 +532,8 @@ class SkipRow(GoogleDispatchLoaderError):
 def parse_dispatch_data_row(
     row_data: RowCellValues,
     spreadsheet_id: str,
-    owner_nations: OwnerNationData,
-    category_setups: CategorySetupData,
+    owner_nations: OwnerNationStore,
+    category_setups: CategorySetupStore,
 ) -> Dispatch:
     """Parse a dispatch sheet row's data into a Dispatch object.
 
@@ -592,9 +584,9 @@ def parse_dispatch_data_row(
             operation, "Category setup cell cannot be empty."
         )
     try:
-        category, subcategory = category_setups.get_category_subcategory_name(
-            category_setup_id
-        )
+        category_setup = category_setups[category_setup_id]
+        category = category_setup.category_name
+        subcategory = category_setup.subcategory_name
     except KeyError as err:
         raise InvalidDispatchDataError(operation, err)
 
@@ -620,14 +612,14 @@ ReportFailureCallback = Callable[
 def parse_dispatch_data_rows(
     rows: RangeCellValues,
     spreadsheet_id: str,
-    owner_nations: OwnerNationData,
-    category_setups: CategorySetupData,
+    owner_nations: OwnerNationStore,
+    category_setups: CategorySetupStore,
     report_failure: ReportFailureCallback,
 ) -> dict[str, Dispatch]:
     """Parse dispatch sheet rows' data into Dispatch objects.
 
     Args:
-        rows (RangeData): Dispatch data rows
+        rows (RangeCellValues): Dispatch data rows
         spreadsheet_id (str): Spreadsheet ID
         owner_nations (OwnerNationData): Owner nation data
         category_setups (CategorySetupData): Category setup data
@@ -660,15 +652,15 @@ def parse_dispatch_data_rows(
 
 
 def parse_dispatch_data_cell_ranges(
-    cell_data: MultiRangeCellValues,
-    owner_nations: OwnerNationData,
-    category_setups: CategorySetupData,
+    values: MultiRangeCellValues,
+    owner_nations: OwnerNationStore,
+    category_setups: CategorySetupStore,
     report_failure: ReportFailureCallback,
 ) -> dict[str, Dispatch]:
     """Parse dispatch data from many sheet ranges into Dispatch objects.
 
     Args:
-        cell_data (SpreadsheetData): Cell data of many sheet ranges
+        values (SpreadsheetData): Cell data of many sheet ranges
         owner_nations (OwnerNationData): Owner nation data
         category_setups (CategorySetupData): Category setup data
         report_failure (ReportFailureFunc): Failure report callback
@@ -678,9 +670,9 @@ def parse_dispatch_data_cell_ranges(
     """
 
     dispatches: dict[str, Dispatch] = {}
-    for range, range_cell_data in cell_data.items():
+    for range, range_cell_values in values.items():
         row_dispatches = parse_dispatch_data_rows(
-            range_cell_data,
+            range_cell_values,
             range.spreadsheet_id,
             owner_nations,
             category_setups,
@@ -691,7 +683,7 @@ def parse_dispatch_data_cell_ranges(
 
 
 def generate_new_dispatch_data_rows(
-    old_cell_data: RangeCellValues,
+    old_values: RangeCellValues,
     dispatch_data: Mapping[str, Dispatch],
     operation_results: Mapping[str, OpResult],
 ) -> RangeCellValues:
@@ -699,7 +691,7 @@ def generate_new_dispatch_data_rows(
     with updated dispatch IDs and status messages.
 
     Args:
-        old_cell_data (RangeCellData): Old cell data of a dispatch sheet range
+        old_values (RangeCellData): Old cell data of a dispatch sheet range
         dispatch_data (Mapping[str, Dispatch]): New dispatch data
         operation_results (Mapping[str, OperationResult]): Dispatch operation results
 
@@ -707,7 +699,7 @@ def generate_new_dispatch_data_rows(
         RangeCellData: New dispatch cell data
     """
 
-    new_row_data = copy.deepcopy(old_cell_data)
+    new_row_data = copy.deepcopy(old_values)
     for row in new_row_data:
         # Skip rows with empty id, operation or are not long enough
         if (not (row[0] and row[1])) or len(row) < 6:
@@ -743,8 +735,8 @@ def generate_new_dispatch_data_rows(
     return new_row_data
 
 
-def generate_new_dispatch_cell_data(
-    old_cell_data: MultiRangeCellValues,
+def generate_new_dispatch_values(
+    old_values: MultiRangeCellValues,
     dispatch_data: Mapping[str, Dispatch],
     operation_results: Mapping[str, OpResult],
 ) -> MultiRangeCellValues:
@@ -760,11 +752,11 @@ def generate_new_dispatch_cell_data(
     """
 
     new_spreadsheet_data: Mapping[SheetRange, RangeCellValues] = {}
-    for range, range_cell_data in old_cell_data.items():
-        new_range_cell_data = generate_new_dispatch_data_rows(
-            range_cell_data, dispatch_data, operation_results
+    for range, range_cell_values in old_values.items():
+        new_range_cell_values = generate_new_dispatch_data_rows(
+            range_cell_values, dispatch_data, operation_results
         )
-        new_spreadsheet_data[range] = new_range_cell_data
+        new_spreadsheet_data[range] = new_range_cell_values
     return new_spreadsheet_data
 
 
@@ -838,40 +830,40 @@ class GoogleDispatchLoader:
 
     Args:
         spreadsheet_api (GoogleSpreadsheetApiAdapter): Spreadsheet API adapter
-        dispatch_cell_data (dict[CellRange, RangeData]): Dispatch spreadsheet values
-        utility_template_cell_data (dict[CellRange, RangeData]): Utility template spreadsheet values
-        owner_nation_spreadsheet_data (RangeData): Owner nation spreadsheet values
-        category_setup_spreadsheet_data (RangeData): Category setup spreadsheet values
+        dispatch_values (dict[CellRange, RangeCellValues]): Dispatch spreadsheet values
+        utility_template_values (dict[CellRange, RangeCellValues]): Utility template spreadsheet values
+        owner_nation_spreadsheet_data (RangeCellValues): Owner nation spreadsheet values
+        category_setup_spreadsheet_data (RangeCellValues): Category setup spreadsheet values
     """
 
     def __init__(
         self,
         spreadsheet_api: GoogleSheetsApiAdapter,
-        dispatch_cell_data: Mapping[SheetRange, RangeCellValues],
-        utility_template_cell_data: Mapping[SheetRange, RangeCellValues],
+        dispatch_values: Mapping[SheetRange, RangeCellValues],
+        utility_template_values: Mapping[SheetRange, RangeCellValues],
         owner_nation_spreadsheet_data: RangeCellValues,
         category_setup_spreadsheet_data: RangeCellValues,
     ) -> None:
         self.spreadsheet_api = spreadsheet_api
-        self.operation_result_recorder = OperationResultStore()
+        self.operation_result_recorder = OpResultStore()
 
-        self.dispatch_cell_data = dispatch_cell_data
+        self.dispatch_values = dispatch_values
 
-        self.owner_nations = OwnerNationData.load_from_range_cell_data(
+        self.owner_nations = OwnerNationStore.load_from_range_cell_values(
             owner_nation_spreadsheet_data
         )
 
-        self.category_setups = CategorySetupData.load_from_range_cell_data(
+        self.category_setups = CategorySetupStore.load_from_range_cell_values(
             category_setup_spreadsheet_data
         )
 
         self.utility_templates = parse_utility_template_cell_ranges(
-            utility_template_cell_data
+            utility_template_values
         )
 
         self.dispatch_data = DispatchData(
             parse_dispatch_data_cell_ranges(
-                self.dispatch_cell_data,
+                self.dispatch_values,
                 self.owner_nations,
                 self.category_setups,
                 self.operation_result_recorder.report_failure,
@@ -939,12 +931,12 @@ class GoogleDispatchLoader:
     def update_spreadsheets(self) -> None:
         """Update spreadsheets."""
 
-        new_dispatch_cell_data = generate_new_dispatch_cell_data(
-            self.dispatch_cell_data,
+        new_dispatch_values = generate_new_dispatch_values(
+            self.dispatch_values,
             self.dispatch_data,
             self.operation_result_recorder,
         )
-        self.spreadsheet_api.update_values_of_ranges(new_dispatch_cell_data)
+        self.spreadsheet_api.update_values_of_ranges(new_dispatch_values)
         logger.info("Updated Google spreadsheets.")
 
 
@@ -973,19 +965,19 @@ def init_dispatch_loader(config: Mapping):
     )
     spreadsheet_api = GoogleSheetsApiAdapter(google_api)
 
-    owner_nation_range_cell_data = spreadsheet_api.get_values_of_range(
+    owner_nation_range_cell_values = spreadsheet_api.get_values_of_range(
         SheetRange(
             config["owner_nation_sheet"]["spreadsheet_id"],
             config["owner_nation_sheet"]["range"],
         )
     )
-    category_setup_range_cell_data = spreadsheet_api.get_values_of_range(
+    category_setup_range_cell_values = spreadsheet_api.get_values_of_range(
         SheetRange(
             config["category_setup_sheet"]["spreadsheet_id"],
             config["category_setup_sheet"]["range"],
         )
     )
-    utility_template_range_cell_data = spreadsheet_api.get_values_of_ranges(
+    utility_template_range_cell_values = spreadsheet_api.get_values_of_ranges(
         flatten_spreadsheet_config(config["utility_template_spreadsheets"])
     )
     dispatch_spreadsheets = spreadsheet_api.get_values_of_ranges(
@@ -995,9 +987,9 @@ def init_dispatch_loader(config: Mapping):
     return GoogleDispatchLoader(
         spreadsheet_api,
         dispatch_spreadsheets,
-        utility_template_range_cell_data,
-        owner_nation_range_cell_data,
-        category_setup_range_cell_data,
+        utility_template_range_cell_values,
+        owner_nation_range_cell_values,
+        category_setup_range_cell_values,
     )
 
 
