@@ -1,6 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
 from unittest import mock
 
+import freezegun
 import pytest
 
 from nsdu.loaders import google_dispatch_loader as loader
@@ -86,81 +87,99 @@ class TestGoogleSpreadsheetApiAdapter:
 
 
 class TestOperationResult:
-    def test_get_success_user_message_returns_formatted_user_message(self):
-        result_obj = loader.SuccessOperationResult(
-            "name1", "create", datetime(2023, 1, 1)
-        )
-
-        assert result_obj.user_message == "Created on 2023/01/01 00:00:00 "
-
-    def test_get_failure_user_message_returns_formatted_user_message(self):
-        result_obj = loader.FailureOperationResult(
-            "name1", "create", datetime(2023, 1, 1), "Some details"
+    def test_get_success_result_message_returns_formatted_message(self):
+        result = loader.SuccessOpResult(
+            "name", loader.DispatchOperation.CREATE, datetime(2023, 1, 1)
         )
 
         assert (
-            result_obj.user_message
-            == "Failed to create on 2023/01/01 00:00:00 \nError: Some details"
+            result.result_message == "Created successfully.\nTime: 2023/01/01 00:00:00 "
+        )
+
+    def test_get_failure_result_message_returns_formatted_message(self):
+        result = loader.FailureOpResult(
+            "name",
+            loader.DispatchOperation.CREATE,
+            datetime(2023, 1, 1),
+            "Some details.",
+        )
+
+        assert (
+            result.result_message
+            == "Failed to create.\nDetails: Some details.\nTime: 2023/01/01 00:00:00 "
         )
 
 
-class TestOperationResultReporter:
+class TestOperationResultStore:
     def test_report_success_adds_success_result(self):
-        reporter = loader.OperationResultRecorder()
+        obj = loader.OperationResultStore()
 
-        reporter.report_success("foo", "create", datetime.now())
+        obj.report_success("n", loader.DispatchOperation.CREATE, datetime(2023, 1, 1))
+        result = obj["n"]
 
-        assert reporter["foo"].action == "create"
+        assert result == loader.SuccessOpResult(
+            "n", loader.DispatchOperation.CREATE, datetime(2023, 1, 1)
+        )
 
-    def test_report_success_uses_current_time_if_no_result_time_is_passed(self):
-        reporter = loader.OperationResultRecorder()
+    @freezegun.freeze_time('2023-01-01')
+    def test_report_success_with_no_result_time_uses_current_time_as_result_time(self):
+        obj = loader.OperationResultStore()
 
-        reporter.report_success("foo", "create")
+        obj.report_success("n", loader.DispatchOperation.CREATE)
+        result = obj["n"].result_time
 
-        assert reporter["foo"].result_time
+        assert result == datetime(2023, 1, 1, tzinfo=timezone.utc)
 
-    def test_report_failure_with_no_details_adds_failure_result_with_no_details(self):
-        reporter = loader.OperationResultRecorder()
+    def test_report_failure_with_no_details_adds_no_details_failure_result(self):
+        obj = loader.OperationResultStore()
 
-        reporter.report_failure("foo", "create", None, datetime(2023, 1, 1))
-        result = reporter["foo"]
+        obj.report_failure(
+            "n", loader.DispatchOperation.CREATE, None, datetime(2023, 1, 1)
+        )
+        result = obj["n"]
 
-        assert isinstance(result, loader.FailureOperationResult) and not result.details
+        assert isinstance(result, loader.FailureOpResult) and result.details is None
 
-    def test_report_failure_with_text_details_adds_failure_result_with_text_details(
+    def test_report_failure_with_str_details_adds_failure_result_with_str_details(
         self,
     ):
-        reporter = loader.OperationResultRecorder()
+        obj = loader.OperationResultStore()
 
-        reporter.report_failure("foo", "create", "Some details", datetime(2023, 1, 1))
-        result = reporter["foo"]
-
-        assert (
-            isinstance(result, loader.FailureOperationResult)
-            and result.details == "Some details"
+        obj.report_failure(
+            "n", loader.DispatchOperation.CREATE, "d", datetime(2023, 1, 1)
         )
+        result = obj["n"]
 
-    def test_report_failure_with_exception_details_adds_failure_result_with_exception_msg(
+        assert isinstance(result, loader.FailureOpResult) and result.details == "d"
+
+    def test_report_failure_with_exception_details_adds_failure_result_with_exception_msg_details(
         self,
     ):
-        reporter = loader.OperationResultRecorder()
+        obj = loader.OperationResultStore()
 
-        reporter.report_failure(
-            "foo", "create", Exception("Some details"), datetime(2023, 1, 1)
+        obj.report_failure(
+            "n", loader.DispatchOperation.CREATE, Exception("d"), datetime(2023, 1, 1)
         )
-        result = reporter["foo"]
+        result = obj["n"]
 
-        assert (
-            isinstance(result, loader.FailureOperationResult)
-            and result.details == "Some details"
-        )
+        assert isinstance(result, loader.FailureOpResult) and result.details == "d"
 
-    def test_report_failure_uses_current_time_if_no_result_time_is_passed(self):
-        reporter = loader.OperationResultRecorder()
+    def test_report_failure_with_invalid_op_adds_failure_result_with_invalid_op_name(self):
+        obj = loader.OperationResultStore()
 
-        reporter.report_failure("foo", "create", details="Some details")
+        obj.report_failure("n", "a", details="d")
+        result = obj['n'].operation
 
-        assert reporter["foo"].result_time
+        assert result == "a"
+
+    @freezegun.freeze_time('2023-01-01')
+    def test_report_failure_with_no_result_time_uses_current_time_as_result_time(self):
+        obj = loader.OperationResultStore()
+
+        obj.report_failure("n", loader.DispatchOperation.CREATE, details="d")
+        result = obj['n'].result_time
+
+        assert result == datetime(2023, 1, 1, tzinfo=timezone.utc)
 
 
 class TestCategorySetupData:
@@ -293,17 +312,17 @@ class TestParseUtilityTemplateCellRanges:
         range_data = [["layout1", "abcd"]]
         ranges = {loader.SheetRange("abcd1234", "Layout!A1:B"): range_data}
 
-        r = loader.parse_utility_template_cell_ranges(ranges)
+        result = loader.parse_utility_template_cell_ranges(ranges)
 
-        assert r == {"layout1": "abcd"}
+        assert result == {"layout1": "abcd"}
 
     def test_returns_last_identical_template(self):
         range_data = [["layout1", "abcd"], ["layout1", "xyzt"]]
         ranges = {loader.SheetRange("abcd1234", "Layout!A1:B"): range_data}
 
-        r = loader.parse_utility_template_cell_ranges(ranges)
+        result = loader.parse_utility_template_cell_ranges(ranges)
 
-        assert r == {"layout1": "xyzt"}
+        assert result == {"layout1": "xyzt"}
 
 
 class TestDispatchData:
@@ -312,7 +331,7 @@ class TestDispatchData:
             "name1": loader.Dispatch(
                 ns_id="12345",
                 owner_nation="testopia",
-                action="edit",
+                operation=loader.DispatchOperation.EDIT,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -321,9 +340,9 @@ class TestDispatchData:
         }
         obj = loader.DispatchData(dispatch_data)
 
-        r = obj.get_canonical_dispatch_config()
+        result = obj.get_canonical_dispatch_config()
 
-        assert r == {
+        assert result == {
             "testopia": {
                 "name1": {
                     "action": "edit",
@@ -340,7 +359,7 @@ class TestDispatchData:
             "name1": loader.Dispatch(
                 ns_id=None,
                 owner_nation="testopia",
-                action="create",
+                operation=loader.DispatchOperation.CREATE,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -349,9 +368,9 @@ class TestDispatchData:
         }
         obj = loader.DispatchData(dispatch_data)
 
-        r = obj.get_canonical_dispatch_config()
+        result = obj.get_canonical_dispatch_config()
 
-        assert r == {
+        assert result == {
             "testopia": {
                 "name1": {
                     "action": "create",
@@ -367,7 +386,7 @@ class TestDispatchData:
             "name1": loader.Dispatch(
                 ns_id="12345",
                 owner_nation="testopia",
-                action="edit",
+                operation=loader.DispatchOperation.EDIT,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -389,7 +408,7 @@ class TestDispatchData:
             "name1": loader.Dispatch(
                 ns_id=None,
                 owner_nation="testopia",
-                action="create",
+                operation=loader.DispatchOperation.CREATE,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -407,7 +426,7 @@ class TestDispatchData:
             "name1": loader.Dispatch(
                 ns_id="12345",
                 owner_nation="testopia",
-                action="edit",
+                operation=loader.DispatchOperation.EDIT,
                 title="Hello Title",
                 content="Hello World",
                 category="meta",
@@ -450,7 +469,13 @@ class TestParseDispatchDataRow:
         )
 
         assert dispatch == loader.Dispatch(
-            "1234", "edit", "nation1", "Title", "meta", "gameplay", "Text"
+            "1234",
+            loader.DispatchOperation.EDIT,
+            "nation1",
+            "Title",
+            "meta",
+            "gameplay",
+            "Text",
         )
 
     def test_no_ns_id_returns_dispatch_obj_with_no_ns_id(
@@ -670,7 +695,13 @@ class TestParseDispatchDataRow:
         )
 
         assert dispatch == loader.Dispatch(
-            "1234", "edit", "nation1", "Title", "meta", "gameplay", "Text"
+            "1234",
+            loader.DispatchOperation.EDIT,
+            "nation1",
+            "Title",
+            "meta",
+            "gameplay",
+            "Text",
         )
 
 
@@ -691,7 +722,7 @@ class TestGoogleDispatchLoader:
         range_data_2 = [
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=4321","name3")',
-                "remove",
+                "delete",
                 2,
                 1,
                 "Title 3",
@@ -715,9 +746,9 @@ class TestGoogleDispatchLoader:
             category_rows,
         )
 
-        r = obj.get_dispatch_config()
+        result = obj.get_dispatch_config()
 
-        assert r == {
+        assert result == {
             "Testopia": {
                 "name1": {
                     "action": "create",
@@ -754,9 +785,9 @@ class TestGoogleDispatchLoader:
             mock.Mock(), {}, utility_template_ranges, [], []
         )
 
-        r = obj.get_dispatch_template("layout1")
+        result = obj.get_dispatch_template("layout1")
 
-        assert r == "abcd"
+        assert result == "abcd"
 
     def test_get_dispatch_template_of_normal_dispatch(self):
         range1 = [
@@ -782,11 +813,11 @@ class TestGoogleDispatchLoader:
             category_rows,
         )
 
-        r = obj.get_dispatch_template("name1")
+        result = obj.get_dispatch_template("name1")
 
-        assert r == "Hello World"
+        assert result == "Hello World"
 
-    def test_update_spreadsheets_after_successfully_create_new_dispatch(self):
+    def test_update_spreadsheets_after_new_dispatch_created(self):
         range1 = [["name1", "create", 1, 1, "Hello Title", "Hello World"]]
         dispatch_spreadsheets = {loader.SheetRange("abcd1234", "Sheet1!A3:F"): range1}
         owner_nation_rows = [[1, "Testopia", "abcd1234"]]
@@ -802,7 +833,10 @@ class TestGoogleDispatchLoader:
 
         obj.add_dispatch_id("name1", "1234")
         obj.report_result(
-            "name1", "create", "success", datetime.fromisoformat("2021-01-01T00:00:00")
+            "name1",
+            loader.DispatchOperation.CREATE,
+            "success",
+            datetime(2023, 1, 1),
         )
         obj.update_spreadsheets()
 
@@ -814,7 +848,7 @@ class TestGoogleDispatchLoader:
                 1,
                 "Hello Title",
                 "Hello World",
-                "Created on 2021/01/01 00:00:00 ",
+                "Created successfully.\nTime: 2023/01/01 00:00:00 ",
             ]
         ]
         new_spreadsheets = {loader.SheetRange("abcd1234", "Sheet1!A3:F"): new_range}

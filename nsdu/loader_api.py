@@ -1,7 +1,7 @@
 """API for loader plugins.
 """
 
-import datetime
+from datetime import datetime
 from typing import Any, Mapping
 
 import pluggy
@@ -64,7 +64,7 @@ def get_dispatch_template(loader: object, name: str) -> str:
 
 @dispatch_loader_specs(firstresult=True)
 def after_update(
-    loader: object, name: str, action: str, result: str, result_time: datetime.datetime
+    loader: object, name: str, action: str, result: str, result_time: datetime
 ) -> None:
     """Run after a dispatch has finished updating to report
     the result of an operation.
@@ -74,7 +74,7 @@ def after_update(
         name (str): Dispatch name
         action (str): Finished action
         result (str): Result message
-        result_time (datetime.datetime): Time of the update
+        result_time (datetime): Time of the update
     """
 
     raise NotImplemented

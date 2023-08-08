@@ -10,6 +10,7 @@ from abc import ABC, abstractmethod
 from collections import UserDict
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from enum import Enum
 from typing import Any, Callable, Mapping, Sequence
 
 from google.oauth2 import service_account
@@ -19,24 +20,38 @@ from googleapiclient.http import HttpError
 from nsdu import exceptions, loader_api
 
 GOOGLE_API_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
-HYPERLINK_REGEX = (
+
+HYPERLINK_PATTERN = (
     r'=hyperlink\("https://www.nationstates.net/page=dispatch/id=(\d+)",\s*"(.+)"\)'
 )
-HYPERLINK_BUILD_FORMAT = (
+HYPERLINK_FORMAT = (
     '=hyperlink("https://www.nationstates.net/page=dispatch/id={dispatch_id}","{name}")'
 )
 
-SUCCESS_MESSAGE_FORMATS = {
-    "create": "Created on {time}",
-    "edit": "Edited on {time}",
-    "remove": "Removed on {time}",
+
+class DispatchOperation(Enum):
+    """Dispatch operation type."""
+
+    CREATE = 1
+    EDIT = 2
+    DELETE = 3
+
+
+SUCCESS_RESULT_MESSAGE_FORMAT = "{message}\nTime: {result_time}"
+SUCCESS_RESULT_MESSAGES = {
+    DispatchOperation.CREATE: "Created successfully.",
+    DispatchOperation.EDIT: "Edited successfully.",
+    DispatchOperation.DELETE: "Deleted successfully.",
 }
-FAILURE_MESSAGE_FORMATS = {
-    "create": "Failed to create on {time}",
-    "edit": "Failed to edit on {time}",
-    "remove": "Failed to remove on {time}",
+FAILURE_RESULT_MESSAGE_FORMAT = (
+    "{message}\nDetails: {failure_details}\nTime: {result_time}"
+)
+FAILURE_RESULT_MESSAGES = {
+    DispatchOperation.CREATE: "Failed to create.",
+    DispatchOperation.EDIT: "Failed to edit.",
+    DispatchOperation.DELETE: "Failed to remove.",
 }
-FAILURE_DETAILS_FORMAT = "\nError: {details}"
+INVALID_OPERATION_MESSAGE = "Invalid operation {operation}"
 RESULT_TIME_FORMAT = "%Y/%m/%d %H:%M:%S %Z"
 
 logger = logging.getLogger(__name__)
@@ -173,87 +188,100 @@ class GoogleSpreadsheetApiAdapter:
 
 
 @dataclass(frozen=True)
-class OperationResult(ABC):
-    """Describes an operation result."""
+class OpResult(ABC):
+    """Describes the result of a dispatch operation."""
 
     dispatch_name: str
-    action: str
+    operation: DispatchOperation
     result_time: datetime
 
     @property
     @abstractmethod
-    def user_message(self) -> str:
+    def result_message(self) -> str:
         pass
 
 
 @dataclass(frozen=True)
-class SuccessOperationResult(OperationResult):
-    """Describes a successful operation result."""
+class SuccessOpResult(OpResult):
+    """Describes the result of a successful dispatch operation."""
 
     @property
-    def user_message(self) -> str:
-        time_string = self.result_time.strftime(RESULT_TIME_FORMAT)
-        return SUCCESS_MESSAGE_FORMATS[self.action].format(time=time_string)
+    def result_message(self) -> str:
+        result_message = SUCCESS_RESULT_MESSAGES[self.operation]
+        result_time_str = self.result_time.strftime(RESULT_TIME_FORMAT)
+        return SUCCESS_RESULT_MESSAGE_FORMAT.format(
+            message=result_message, result_time=result_time_str
+        )
 
 
 @dataclass(frozen=True)
-class FailureOperationResult(OperationResult):
-    """Describes a failure operation result."""
+class FailureOpResult(OpResult):
+    """Describes the result of a failed dispatch operation."""
 
+    operation: DispatchOperation | str
     details: str | None
 
     @property
-    def user_message(self) -> str:
-        time_string = self.result_time.strftime(RESULT_TIME_FORMAT)
-        message = FAILURE_MESSAGE_FORMATS[self.action].format(time=time_string)
-        message += FAILURE_DETAILS_FORMAT.format(details=self.details)
-        return message
+    def result_message(self) -> str:
+        result_message = (
+            FAILURE_RESULT_MESSAGES[self.operation]
+            if isinstance(self.operation, DispatchOperation)
+            else INVALID_OPERATION_MESSAGE.format(operation=self.operation)
+        )
+        result_time_str = self.result_time.strftime(RESULT_TIME_FORMAT)
+        return FAILURE_RESULT_MESSAGE_FORMAT.format(
+            message=result_message,
+            failure_details=self.details,
+            result_time=result_time_str,
+        )
 
 
-class OperationResultRecorder(UserDict):
-    """Records the results of spreadsheet and dispatch update operations."""
+class OperationResultStore(UserDict[str, OpResult]):
+    """Stores the results of dispatch operations."""
 
     def report_success(
-        self, dispatch_name: str, action: str, result_time: datetime | None = None
+        self,
+        dispatch_name: str,
+        operation: DispatchOperation,
+        result_time: datetime | None = None,
     ) -> None:
-        """Report a successful operation.
+        """Report a successful dispatch operation.
 
         Args:
             dispatch_name (str): Dispatch name
-            action (str): Dispatch action
-            result_time (datetime | None) The time the operation happened. Use current time if None.
+            operation (DispatchOperation): Dispatch operation
+            result_time (datetime | None): Time the result happened. Use current time if None.
         """
 
         if result_time is None:
             result_time = datetime.now(tz=timezone.utc)
-        self.data[dispatch_name] = SuccessOperationResult(
-            dispatch_name, action, result_time
+        self.data[dispatch_name] = SuccessOpResult(
+            dispatch_name, operation, result_time
         )
 
     def report_failure(
         self,
         dispatch_name: str,
-        action: str,
+        operation: DispatchOperation | str,
         details: str | Exception | None = None,
         result_time: datetime | None = None,
     ) -> None:
-        """Report a failed operation.
+        """Report a failed dispatch operation.
 
         Args:
             dispatch_name (str): Dispatch name
-            action (str): Dispatch action
-            details (str | Exception | None): Error details
-            result_time (datetime.datetime) Time the operation happened. Use current time if None.
+            operation (DispatchOperation | str): Dispatch operation. Use a normal string for an invalid operation
+            details (str | Exception | None): Error details. Defaults to None.
+            result_time (datetime.datetime) Time the result happened. Use current time if None.
         """
-
-        if isinstance(details, Exception):
-            details = str(details)
 
         if result_time is None:
             result_time = datetime.now(tz=timezone.utc)
 
-        self.data[dispatch_name] = FailureOperationResult(
-            dispatch_name, action, result_time, details
+        details = str(details) if details is not None else None
+
+        self.data[dispatch_name] = FailureOpResult(
+            dispatch_name, operation, result_time, details
         )
 
 
@@ -419,7 +447,7 @@ def extract_dispatch_id_from_hyperlink(cell_value: str) -> str | None:
         str | None: Dispatch ID
     """
 
-    result = re.search(HYPERLINK_REGEX, cell_value, flags=re.IGNORECASE)
+    result = re.search(HYPERLINK_PATTERN, cell_value, flags=re.IGNORECASE)
     if result is None:
         return None
 
@@ -436,7 +464,7 @@ def extract_name_from_hyperlink(cell_value: str) -> str:
         str: Dispatch name
     """
 
-    result = re.search(HYPERLINK_REGEX, cell_value, flags=re.IGNORECASE)
+    result = re.search(HYPERLINK_PATTERN, cell_value, flags=re.IGNORECASE)
     if result is None:
         return cell_value
 
@@ -453,15 +481,15 @@ def create_hyperlink(name: str, dispatch_id: str) -> str:
     Returns:
         str: Hyperlink function
     """
-    return HYPERLINK_BUILD_FORMAT.format(name=name, dispatch_id=dispatch_id)
+    return HYPERLINK_FORMAT.format(name=name, dispatch_id=dispatch_id)
 
 
 @dataclass(frozen=True)
 class Dispatch:
-    """Describes the configuration and content of a dispatch."""
+    """Contains the metadata and content of a dispatch."""
 
     ns_id: str | None
-    action: str
+    operation: DispatchOperation
     owner_nation: str
     title: str
     category: str
@@ -472,9 +500,9 @@ class Dispatch:
 class InvalidDispatchDataError(Exception):
     """Exception for invalid values on dispatch sheet rows."""
 
-    def __init__(self, action: str, *args: object) -> None:
+    def __init__(self, operation: DispatchOperation | str, *args: object) -> None:
         super().__init__(*args)
-        self.action = action
+        self.operation = operation
 
 
 class SkipRow(Exception):
@@ -509,40 +537,44 @@ def parse_dispatch_data_row(
         raise SkipRow
     dispatch_id = extract_dispatch_id_from_hyperlink(str(row_data[0]))
 
-    action = str(row_data[1])
-    if not action:
+    operation = str(row_data[1]).lower()
+    if not operation:
         raise SkipRow
-    if action not in ("create", "edit", "remove"):
-        raise InvalidDispatchDataError(action, "Invalid action.")
+    try:
+        operation = DispatchOperation[operation.upper()]
+    except KeyError:
+        raise InvalidDispatchDataError(operation, "Invalid operation.")
 
     if len(row_data) < 5:
-        raise InvalidDispatchDataError(action, "Not enough cells are filled.")
+        raise InvalidDispatchDataError(operation, "Not enough cells are filled.")
 
     owner_id = str(row_data[2])
     if not owner_id:
-        raise InvalidDispatchDataError(action, "Owner nation cell cannot be empty.")
+        raise InvalidDispatchDataError(operation, "Owner nation cell cannot be empty.")
     try:
         owner_nation = owner_nations.get_owner_nation_name(owner_id)
     except KeyError as err:
-        raise InvalidDispatchDataError(action, err)
+        raise InvalidDispatchDataError(operation, err)
     if not owner_nations.check_spreadsheet_permission(owner_id, spreadsheet_id):
         raise InvalidDispatchDataError(
-            action, f"Owner nation {owner_id} cannot be used on this spreadsheet."
+            operation, f"Owner nation {owner_id} cannot be used on this spreadsheet."
         )
 
     category_setup_id = str(row_data[3])
     if not category_setup_id:
-        raise InvalidDispatchDataError(action, "Category setup cell cannot be empty.")
+        raise InvalidDispatchDataError(
+            operation, "Category setup cell cannot be empty."
+        )
     try:
         category, subcategory = category_setups.get_category_subcategory_name(
             category_setup_id
         )
     except KeyError as err:
-        raise InvalidDispatchDataError(action, err)
+        raise InvalidDispatchDataError(operation, err)
 
     title = str(row_data[4])
     if not title:
-        raise InvalidDispatchDataError(action, "Title cell cannot be empty")
+        raise InvalidDispatchDataError(operation, "Title cell cannot be empty")
 
     try:
         content = str(row_data[5])
@@ -550,11 +582,13 @@ def parse_dispatch_data_row(
         content = ""
 
     return Dispatch(
-        dispatch_id, action, owner_nation, title, category, subcategory, content
+        dispatch_id, operation, owner_nation, title, category, subcategory, content
     )
 
 
-ReportFailureCallback = Callable[[str, str, InvalidDispatchDataError], None]
+ReportFailureCallback = Callable[
+    [str, DispatchOperation | str, InvalidDispatchDataError], None
+]
 
 
 def parse_dispatch_data_rows(
@@ -594,7 +628,7 @@ def parse_dispatch_data_rows(
             logger.error(
                 f'Spreadsheet row of dispatch "{dispatch_name}" is invalid: {err}'
             )
-            report_failure(dispatch_name, err.action, err)
+            report_failure(dispatch_name, err.operation, err)
 
     return dispatches
 
@@ -633,7 +667,7 @@ def parse_dispatch_data_cell_ranges(
 def generate_new_dispatch_data_rows(
     old_cell_data: RangeCellData,
     dispatch_data: Mapping[str, Dispatch],
-    operation_results: Mapping[str, OperationResult],
+    operation_results: Mapping[str, OpResult],
 ) -> RangeCellData:
     """Generate new dispatch data row values for a sheet range
     with updated dispatch IDs and status messages.
@@ -649,7 +683,7 @@ def generate_new_dispatch_data_rows(
 
     new_row_data = copy.deepcopy(old_cell_data)
     for row in new_row_data:
-        # Skip rows with empty id, action or are not long enough
+        # Skip rows with empty id, operation or are not long enough
         if (not (row[0] and row[1])) or len(row) < 6:
             continue
 
@@ -661,21 +695,24 @@ def generate_new_dispatch_data_rows(
             continue
 
         try:
-            row[6] = result.user_message
+            row[6] = result.result_message
         except IndexError:
-            row.append(result.user_message)
+            row.append(result.result_message)
 
-        if isinstance(result, FailureOperationResult):
+        if isinstance(result, FailureOpResult):
             continue
 
         dispatch = dispatch_data[name]
 
-        if dispatch.action == "remove":
-            row[0] = name
-            row[1] = ""
-        elif dispatch.action == "create" and dispatch.ns_id is not None:
+        if (
+            dispatch.operation == DispatchOperation.CREATE
+            and dispatch.ns_id is not None
+        ):
             row[0] = create_hyperlink(name, dispatch.ns_id)
             row[1] = "edit"
+        elif dispatch.operation == DispatchOperation.DELETE:
+            row[0] = name
+            row[1] = ""
 
     return new_row_data
 
@@ -683,7 +720,7 @@ def generate_new_dispatch_data_rows(
 def generate_new_dispatch_cell_data(
     old_cell_data: MultiRangeCellData,
     dispatch_data: Mapping[str, Dispatch],
-    operation_results: Mapping[str, OperationResult],
+    operation_results: Mapping[str, OpResult],
 ) -> MultiRangeCellData:
     """_summary_
 
@@ -705,7 +742,7 @@ def generate_new_dispatch_cell_data(
     return new_spreadsheet_data
 
 
-class DispatchData(UserDict):
+class DispatchData(UserDict[str, Dispatch]):
     """Manage dispatch data.
 
     Args:
@@ -724,8 +761,16 @@ class DispatchData(UserDict):
 
         result = {}
         for name, dispatch in self.data.items():
+            match dispatch.operation:
+                case DispatchOperation.CREATE:
+                    canonical_operation = "create"
+                case DispatchOperation.EDIT:
+                    canonical_operation = "edit"
+                case DispatchOperation.DELETE:
+                    canonical_operation = "remove"
+
             canonical_config = {
-                "action": dispatch.action,
+                "action": canonical_operation,
                 "title": dispatch.title,
                 "category": dispatch.category,
                 "subcategory": dispatch.subcategory,
@@ -782,7 +827,7 @@ class GoogleDispatchLoader:
         category_setup_spreadsheet_data: RangeCellData,
     ) -> None:
         self.spreadsheet_api = spreadsheet_api
-        self.operation_result_recorder = OperationResultRecorder()
+        self.operation_result_recorder = OperationResultStore()
 
         self.dispatch_cell_data = dispatch_cell_data
 
@@ -843,22 +888,26 @@ class GoogleDispatchLoader:
         self.dispatch_data.add_dispatch_id(name, dispatch_id)
 
     def report_result(
-        self, name: str, action: str, result: str, result_time: datetime
+        self,
+        name: str,
+        operation: DispatchOperation,
+        result: str,
+        result_time: datetime,
     ) -> None:
         """Report operation result from NSDU.
 
         Args:
             name (str): Dispatch name
-            action (str): Action
+            operation (str): Dispatch operation
             result (str): Result
             result_time (datetime): Time update operation happened
         """
 
         if result == "success":
-            self.operation_result_recorder.report_success(name, action, result_time)
+            self.operation_result_recorder.report_success(name, operation, result_time)
         else:
             self.operation_result_recorder.report_failure(
-                name, action, result, result_time
+                name, operation, result, result_time
             )
 
     def update_spreadsheets(self) -> None:
@@ -938,7 +987,17 @@ def get_dispatch_template(loader: GoogleDispatchLoader, name: str):
 
 @loader_api.dispatch_loader
 def after_update(loader: GoogleDispatchLoader, name, action, result, result_time):
-    loader.report_result(name, action, result, result_time)
+    match action:
+        case "create":
+            operation = DispatchOperation.CREATE
+        case "edit":
+            operation = DispatchOperation.EDIT
+        case "remove":
+            operation = DispatchOperation.DELETE
+        case _:
+            raise ValueError("Invalid dispatch action")
+
+    loader.report_result(name, operation, result, result_time)
 
 
 @loader_api.dispatch_loader
