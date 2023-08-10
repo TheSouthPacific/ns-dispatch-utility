@@ -221,65 +221,54 @@ class TestCategorySetupStore:
 
 
 class TestOwnerNationData:
-    def test_get_owner_nation_name_returns_name(self):
-        owner_nation_names = {"id1": "nation1"}
-        allowed_spreadsheet_ids = {"id1": ["s1"]}
+    def test_get_owner_nation_returns_correct_nation(self):
+        owner_nations = {"1": loader.OwnerNation("n", [])}
+        obj = loader.OwnerNationStore(owner_nations)
 
-        owner_nations = loader.OwnerNationStore(
-            owner_nation_names, allowed_spreadsheet_ids
-        )
+        result = obj["1"]
 
-        assert owner_nations.get_owner_nation_name("id1") == "nation1"
+        assert result == loader.OwnerNation("n", [])
 
-    def test_get_non_existent_owner_nation_name_raises_exception(self):
-        owner_nations = loader.OwnerNationStore({}, {})
+    def test_get_non_existent_owner_nation_raises_exception(self):
+        obj = loader.OwnerNationStore({})
 
         with pytest.raises(KeyError):
-            owner_nations.get_owner_nation_name("id1")
+            obj["1"]
 
     def test_check_permission_on_allowed_spreadsheet_returns_true(self):
-        owner_nation_names = {"id1": "nation1"}
-        allowed_spreadsheet_ids = {"id1": ["s1"]}
+        owner_nations = {"1": loader.OwnerNation("n", ["s"])}
+        obj = loader.OwnerNationStore(owner_nations)
 
-        owner_nations = loader.OwnerNationStore(
-            owner_nation_names, allowed_spreadsheet_ids
-        )
+        result = obj.check_spreadsheet_permission("1", "s")
 
-        assert owner_nations.check_spreadsheet_permission("id1", "s1")
+        assert result
 
     def test_check_permission_on_non_allowed_spreadsheet_returns_false(self):
-        owner_nation_names = {"id1": "nation1"}
-        allowed_spreadsheet_ids = {"id1": ["s1"]}
+        owner_nations = {"1": loader.OwnerNation("n", ["s"])}
+        obj = loader.OwnerNationStore(owner_nations)
 
-        owner_nations = loader.OwnerNationStore(
-            owner_nation_names, allowed_spreadsheet_ids
-        )
+        result = obj.check_spreadsheet_permission("1", "s1")
 
-        assert not owner_nations.check_spreadsheet_permission("id1", "s2")
+        assert not result
 
-    def test_check_permission_on_non_existent_owner_id_raises_exception(self):
-        owner_nations = loader.OwnerNationStore({}, {})
+    def test_check_permission_of_non_existent_owner_raises_exception(self):
+        obj = loader.OwnerNationStore({})
 
         with pytest.raises(KeyError):
-            owner_nations.check_spreadsheet_permission("id1", "s1")
+            obj.check_spreadsheet_permission("1", "s")
 
-    def test_load_owner_nation_data_from_cell_data(self):
-        cell_data = [["id1", "nation1", "s1,s2"]]
+    def test_load_from_range_cell_values_gets_correct_owner_nations(self):
+        cell_data = [["1", "n", "s1,s2"]]
+        obj = loader.OwnerNationStore.load_from_range_cell_values(cell_data)
 
-        owner_nations = loader.OwnerNationStore.load_from_range_cell_values(cell_data)
+        assert obj["1"] == loader.OwnerNation("n", ["s1", "s2"])
 
-        assert owner_nations.owner_nation_names == {
-            "id1": "nation1"
-        } and owner_nations.allowed_spreadsheet_ids == {"id1": ["s1", "s2"]}
+    def test_load_from_range_cell_values_uses_last_conflicting_owner_id(self):
+        cell_data = [["1", "n1", "s1"], ["1", "n2", "s2"]]
 
-    def test_load_owner_nation_data_from_cell_data_uses_last_identical_owner_id(self):
-        cell_data = [["id1", "nation1", "s1,s2"], ["id1", "nation2", "s2,s3"]]
+        obj = loader.OwnerNationStore.load_from_range_cell_values(cell_data)
 
-        owner_nations = loader.OwnerNationStore.load_from_range_cell_values(cell_data)
-
-        assert owner_nations.owner_nation_names == {
-            "id1": "nation2"
-        } and owner_nations.allowed_spreadsheet_ids == {"id1": ["s2", "s3"]}
+        assert obj["1"] == loader.OwnerNation("n2", ["s2"])
 
 
 class TestExtractNameFromHyperlink:
@@ -445,7 +434,7 @@ class TestDispatchData:
 
 @pytest.fixture
 def owner_nations():
-    return loader.OwnerNationStore({"1": "n"}, {"1": ["s"]})
+    return loader.OwnerNationStore({"1": loader.OwnerNation("n", "s")})
 
 
 @pytest.fixture

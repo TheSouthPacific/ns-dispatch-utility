@@ -352,63 +352,56 @@ class CategorySetupStore(UserDict[str, CategorySetup]):
             raise KeyError(f"Could not find category setup ID {setup_id}")
 
 
-class OwnerNationStore:
-    """Contains information about dispatch owner nations.
+@dataclass(frozen=True)
+class OwnerNation:
+    """Describes a dispatch owner nation and its allowed spreadsheets."""
+
+    nation_name: str
+    allowed_spreadsheet_ids: SpreadsheetIds
+
+
+class OwnerNationStore(UserDict[str, OwnerNation]):
+    """Contains dispatch owner nations' config.
 
     Args:
-        owner_nation_names (Mapping[str, str]): Owner nation names
-        allowed_spreadsheet_ids (Mapping[str, SpreadsheetIds])  : Allowed spreadsheets of each owner
+        owner_nations (Mapping[str, OwnerNation]): Owner nations
     """
 
     def __init__(
         self,
-        owner_nation_names: Mapping[str, str],
-        allowed_spreadsheet_ids: Mapping[str, SpreadsheetIds],
+        owner_nations: Mapping[str, OwnerNation],
     ) -> None:
-        self.owner_nation_names = owner_nation_names
-        self.allowed_spreadsheet_ids = allowed_spreadsheet_ids
+        self.data = dict(owner_nations)
 
     @classmethod
     def load_from_range_cell_values(cls, range_cell_values: RangeCellValues):
-        """Load owner nation data from spreadsheet cell data.
+        """Load owner nations from cell values of a spreadsheet range.
 
         Args:
-            range_cell_values (RangeCellValues): Cell data
+            range_cell_values (RangeCellValues): Cell values
 
         Returns:
-            OwnerNationData
+            OwnerNationStore
         """
 
-        owner_nation_names: dict[str, str] = {}
-        allowed_spreadsheet_ids: dict[str, SpreadsheetIds] = {}
+        owner_nations: dict[str, OwnerNation] = {}
         # If there are similar IDs, the latest one is used
         for row in range_cell_values:
             owner_id = str(row[0])
             owner_nation_name = str(row[1])
-            allowed_spreadsheets = str(row[2])
+            allowed_spreadsheets = str(row[2]).split(",")
 
-            owner_nation_names[owner_id] = owner_nation_name
-            allowed_spreadsheet_ids[owner_id] = allowed_spreadsheets.split(",")
+            owner_nations[owner_id] = OwnerNation(
+                owner_nation_name, allowed_spreadsheets
+            )
 
-        return cls(owner_nation_names, allowed_spreadsheet_ids)
+        return cls(owner_nations)
 
-    def get_owner_nation_name(self, owner_id: str) -> str:
-        """Get owner nation name from owner ID.
-
-        Args:
-            owner_id (int): Owner nation ID
-
-        Raises:
-            KeyError: Owner nation does not exist
-
-        Returns:
-            str: Owner nation name
-        """
-
-        if owner_id not in self.owner_nation_names:
+    def __getitem__(self, owner_id: str) -> OwnerNation:
+        try:
+            return super().__getitem__(owner_id)
+        except KeyError:
             raise KeyError(f'Could not find any nation with owner ID "{owner_id}"')
-
-        return self.owner_nation_names[owner_id]
 
     def check_spreadsheet_permission(self, owner_id: str, spreadsheet_id: str) -> bool:
         """Check if the provided owner ID can be used with the provided spreadsheet ID.
@@ -421,10 +414,10 @@ class OwnerNationStore:
             bool: True if allowed
         """
 
-        if owner_id not in self.allowed_spreadsheet_ids:
+        if owner_id not in self.data:
             raise KeyError(f'Could not find any nation with owner ID "{owner_id}"')
 
-        return spreadsheet_id in self.allowed_spreadsheet_ids[owner_id]
+        return spreadsheet_id in self.data[owner_id].allowed_spreadsheet_ids
 
 
 def parse_utility_template_cell_ranges(
@@ -549,7 +542,7 @@ def parse_dispatch_data_row(
     if not owner_id:
         raise InvalidDispatchDataError(operation, "Owner nation cell cannot be empty.")
     try:
-        owner_nation = owner_nations.get_owner_nation_name(owner_id)
+        owner_nation = owner_nations[owner_id].nation_name
     except KeyError as err:
         raise InvalidDispatchDataError(operation, err)
     if not owner_nations.check_spreadsheet_permission(owner_id, spreadsheet_id):
