@@ -432,17 +432,17 @@ class TestDispatchData:
         assert obj["name1"].ns_id == "54321"
 
 
-@pytest.fixture
-def owner_nations():
-    return loader.OwnerNationStore({"1": loader.OwnerNation("n", "s")})
-
-
-@pytest.fixture
-def category_setups():
-    return loader.CategorySetupStore({"1": loader.CategorySetup("meta", "gameplay")})
-
-
 class TestParseDispatchDataRow:
+    @pytest.fixture(scope='class')
+    def owner_nations(self):
+        return loader.OwnerNationStore({"1": loader.OwnerNation("n", ["s"])})
+
+    @pytest.fixture(scope='class')
+    def category_setups(self):
+        return loader.CategorySetupStore(
+            {"1": loader.CategorySetup("meta", "gameplay")}
+        )
+
     def test_ns_id_exists_returns_dispatch_obj_with_ns_id(
         self, owner_nations, category_setups
     ):
