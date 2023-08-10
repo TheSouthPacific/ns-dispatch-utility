@@ -51,7 +51,6 @@ logger = logging.getLogger(__name__)
 CellValue = Any
 RowCellValues = list[CellValue]
 RangeCellValues = list[RowCellValues]
-SpreadsheetIds = Sequence[str]
 
 
 @dataclass(frozen=True)
@@ -357,7 +356,7 @@ class OwnerNation:
     """Describes a dispatch owner nation and its allowed spreadsheets."""
 
     nation_name: str
-    allowed_spreadsheet_ids: SpreadsheetIds
+    allowed_spreadsheet_ids: list[str]
 
 
 class OwnerNationStore(UserDict[str, OwnerNation]):
