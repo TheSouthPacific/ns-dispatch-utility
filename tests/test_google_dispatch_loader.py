@@ -803,7 +803,6 @@ class TestGoogleDispatchLoader:
             category_setups,
             op_result_store,
         )
-
         obj.add_dispatch_id("n", "1")
         obj.report_result(
             "n",
@@ -811,6 +810,7 @@ class TestGoogleDispatchLoader:
             "success",
             datetime(2023, 1, 1),
         )
+
         obj.update_spreadsheets()
 
         new_range = [

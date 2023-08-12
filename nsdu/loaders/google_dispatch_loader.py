@@ -1,4 +1,4 @@
-"""Load dispatches from Google spreadsheets.
+"""A loader plugin to load dispatches from Google spreadsheets.
 """
 
 from __future__ import annotations
