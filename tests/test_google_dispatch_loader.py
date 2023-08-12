@@ -12,6 +12,7 @@ from nsdu.loaders.google_dispatch_loader import (
     DispatchRow,
     OwnerNation,
     SheetRange,
+    UtilityTemplateRow,
 )
 
 
@@ -306,26 +307,70 @@ class TestExtractDispatchIdFromHyperlink:
         assert loader.extract_dispatch_id_from_hyperlink(cell_value) == None
 
 
+class TestUtilityTemplateRow:
+    @pytest.mark.parametrize(
+        "row,expected",
+        [
+            [[], UtilityTemplateRow("", "")],
+            [["u"], UtilityTemplateRow("u", "")],
+            [["u", "utp"], UtilityTemplateRow("u", "utp")],
+        ],
+    )
+    def test_load_api_resp_row_returns_correct_obj(self, row, expected):
+        result = UtilityTemplateRow.from_api_resp_row(row)
+
+        assert result == expected
+
+    @pytest.mark.parametrize(
+        "row,expected",
+        [
+            [{}, []],
+            [
+                {
+                    SheetRange("s", "a"): [["u1", "utp1"], ["u2", "utp2"]],
+                    SheetRange("s", "b"): [["u3", "utp3"]],
+                },
+                [
+                    UtilityTemplateRow("u1", "utp1"),
+                    UtilityTemplateRow("u2", "utp2"),
+                    UtilityTemplateRow("u3", "utp3"),
+                ],
+            ],
+        ],
+    )
+    def test_load_rows_from_api_returns_correct_objs(self, row, expected):
+        sheets_api = Mock(get_values_of_ranges=Mock(return_value=row))
+
+        result = UtilityTemplateRow.loads_rows_from_api(sheets_api, [])
+
+        assert result == expected
+
+
 class TestParseUtilityTemplateCellRanges:
-    def test_parse_many_templates_returns_correct_templates(self):
-        rows = [
-            loader.UtilityTemplateRow("l1", "a"),
-            loader.UtilityTemplateRow("l2", "b"),
-        ]
-
+    @pytest.mark.parametrize(
+        "rows,expected",
+        [
+            [[], {}],
+            [
+                [
+                    UtilityTemplateRow("u1", "utp1"),
+                    UtilityTemplateRow("u2", "utp2"),
+                ],
+                {"u1": "utp1", "u2": "utp2"},
+            ],
+            [
+                [
+                    UtilityTemplateRow("u1", "utp1"),
+                    UtilityTemplateRow("u1", "utp2"),
+                ],
+                {"u1": "utp2"}
+            ],
+        ],
+    )
+    def test_returns_correct_utility_templates(self, rows, expected):
         result = loader.parse_utility_template_sheet_rows(rows)
 
-        assert result == {"l1": "a", "l2": "b"}
-
-    def test_parse_uses_last_conflicting_template(self):
-        rows = [
-            loader.UtilityTemplateRow("l", "a"),
-            loader.UtilityTemplateRow("l", "b"),
-        ]
-
-        result = loader.parse_utility_template_sheet_rows(rows)
-
-        assert result == {"l": "b"}
+        assert result == expected
 
 
 class TestDispatchConfig:
@@ -441,6 +486,61 @@ class TestDispatchConfig:
         obj.add_dispatch_id("name1", "54321")
 
         assert obj["name1"].ns_id == "54321"
+
+
+class TestDispatchRow:
+    @pytest.mark.parametrize(
+        "row,expected",
+        [
+            [[], DispatchRow("", "", "", "", "", "", "")],
+            [["n"], DispatchRow("n", "", "", "", "", "", "")],
+            [
+                ["n", "create", "1", "1", "t", "tp"],
+                DispatchRow("n", "create", "1", "1", "t", "tp", ""),
+            ],
+            [
+                ["n", "edit", "1", "1", "t", "tp", "stat"],
+                DispatchRow("n", "edit", "1", "1", "t", "tp", "stat"),
+            ],
+        ],
+    )
+    def test_load_api_resp_row_returns_correct_obj(self, row, expected):
+        result = DispatchRow.from_api_resp_row(row)
+
+        assert result == expected
+
+    @pytest.mark.parametrize(
+        "row,expected",
+        [
+            [{}, {}],
+            [
+                {
+                    SheetRange("s", "a"): [
+                        ["n1", "edit", "1", "1", "t1", "tp1", "stat1"],
+                        ["n2", "edit", "1", "1", "t2", "tp2", "stat2"],
+                    ],
+                    SheetRange("s", "b"): [
+                        ["n3", "edit", "1", "1", "t3", "tp3", "stat3"]
+                    ],
+                },
+                {
+                    SheetRange("s", "a"): [
+                        DispatchRow("n1", "edit", "1", "1", "t1", "tp1", "stat1"),
+                        DispatchRow("n2", "edit", "1", "1", "t2", "tp2", "stat2"),
+                    ],
+                    SheetRange("s", "b"): [
+                        DispatchRow("n3", "edit", "1", "1", "t3", "tp3", "stat3"),
+                    ],
+                },
+            ],
+        ],
+    )
+    def test_load_rows_from_api_returns_many_objs(self, row, expected):
+        sheets_api = Mock(get_values_of_ranges=Mock(return_value=row))
+
+        result = DispatchRow.loads_rows_from_api(sheets_api, [])
+
+        assert result == expected
 
 
 class TestParseDispatchDataRow:

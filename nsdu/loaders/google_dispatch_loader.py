@@ -413,8 +413,12 @@ class UtilityTemplateRow:
 
     @classmethod
     def from_api_resp_row(cls, resp: RowCellValues):
-        name = resp[0]
-        template = resp[1]
+        name = template = ""
+        try:
+            name = str(resp[0])
+            template = str(resp[1])
+        except IndexError:
+            pass
         return cls(name, template)
 
     @staticmethod
@@ -517,14 +521,20 @@ class DispatchRow:
     status: str
 
     @classmethod
-    def from_api_resp(cls, resp: RowCellValues):
-        dispatch_name = str(resp[0])
-        operation = str(resp[1])
-        owner_nation = str(resp[2])
-        category_setup = str(resp[3])
-        title = str(resp[4])
-        template = str(resp[5])
-        status = str(resp[6])
+    def from_api_resp_row(cls, resp: RowCellValues):
+        dispatch_name = (
+            operation
+        ) = owner_nation = category_setup = title = template = status = ""
+        try:
+            dispatch_name = str(resp[0])
+            operation = str(resp[1])
+            owner_nation = str(resp[2])
+            category_setup = str(resp[3])
+            title = str(resp[4])
+            template = str(resp[5])
+            status = str(resp[6])
+        except IndexError:
+            pass
         return cls(
             dispatch_name,
             operation,
@@ -541,7 +551,7 @@ class DispatchRow:
     ) -> dict[SheetRange, DispatchRows]:
         resp = api.get_values_of_ranges(sheet_ranges)
         return {
-            range: [DispatchRow.from_api_resp(row) for row in rows]
+            range: [DispatchRow.from_api_resp_row(row) for row in rows]
             for range, rows in resp.items()
         }
 
