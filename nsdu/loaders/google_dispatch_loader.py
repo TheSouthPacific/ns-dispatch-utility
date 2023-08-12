@@ -62,7 +62,7 @@ class SheetRange:
     range_value: str
 
 
-MultiRangeCellValues = Mapping[SheetRange, RangeCellValues]
+MultiRangeCellValues = dict[SheetRange, RangeCellValues]
 
 
 class GoogleDispatchLoaderError(exceptions.LoaderError):
