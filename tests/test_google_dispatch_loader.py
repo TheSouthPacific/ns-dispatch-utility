@@ -363,7 +363,7 @@ class TestParseUtilityTemplateCellRanges:
                     UtilityTemplateRow("u1", "utp1"),
                     UtilityTemplateRow("u1", "utp2"),
                 ],
-                {"u1": "utp2"}
+                {"u1": "utp2"},
             ],
         ],
     )
@@ -554,164 +554,124 @@ class TestParseDispatchDataRow:
             {"1": loader.CategorySetup("meta", "gameplay")}
         )
 
-    def test_ns_id_exists_returns_dispatch_obj_with_ns_id(
-        self, owner_nations, category_setups
+    @pytest.mark.parametrize(
+        "row,expected",
+        [
+            [
+                DispatchRow(
+                    '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
+                    "edit",
+                    "1",
+                    "1",
+                    "t",
+                    "tp",
+                    "",
+                ),
+                Dispatch(
+                    "1",
+                    DispatchOperation.EDIT,
+                    "n",
+                    "t",
+                    "meta",
+                    "gameplay",
+                    "tp",
+                ),
+            ],
+            [
+                DispatchRow("n", "create", "1", "1", "t", "tp", ""),
+                Dispatch(
+                    None, DispatchOperation.CREATE, "n", "t", "meta", "gameplay", "tp"
+                ),
+            ],
+            [
+                DispatchRow("n", "create", "1", "1", "t", "", ""),
+                Dispatch(
+                    None, DispatchOperation.CREATE, "n", "t", "meta", "gameplay", ""
+                ),
+            ],
+        ],
+    )
+    def test_with_valid_row_returns_correct_dispatch_obj(
+        self, row, expected, owner_nations, category_setups
     ):
         spreadsheet_id = "s"
-        row = DispatchRow(
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
-            "edit",
-            "1",
-            "1",
-            "t",
-            "c",
-            "",
-        )
 
         result = loader.parse_dispatch_sheet_row(
             row, spreadsheet_id, owner_nations, category_setups
         )
 
-        assert result == Dispatch(
-            "1",
-            DispatchOperation.EDIT,
-            "n",
-            "t",
-            "meta",
-            "gameplay",
-            "c",
-        )
+        assert result == expected
 
-    def test_no_ns_id_returns_dispatch_obj_with_no_ns_id(
-        self, owner_nations, category_setups
+    @pytest.mark.parametrize(
+        "row,spreadsheet_id,expected",
+        [
+            [DispatchRow("", "create", "1", "1", "t", "tp", ""), "s", loader.SkipRow],
+            [DispatchRow("n", "", "1", "1", "t", "tp", ""), "s", loader.SkipRow],
+            [
+                DispatchRow("n", "a", "1", "1", "t", "tp", ""),
+                "s",
+                loader.InvalidDispatchDataError,
+            ],
+            [
+                DispatchRow("n", "create", "1", "1", "", "tp", ""),
+                "s",
+                loader.InvalidDispatchDataError,
+            ],
+            [
+                DispatchRow("n", "create", "0", "1", "t", "tp", ""),
+                "s",
+                loader.InvalidDispatchDataError,
+            ],
+            [
+                DispatchRow("n", "create", "1", "0", "t", "tp", ""),
+                "s",
+                loader.InvalidDispatchDataError,
+            ],
+            [
+                DispatchRow("n", "create", "1", "0", "t", "tp", ""),
+                "s2",
+                loader.InvalidDispatchDataError,
+            ],
+        ],
+    )
+    def test_with_invalid_row_raises_correct_exception(
+        self, row, spreadsheet_id, expected, owner_nations, category_setups
     ):
-        spreadsheet_id = "s"
-        row = DispatchRow("n", "edit", "1", "1", "t", "c", "")
-
-        result = loader.parse_dispatch_sheet_row(
-            row, spreadsheet_id, owner_nations, category_setups
-        )
-
-        assert result.ns_id is None
-
-    def test_empty_dispatch_name_raises_skip_exception(
-        self, owner_nations, category_setups
-    ):
-        spreadsheet_id = "s"
-        row = DispatchRow("", "edit", "1", "1", "t", "c", "")
-
-        with pytest.raises(loader.SkipRow):
+        with pytest.raises(expected):
             loader.parse_dispatch_sheet_row(
                 row, spreadsheet_id, owner_nations, category_setups
             )
 
-    def test_empty_action_raises_skip_exception(self, owner_nations, category_setups):
-        spreadsheet_id = "s"
-        row = DispatchRow("n", "", "1", "1", "t", "c", "")
 
-        with pytest.raises(loader.SkipRow):
-            loader.parse_dispatch_sheet_row(
-                row, spreadsheet_id, owner_nations, category_setups
-            )
+@pytest.mark.parametrize(
+    "config,expected",
+    [
+        [[], []],
+        [
+            [
+                {"spreadsheet_id": "s1", "ranges": []},
+                {"spreadsheet_id": "s2", "ranges": []},
+            ],
+            [],
+        ],
+        [
+            [
+                {"spreadsheet_id": "s1", "ranges": ["r1", "r2"]},
+                {"spreadsheet_id": "s2", "ranges": ["r3", "r4"]},
+            ],
+            [
+                SheetRange("s1", "r1"),
+                SheetRange("s1", "r2"),
+                SheetRange("s2", "r3"),
+                SheetRange("s2", "r4"),
+            ],
+        ],
+    ],
+)
+def test_flatten_dispatch_sheet_config_returns_flatten_list(config, expected):
+    result = loader.flatten_spreadsheet_config(config)
 
-    def test_invalid_action_raises_invalid_data_exception(
-        self, owner_nations, category_setups
-    ):
-        spreadsheet_id = "s"
-        row = DispatchRow("n", "a", "1", "1", "t", "c", "")
-
-        with pytest.raises(loader.InvalidDispatchDataError):
-            loader.parse_dispatch_sheet_row(
-                row, spreadsheet_id, owner_nations, category_setups
-            )
-
-    def test_empty_title_raises_invalid_exception(self, owner_nations, category_setups):
-        spreadsheet_id = "s"
-        row = DispatchRow("n", "create", "1", "1", "", "c", "")
-
-        with pytest.raises(loader.InvalidDispatchDataError):
-            loader.parse_dispatch_sheet_row(
-                row, spreadsheet_id, owner_nations, category_setups
-            )
-
-    def test_owner_id_not_found_raises_invalid_data_exception(
-        self, owner_nations, category_setups
-    ):
-        spreadsheet_id = "s"
-        row = DispatchRow("n", "create", "0", "1", "t", "c", "")
-
-        with pytest.raises(loader.InvalidDispatchDataError):
-            loader.parse_dispatch_sheet_row(
-                row, spreadsheet_id, owner_nations, category_setups
-            )
-
-    def test_owner_id_not_permitted_raises_invalid_data_exception(
-        self, owner_nations, category_setups
-    ):
-        spreadsheet_id = "s2"
-        row = DispatchRow("n", "create", "1", "1", "t", "c", "")
-
-        with pytest.raises(loader.InvalidDispatchDataError):
-            loader.parse_dispatch_sheet_row(
-                row, spreadsheet_id, owner_nations, category_setups
-            )
-
-    def test_category_setup_id_not_found_raises_invalid_data_exception(
-        self, owner_nations, category_setups
-    ):
-        spreadsheet_id = "s"
-        row = DispatchRow("n", "create", "1", "0", "t", "c", "")
-
-        with pytest.raises(loader.InvalidDispatchDataError):
-            loader.parse_dispatch_sheet_row(
-                row, spreadsheet_id, owner_nations, category_setups
-            )
-
-    def test_empty_content_uses_empty_string_on_content_field(
-        self, owner_nations, category_setups
-    ):
-        spreadsheet_id = "s"
-        row = DispatchRow("n", "create", "1", "1", "t", "", "")
-
-        result = loader.parse_dispatch_sheet_row(
-            row, spreadsheet_id, owner_nations, category_setups
-        )
-
-        assert result.content == ""
-
-
-class TestFlattenDispatchSheetConfig:
-    def test_empty_config_returns_empty_list(self):
-        config = []
-
-        result = loader.flatten_spreadsheet_config(config)
-
-        assert result == []
-
-    def test_many_spreadsheets_with_empty_range_returns_empty_list(self):
-        config = [
-            {"spreadsheet_id": "s1", "ranges": []},
-            {"spreadsheet_id": "s2", "ranges": []},
-        ]
-
-        result = loader.flatten_spreadsheet_config(config)
-
-        assert result == []
-
-    def test_many_spreadsheets_with_many_ranges_returns_flatten_list(self):
-        config = [
-            {"spreadsheet_id": "s1", "ranges": ["r1", "r2"]},
-            {"spreadsheet_id": "s2", "ranges": ["r3", "r4"]},
-        ]
-
-        result = loader.flatten_spreadsheet_config(config)
-
-        assert result == [
-            loader.SheetRange("s1", "r1"),
-            loader.SheetRange("s1", "r2"),
-            loader.SheetRange("s2", "r3"),
-            loader.SheetRange("s2", "r4"),
-        ]
+    assert result == expected
 
 
 class TestGoogleDispatchLoader:
