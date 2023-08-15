@@ -512,7 +512,7 @@ class SkipRow(GoogleDispatchLoaderError):
 class DispatchRow:
     """Contains cell values of a dispatch sheet row."""
 
-    dispatch_name: str
+    hyperlink: str
     operation: str
     owner_id: str
     category_setup_id: str
@@ -555,9 +555,9 @@ class DispatchRow:
             for range, rows in resp.items()
         }
 
-    def get_cell_values(self):
+    def to_cell_values(self):
         return [
-            self.dispatch_name,
+            self.hyperlink,
             self.operation,
             self.owner_id,
             self.category_setup_id,
@@ -592,9 +592,9 @@ def parse_dispatch_sheet_row(
         Dispatch: Dispatch object
     """
 
-    if not row.dispatch_name:
+    if not row.hyperlink:
         raise SkipRow
-    dispatch_id = extract_dispatch_id_from_hyperlink(str(row.dispatch_name))
+    dispatch_id = extract_dispatch_id_from_hyperlink(str(row.hyperlink))
 
     if not row.operation:
         raise SkipRow
@@ -676,7 +676,7 @@ def parse_dispatch_sheet_rows(
     dispatches: dict[str, Dispatch] = {}
 
     for row in rows:
-        dispatch_name = extract_name_from_hyperlink(row.dispatch_name)
+        dispatch_name = extract_name_from_hyperlink(row.hyperlink)
 
         try:
             dispatch = parse_dispatch_sheet_row(
@@ -736,32 +736,38 @@ def generate_new_dispatch_range_cell_values(
 
     Args:
         old_rows (DispatchRows): Old cell data of a dispatch sheet range
-        dispatch_data (Mapping[str, Dispatch]): New dispatch data
-        operation_results (Mapping[str, OperationResult]): Dispatch operation results
+        dispatch_config (Mapping[str, Dispatch]): New dispatch config
+        op_results (Mapping[str, OpResult]): Dispatch operation results
 
     Returns:
         RangeCellData: New dispatch cell data
     """
 
-    new_row_data: RangeCellValues = []
+    new_row_values: RangeCellValues = []
     for row in old_rows:
-        # Skip rows with empty id, operation or are not long enough
-        if not (row.dispatch_name and row.operation):
+        dispatch_name = extract_name_from_hyperlink(row.hyperlink)
+
+        if dispatch_name not in dispatch_config:
+            new_row_values.append(row.to_cell_values())
             continue
 
-        dispatch_name = extract_name_from_hyperlink(row.dispatch_name)
-
+        # This case arises when the dispatch was loaded but
+        # the program exits before it is updated
         try:
             result = op_results[dispatch_name]
         except KeyError:
+            new_row_values.append(row.to_cell_values())
             continue
+
         new_status = result.result_message
         if isinstance(result, FailureOpResult):
+            new_dispatch_row = dataclasses.replace(row, status=new_status)
+            new_row_values.append(new_dispatch_row.to_cell_values())
             continue
 
         dispatch = dispatch_config[dispatch_name]
 
-        new_dispatch_name = row.dispatch_name
+        new_dispatch_name = row.hyperlink
         new_operation = row.operation
         if (
             dispatch.operation == DispatchOperation.CREATE
@@ -781,9 +787,9 @@ def generate_new_dispatch_range_cell_values(
             row.template,
             new_status,
         )
-        new_row_data.append(new_dispatch_row.get_cell_values())
+        new_row_values.append(new_dispatch_row.to_cell_values())
 
-    return new_row_data
+    return new_row_values
 
 
 def generate_new_dispatch_spreadsheet_values(
@@ -855,7 +861,7 @@ class DispatchConfigStore(UserDict[str, Dispatch]):
             str: Template text
         """
 
-        return self.data[name].content
+        return self.data[name].template
 
     def add_dispatch_id(self, name: str, dispatch_id: str) -> None:
         """Add id of new dispatch.

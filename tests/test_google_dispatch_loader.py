@@ -13,6 +13,8 @@ from nsdu.loaders.google_dispatch_loader import (
     OwnerNation,
     SheetRange,
     UtilityTemplateRow,
+    SuccessOpResult,
+    FailureOpResult,
 )
 
 
@@ -97,16 +99,14 @@ class TestGoogleSheetsApiAdapter:
 
 class TestOperationResult:
     def test_get_success_result_message_returns_formatted_message(self):
-        result = loader.SuccessOpResult(
-            "name", DispatchOperation.CREATE, datetime(2023, 1, 1)
-        )
+        result = SuccessOpResult("name", DispatchOperation.CREATE, datetime(2023, 1, 1))
 
         assert (
             result.result_message == "Created successfully.\nTime: 2023/01/01 00:00:00 "
         )
 
     def test_get_failure_result_message_returns_formatted_message(self):
-        result = loader.FailureOpResult(
+        result = FailureOpResult(
             "name",
             DispatchOperation.CREATE,
             datetime(2023, 1, 1),
@@ -381,7 +381,7 @@ class TestDispatchConfig:
                 owner_nation="testopia",
                 operation=DispatchOperation.EDIT,
                 title="Hello Title",
-                content="Hello World",
+                template="Hello World",
                 category="meta",
                 subcategory="gameplay",
             )
@@ -409,7 +409,7 @@ class TestDispatchConfig:
                 owner_nation="testopia",
                 operation=DispatchOperation.CREATE,
                 title="Hello Title",
-                content="Hello World",
+                template="Hello World",
                 category="meta",
                 subcategory="gameplay",
             )
@@ -436,7 +436,7 @@ class TestDispatchConfig:
                 owner_nation="testopia",
                 operation=DispatchOperation.EDIT,
                 title="Hello Title",
-                content="Hello World",
+                template="Hello World",
                 category="meta",
                 subcategory="gameplay",
             )
@@ -458,7 +458,7 @@ class TestDispatchConfig:
                 owner_nation="testopia",
                 operation=DispatchOperation.CREATE,
                 title="Hello Title",
-                content="Hello World",
+                template="Hello World",
                 category="meta",
                 subcategory="gameplay",
             )
@@ -476,7 +476,7 @@ class TestDispatchConfig:
                 owner_nation="testopia",
                 operation=DispatchOperation.EDIT,
                 title="Hello Title",
-                content="Hello World",
+                template="Hello World",
                 category="meta",
                 subcategory="gameplay",
             )
@@ -643,6 +643,134 @@ class TestParseDispatchDataRow:
             )
 
 
+class TestGenerateNewDispatchRangeCellValues:
+    @pytest.mark.parametrize(
+        "hyperlink, op, op_enum, expected_hyperlink, expected_op, expected_status",
+        [
+            [
+                "n",
+                "create",
+                DispatchOperation.CREATE,
+                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
+                "edit",
+                "Created successfully.\nTime: 2023/01/01 00:00:00 ",
+            ],
+            [
+                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
+                "edit",
+                DispatchOperation.EDIT,
+                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
+                "edit",
+                "Edited successfully.\nTime: 2023/01/01 00:00:00 ",
+            ],
+            [
+                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
+                "delete",
+                DispatchOperation.DELETE,
+                '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
+                "",
+                "Deleted successfully.\nTime: 2023/01/01 00:00:00 ",
+            ],
+        ],
+    )
+    def test_with_successful_ops_returns_correct_new_op_and_hyperlink(
+        self, hyperlink, op, op_enum, expected_hyperlink, expected_op, expected_status
+    ):
+        old_rows = [DispatchRow(hyperlink, op, "1", "1", "t", "tp", "")]
+        dispatch_config = {
+            "n": Dispatch("1", op_enum, "nat", "t", "meta", "gameplay", "tp")
+        }
+        op_results = {"n": SuccessOpResult("n", op_enum, datetime(2023, 1, 1))}
+
+        result = loader.generate_new_dispatch_range_cell_values(
+            old_rows, dispatch_config, op_results
+        )
+
+        assert result == [
+            [expected_hyperlink, expected_op, "1", "1", "t", "tp", expected_status]
+        ]
+
+    @pytest.mark.parametrize(
+        "hyperlink,dispatch_config,op_results",
+        [
+            ["", {}, {}],
+            [
+                "n",
+                {},
+                {
+                    "n": SuccessOpResult(
+                        "n", DispatchOperation.CREATE, datetime(2023, 1, 1)
+                    )
+                },
+            ],
+            [
+                "n",
+                {
+                    "n": Dispatch(
+                        "1",
+                        DispatchOperation.CREATE,
+                        "nat",
+                        "t",
+                        "meta",
+                        "gameplay",
+                        "tp",
+                    )
+                },
+                {},
+            ],
+        ],
+    )
+    def test_with_no_op_cases_returns_identical_row(
+        self, hyperlink, dispatch_config, op_results
+    ):
+        old_rows = [DispatchRow(hyperlink, "create", "1", "1", "t", "tp", "")]
+
+        result = loader.generate_new_dispatch_range_cell_values(
+            old_rows, dispatch_config, op_results
+        )
+
+        assert result == [
+            [
+                hyperlink,
+                "create",
+                "1",
+                "1",
+                "t",
+                "tp",
+                "",
+            ]
+        ]
+
+    def test_with_failed_op_returns_identical_row_with_failed_status(self):
+        old_rows = [DispatchRow("n", "create", "1", "1", "t", "tp", "")]
+        dispatch_config = {
+            "n": Dispatch(
+                "1", DispatchOperation.CREATE, "nat", "t", "meta", "gameplay", "tp"
+            )
+        }
+        op_results = {
+            "n": FailureOpResult(
+                "n", DispatchOperation.CREATE, datetime(2023, 1, 1), "d"
+            )
+        }
+
+        result = loader.generate_new_dispatch_range_cell_values(
+            old_rows, dispatch_config, op_results
+        )
+
+        assert result == [
+            [
+                "n",
+                "create",
+                "1",
+                "1",
+                "t",
+                "tp",
+                "Failed to create.\nDetails: d\nTime: 2023/01/01 00:00:00 ",
+            ]
+        ]
+
+
 @pytest.mark.parametrize(
     "config,expected",
     [
@@ -657,13 +785,12 @@ class TestParseDispatchDataRow:
         [
             [
                 {"spreadsheet_id": "s1", "ranges": ["r1", "r2"]},
-                {"spreadsheet_id": "s2", "ranges": ["r3", "r4"]},
+                {"spreadsheet_id": "s2", "ranges": ["r3"]},
             ],
             [
                 SheetRange("s1", "r1"),
                 SheetRange("s1", "r2"),
                 SheetRange("s2", "r3"),
-                SheetRange("s2", "r4"),
             ],
         ],
     ],

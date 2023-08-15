@@ -21,7 +21,7 @@ class DispatchOperation(Enum):
 
 @dataclass(frozen=True)
 class Dispatch:
-    """Contains the metadata and content of a dispatch."""
+    """Contains the metadata and template of a dispatch."""
 
     ns_id: str | None
     operation: DispatchOperation
@@ -29,7 +29,7 @@ class Dispatch:
     title: str
     category: str
     subcategory: str
-    content: str
+    template: str
 
 
 dispatch_loader_specs = pluggy.HookspecMarker(info.DISPATCH_LOADER_PROJ)
