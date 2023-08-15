@@ -30,8 +30,8 @@ class TestGoogleSheetsApiAdapter:
         google_api = Mock(batchGet=Mock(return_value=request))
         api = loader.GoogleSheetsApiAdapter(google_api)
 
-        range = loader.SheetRange("s", "A!A1:F")
-        result = api.get_values_of_range(range)
+        sheet_range = loader.SheetRange("s", "A!A1:F")
+        result = api.get_values_of_range(sheet_range)
 
         assert result == [["v"]]
 
@@ -44,8 +44,8 @@ class TestGoogleSheetsApiAdapter:
         google_api = Mock(batchGet=Mock(return_value=request))
         api = loader.GoogleSheetsApiAdapter(google_api)
 
-        range = loader.SheetRange("s", "A!A1:F")
-        result = api.get_values_of_range(range)
+        sheet_range = loader.SheetRange("s", "A!A1:F")
+        result = api.get_values_of_range(sheet_range)
 
         assert result == []
 
@@ -304,7 +304,7 @@ class TestExtractDispatchIdFromHyperlink:
     def test_invalid_hyperlink_returns_none(self):
         cell_value = "foobar"
 
-        assert loader.extract_dispatch_id_from_hyperlink(cell_value) == None
+        assert loader.extract_dispatch_id_from_hyperlink(cell_value) is None
 
 
 class TestUtilityTemplateRow:
@@ -316,8 +316,8 @@ class TestUtilityTemplateRow:
             [["u", "utp"], UtilityTemplateRow("u", "utp")],
         ],
     )
-    def test_load_api_resp_row_returns_correct_obj(self, row, expected):
-        result = UtilityTemplateRow.from_api_resp_row(row)
+    def test_create_from_api_row_returns_correct_obj(self, row, expected):
+        result = UtilityTemplateRow.from_api_row(row)
 
         assert result == expected
 
@@ -338,39 +338,40 @@ class TestUtilityTemplateRow:
             ],
         ],
     )
-    def test_load_rows_from_api_returns_correct_objs(self, row, expected):
+    def test_get_rows_from_api_returns_correct_objs(self, row, expected):
         sheets_api = Mock(get_values_of_ranges=Mock(return_value=row))
 
-        result = UtilityTemplateRow.loads_rows_from_api(sheets_api, [])
+        result = UtilityTemplateRow.get_many_from_api(sheets_api, [])
 
         assert result == expected
 
 
-class TestParseUtilityTemplateCellRanges:
-    @pytest.mark.parametrize(
-        "rows,expected",
+@pytest.mark.parametrize(
+    "rows,expected",
+    [
+        [[], {}],
         [
-            [[], {}],
             [
-                [
-                    UtilityTemplateRow("u1", "utp1"),
-                    UtilityTemplateRow("u2", "utp2"),
-                ],
-                {"u1": "utp1", "u2": "utp2"},
+                UtilityTemplateRow("u1", "utp1"),
+                UtilityTemplateRow("u2", "utp2"),
             ],
-            [
-                [
-                    UtilityTemplateRow("u1", "utp1"),
-                    UtilityTemplateRow("u1", "utp2"),
-                ],
-                {"u1": "utp2"},
-            ],
+            {"u1": "utp1", "u2": "utp2"},
         ],
-    )
-    def test_returns_correct_utility_templates(self, rows, expected):
-        result = loader.parse_utility_template_sheet_rows(rows)
+        [
+            [
+                UtilityTemplateRow("u1", "utp1"),
+                UtilityTemplateRow("u1", "utp2"),
+            ],
+            {"u1": "utp2"},
+        ],
+    ],
+)
+def test_parse_utility_template_sheet_rows_returns_correct_utility_templates(
+    rows, expected
+):
+    result = loader.parse_utility_template_sheet_rows(rows)
 
-        assert result == expected
+    assert result == expected
 
 
 class TestDispatchConfig:
@@ -504,8 +505,8 @@ class TestDispatchRow:
             ],
         ],
     )
-    def test_load_api_resp_row_returns_correct_obj(self, row, expected):
-        result = DispatchRow.from_api_resp_row(row)
+    def test_create_from_api_row_returns_correct_obj(self, row, expected):
+        result = DispatchRow.from_api_row(row)
 
         assert result == expected
 
@@ -535,10 +536,10 @@ class TestDispatchRow:
             ],
         ],
     )
-    def test_load_rows_from_api_returns_many_objs(self, row, expected):
+    def test_get_rows_from_api_returns_many_objs(self, row, expected):
         sheets_api = Mock(get_values_of_ranges=Mock(return_value=row))
 
-        result = DispatchRow.loads_rows_from_api(sheets_api, [])
+        result = DispatchRow.get_many_from_api(sheets_api, [])
 
         assert result == expected
 

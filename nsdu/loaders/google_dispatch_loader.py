@@ -217,7 +217,11 @@ class OpResult(ABC):
     @property
     @abstractmethod
     def result_message(self) -> str:
-        pass
+        """Get user-friendly result message.
+
+        Returns:
+            str: Message
+        """
 
 
 @dataclass(frozen=True)
@@ -412,7 +416,17 @@ class UtilityTemplateRow:
     template: str
 
     @classmethod
-    def from_api_resp_row(cls, resp: RowCellValues):
+    def from_api_row(cls, resp: RowCellValues) -> UtilityTemplateRow:
+        """Create a utility template row object from
+        row cell values in Sheets API format.
+
+        Args:
+            resp (RowCellValues): Row cell values in Sheets API format
+
+        Returns:
+            UtilityTemplateRow: Utility template row object
+        """
+
         name = template = ""
         try:
             name = str(resp[0])
@@ -422,27 +436,36 @@ class UtilityTemplateRow:
         return cls(name, template)
 
     @staticmethod
-    def loads_rows_from_api(
+    def get_many_from_api(
         api: GoogleSheetsApiAdapter, sheet_ranges: Sequence[SheetRange]
     ) -> list[UtilityTemplateRow]:
+        """Get utility template row objects from many spreadsheet ranges
+        using the Sheets API.
+
+        Args:
+            api (GoogleSheetsApiAdapter): Sheets API client
+            sheet_ranges (Sequence[SheetRange]): Ranges to load
+
+        Returns:
+            list[UtilityTemplateRow]: Utility template row objects
+        """
+
         values = api.get_values_of_ranges(sheet_ranges).values()
         return [
-            UtilityTemplateRow.from_api_resp_row(row)
-            for range in values
-            for row in range
+            UtilityTemplateRow.from_api_row(row) for range in values for row in range
         ]
 
 
 def parse_utility_template_sheet_rows(
     rows: Sequence[UtilityTemplateRow],
 ) -> dict[str, str]:
-    """Get utility template content from cell data of many sheet ranges.
+    """Get utility templates from utility template sheet rows.
 
     Args:
-        values (Mapping[SheetRange, RangeCellData]): Cell data of many sheet ranges
+        rows: Sequence[UtilityTemplateRow]: Utility template sheet rows
 
     Returns:
-        dict: Utility templates keyed by name
+        dict[str, str]: Utility templates keyed by name
     """
 
     return {row.name: row.template for row in rows if row.name and row.template}
@@ -521,7 +544,16 @@ class DispatchRow:
     status: str
 
     @classmethod
-    def from_api_resp_row(cls, resp: RowCellValues):
+    def from_api_row(cls, resp: RowCellValues) -> DispatchRow:
+        """Create a dispatch row object from row cell values in Sheets API format.
+
+        Args:
+            resp (RowCellValues): Row cell values in Sheets API format
+
+        Returns:
+            DispatchRow: Dispatch row object
+        """
+
         dispatch_name = (
             operation
         ) = owner_nation = category_setup = title = template = status = ""
@@ -546,16 +578,32 @@ class DispatchRow:
         )
 
     @staticmethod
-    def loads_rows_from_api(
+    def get_many_from_api(
         api: GoogleSheetsApiAdapter, sheet_ranges: Sequence[SheetRange]
     ) -> dict[SheetRange, DispatchRows]:
+        """Get dispatch row objects from many spreadsheet ranges using the Sheets API.
+
+        Args:
+            api (GoogleSheetsApiAdapter): Sheets API
+            sheet_ranges (Sequence[SheetRange]): Ranges to get
+
+        Returns:
+            dict[SheetRange, DispatchRows]: Dispatch row objects keyed by their sheet range
+        """
+
         resp = api.get_values_of_ranges(sheet_ranges)
         return {
-            range: [DispatchRow.from_api_resp_row(row) for row in rows]
+            range: [DispatchRow.from_api_row(row) for row in rows]
             for range, rows in resp.items()
         }
 
-    def to_cell_values(self):
+    def to_cell_values(self) -> RowCellValues:
+        """Get cell values of this row in Sheets API format.
+
+        Returns:
+            RowCellValues: Row cell values in Sheets API format
+        """
+
         return [
             self.hyperlink,
             self.operation,
@@ -973,6 +1021,15 @@ class GoogleDispatchLoader:
 
 
 def flatten_spreadsheet_config(config: Any) -> Sequence[SheetRange]:
+    """Flatten spreadsheet configuration dict.
+
+    Args:
+        config (Any): Configuration dict
+
+    Returns:
+        Sequence[SheetRange]: Flatten dict
+    """
+
     return [
         SheetRange(spreadsheet["spreadsheet_id"], range)
         for spreadsheet in config
@@ -1016,13 +1073,13 @@ def init_dispatch_loader(config: Mapping):
         category_setup_rows
     )
 
-    utility_template_rows = UtilityTemplateRow.loads_rows_from_api(
+    utility_template_rows = UtilityTemplateRow.get_many_from_api(
         sheets_api,
         flatten_spreadsheet_config(config["utility_template_spreadsheets"]),
     )
     utility_templates = parse_utility_template_sheet_rows(utility_template_rows)
 
-    dispatch_rows = DispatchRow.loads_rows_from_api(
+    dispatch_rows = DispatchRow.get_many_from_api(
         sheets_api,
         flatten_spreadsheet_config(config["dispatch_spreadsheets"]),
     )
