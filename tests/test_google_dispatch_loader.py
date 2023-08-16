@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+import logging
 from unittest import mock
 from unittest.mock import Mock
 
@@ -19,75 +20,69 @@ from nsdu.loaders.google_dispatch_loader import (
 
 
 class TestGoogleSheetsApiAdapter:
-    def test_get_values_of_a_range_returns_cell_values_of_that_range(self):
+    @pytest.mark.parametrize("range_cell_values", [[[["v"]]], [[]]])
+    def test_get_values_of_a_range_returns_cell_values_of_range(
+        self, range_cell_values
+    ):
         api_resp = {
             "spreadsheetId": "s",
             "valueRanges": [
-                {"range": "A!A1:F", "majorDimension": "ROWS", "values": [["v"]]}
+                {
+                    "range": "A!A1:F",
+                    "majorDimension": "ROWS",
+                    "values": range_cell_values,
+                }
             ],
         }
         request = Mock(execute=Mock(return_value=api_resp))
         google_api = Mock(batchGet=Mock(return_value=request))
         api = loader.GoogleSheetsApiAdapter(google_api)
 
-        sheet_range = loader.SheetRange("s", "A!A1:F")
+        sheet_range = SheetRange("s", "A!A1:F")
         result = api.get_values_of_range(sheet_range)
 
-        assert result == [["v"]]
+        assert result == range_cell_values
 
-    def test_get_values_of_an_empty_range_returns_empty_list(self):
-        api_resp = {
-            "spreadsheetId": "s",
-            "valueRanges": [{"range": "A!A1:F", "majorDimension": "ROWS"}],
-        }
-        request = Mock(execute=Mock(return_value=api_resp))
-        google_api = Mock(batchGet=Mock(return_value=request))
-        api = loader.GoogleSheetsApiAdapter(google_api)
-
-        sheet_range = loader.SheetRange("s", "A!A1:F")
-        result = api.get_values_of_range(sheet_range)
-
-        assert result == []
-
-    def test_get_values_of_many_ranges_returns_cell_values_of_those_ranges(self):
-        api_resp = {
-            "spreadsheetId": "s",
-            "valueRanges": [
-                {"range": "A!A1:F", "majorDimension": "ROWS", "values": [["v1"]]},
-                {"range": "B!A1:F", "majorDimension": "ROWS", "values": [["v2"]]},
+    @pytest.mark.parametrize(
+        "range_resp,expected",
+        [
+            [
+                [
+                    {"range": "A!A1:F", "majorDimension": "ROWS", "values": [["v1"]]},
+                    {"range": "B!A1:F", "majorDimension": "ROWS", "values": [["v2"]]},
+                ],
+                {
+                    SheetRange("s", "A!A1:F"): [["v1"]],
+                    SheetRange("s", "B!A1:F"): [["v2"]],
+                },
             ],
-        }
+            [
+                [
+                    {"range": "A!A1:F", "majorDimension": "ROWS"},
+                    {"range": "B!A1:F", "majorDimension": "ROWS"},
+                ],
+                {SheetRange("s", "A!A1:F"): [], SheetRange("s", "B!A1:F"): []},
+            ],
+        ],
+    )
+    def test_get_values_of_many_ranges_returns_cell_values_of_ranges(
+        self, range_resp, expected
+    ):
+        api_resp = {"spreadsheetId": "s", "valueRanges": range_resp}
         request = Mock(execute=Mock(return_value=api_resp))
         google_api = Mock(batchGet=Mock(return_value=request))
         api = loader.GoogleSheetsApiAdapter(google_api)
 
-        ranges = [loader.SheetRange("s", "A!A1:F"), loader.SheetRange("s", "B!A1:F")]
+        ranges = [SheetRange("s", "A!A1:F"), SheetRange("s", "B!A1:F")]
         result = api.get_values_of_ranges(ranges)
 
-        assert result == {ranges[0]: [["v1"]], ranges[1]: [["v2"]]}
-
-    def test_get_values_of_empty_ranges_returns_empty_list(self):
-        api_resp = {
-            "spreadsheetId": "s",
-            "valueRanges": [
-                {"range": "A!A1:F", "majorDimension": "ROWS"},
-                {"range": "B!A1:F", "majorDimension": "ROWS"},
-            ],
-        }
-        request = Mock(execute=Mock(return_value=api_resp))
-        google_api = Mock(batchGet=Mock(return_value=request))
-        api = loader.GoogleSheetsApiAdapter(google_api)
-
-        ranges = [loader.SheetRange("s", "A!A1:F"), loader.SheetRange("s", "B!A1:F")]
-        result = api.get_values_of_ranges(ranges)
-
-        assert result == {ranges[0]: [], ranges[1]: []}
+        assert result == expected
 
     def test_update_values_of_many_ranges_makes_correct_api_client_call(self):
         google_api = Mock()
         api = loader.GoogleSheetsApiAdapter(google_api)
 
-        new_values = {loader.SheetRange("s", "A!A1:F"): [["v"]]}
+        new_values = {SheetRange("s", "A!A1:F"): [["v"]]}
         api.update_values_of_ranges(new_values)
 
         expected_body = {
@@ -97,7 +92,7 @@ class TestGoogleSheetsApiAdapter:
         google_api.batchUpdate.assert_called_with(spreadsheetId="s", body=expected_body)
 
 
-class TestOperationResult:
+class TestOpResult:
     def test_get_success_result_message_returns_formatted_message(self):
         result = SuccessOpResult("name", DispatchOperation.CREATE, datetime(2023, 1, 1))
 
@@ -119,84 +114,59 @@ class TestOperationResult:
         )
 
 
-class TestOperationResultStore:
-    def test_report_success_adds_success_result(self):
-        obj = loader.OpResultStore()
-
-        obj.report_success("n", DispatchOperation.CREATE, datetime(2023, 1, 1))
-        result = obj["n"]
-
-        assert result == loader.SuccessOpResult(
-            "n", DispatchOperation.CREATE, datetime(2023, 1, 1)
-        )
-
+class TestOpResultStore:
+    @pytest.mark.parametrize(
+        "result_time,expected",
+        [
+            [datetime(2022, 1, 1), datetime(2022, 1, 1)],
+            [None, datetime(2023, 1, 1, tzinfo=timezone.utc)],
+        ],
+    )
     @freezegun.freeze_time("2023-01-01")
-    def test_report_success_with_no_result_time_uses_current_time_as_result_time(self):
+    def test_report_success_adds_success_result(self, result_time, expected):
         obj = loader.OpResultStore()
 
-        obj.report_success("n", DispatchOperation.CREATE)
-        result = obj["n"].result_time
-
-        assert result == datetime(2023, 1, 1, tzinfo=timezone.utc)
-
-    def test_report_failure_with_no_details_adds_no_details_failure_result(self):
-        obj = loader.OpResultStore()
-
-        obj.report_failure("n", DispatchOperation.CREATE, None, datetime(2023, 1, 1))
+        obj.report_success("n", DispatchOperation.CREATE, result_time)
         result = obj["n"]
 
-        assert isinstance(result, loader.FailureOpResult) and result.details is None
+        assert result == SuccessOpResult("n", DispatchOperation.CREATE, expected)
 
-    def test_report_failure_with_str_details_adds_failure_result_with_str_details(
-        self,
-    ):
-        obj = loader.OpResultStore()
-
-        obj.report_failure("n", DispatchOperation.CREATE, "d", datetime(2023, 1, 1))
-        result = obj["n"]
-
-        assert isinstance(result, loader.FailureOpResult) and result.details == "d"
-
-    def test_report_failure_with_exception_details_adds_failure_result_with_exception_msg_details(
-        self,
-    ):
-        obj = loader.OpResultStore()
-
-        obj.report_failure(
-            "n", DispatchOperation.CREATE, Exception("d"), datetime(2023, 1, 1)
-        )
-        result = obj["n"]
-
-        assert isinstance(result, loader.FailureOpResult) and result.details == "d"
-
-    def test_report_failure_with_invalid_op_adds_failure_result_with_invalid_op_name(
-        self,
-    ):
-        obj = loader.OpResultStore()
-
-        obj.report_failure("n", "a", details="d")
-        result = obj["n"].operation
-
-        assert result == "a"
-
+    @pytest.mark.parametrize(
+        "err_details,result_time,expected_err_details,expected_result_time",
+        [
+            [None, None, None, datetime(2023, 1, 1, tzinfo=timezone.utc)],
+            [None, datetime(2022, 1, 1), None, datetime(2022, 1, 1)],
+            ["d", None, "d", datetime(2023, 1, 1, tzinfo=timezone.utc)],
+            [
+                Exception("e"),
+                None,
+                "e",
+                datetime(2023, 1, 1, tzinfo=timezone.utc),
+            ],
+        ],
+    )
     @freezegun.freeze_time("2023-01-01")
-    def test_report_failure_with_no_result_time_uses_current_time_as_result_time(self):
+    def test_report_failure_adds_failure_result(
+        self, err_details, result_time, expected_err_details, expected_result_time
+    ):
         obj = loader.OpResultStore()
 
-        obj.report_failure("n", DispatchOperation.CREATE, details="d")
-        result = obj["n"].result_time
+        obj.report_failure("n", DispatchOperation.CREATE, err_details, result_time)
+        result = obj["n"]
 
-        assert result == datetime(2023, 1, 1, tzinfo=timezone.utc)
+        assert result == FailureOpResult(
+            "n", DispatchOperation.CREATE, expected_result_time, expected_err_details
+        )
 
 
 class TestCategorySetupStore:
-    def test_get_setup_returns_correct_setup(self):
+    def test_get_setup_returns_setup(self):
         setups = {"1": loader.CategorySetup("meta", "gameplay")}
         obj = loader.CategorySetupStore(setups)
 
         result = obj["1"]
 
-        assert result == loader.CategorySetup("meta", "gameplay")
+        assert result == CategorySetup("meta", "gameplay")
 
     def test_get_setup_of_non_existent_id_raises_exception(self):
         category_setups = loader.CategorySetupStore({})
@@ -204,28 +174,29 @@ class TestCategorySetupStore:
         with pytest.raises(KeyError):
             category_setups["1"]
 
-    def test_load_from_range_cell_values_gets_correct_setups(self):
-        cell_values = [[1, "meta", "gameplay"]]
-
-        obj = loader.CategorySetupStore.load_from_range_cell_values(cell_values)
-
-        assert obj["1"] == loader.CategorySetup("meta", "gameplay")
-
-    def test_load_from_range_cell_values_uses_last_conflicting_setup_id(self):
-        cell_values = [["1", "Meta", "Gameplay"], ["1", "overview", "factbook"]]
-
-        obj = loader.CategorySetupStore.load_from_range_cell_values(cell_values)
-
-        assert obj["1"] == loader.CategorySetup("overview", "factbook")
-
-    def test_load_from_range_cell_values_converts_category_subcategory_names_to_lower_case(
-        self,
+    @pytest.mark.parametrize(
+        "cell_values,expected",
+        [
+            [
+                [[1, "meta", "gameplay"], [2, "meta", "reference"]],
+                {
+                    "1": CategorySetup("meta", "gameplay"),
+                    "2": CategorySetup("meta", "reference"),
+                },
+            ],
+            [[[1, "Meta", "Gameplay"]], {"1": CategorySetup("meta", "gameplay")}],
+            [
+                [["1", "meta", "gameplay"], ["1", "overview", "factbook"]],
+                {"1": CategorySetup("overview", "factbook")},
+            ],
+        ],
+    )
+    def test_load_from_range_cell_values_gets_correct_setups(
+        self, cell_values, expected
     ):
-        cell_values = [[1, "meta", "gameplay"]]
+        result = loader.CategorySetupStore.load_from_range_cell_values(cell_values)
 
-        obj = loader.CategorySetupStore.load_from_range_cell_values(cell_values)
-
-        assert obj["1"] == loader.CategorySetup("meta", "gameplay")
+        assert result == expected
 
 
 class TestOwnerNationData:
@@ -235,7 +206,7 @@ class TestOwnerNationData:
 
         result = obj["1"]
 
-        assert result == loader.OwnerNation("n", [])
+        assert result == OwnerNation("n", [])
 
     def test_get_non_existent_owner_nation_raises_exception(self):
         obj = loader.OwnerNationStore({})
@@ -243,21 +214,16 @@ class TestOwnerNationData:
         with pytest.raises(KeyError):
             obj["1"]
 
-    def test_check_permission_on_allowed_spreadsheet_returns_true(self):
+    @pytest.mark.parametrize("spreadsheet,expected", [["s", True], ["ss", False]])
+    def test_check_spreadsheet_permission_returns_permission(
+        self, spreadsheet, expected
+    ):
         owner_nations = {"1": loader.OwnerNation("n", ["s"])}
         obj = loader.OwnerNationStore(owner_nations)
 
-        result = obj.check_spreadsheet_permission("1", "s")
+        result = obj.check_spreadsheet_permission("1", spreadsheet)
 
-        assert result
-
-    def test_check_permission_on_non_allowed_spreadsheet_returns_false(self):
-        owner_nations = {"1": loader.OwnerNation("n", ["s"])}
-        obj = loader.OwnerNationStore(owner_nations)
-
-        result = obj.check_spreadsheet_permission("1", "s1")
-
-        assert not result
+        assert result == expected
 
     def test_check_permission_of_non_existent_owner_raises_exception(self):
         obj = loader.OwnerNationStore({})
@@ -265,46 +231,57 @@ class TestOwnerNationData:
         with pytest.raises(KeyError):
             obj.check_spreadsheet_permission("1", "s")
 
-    def test_load_from_range_cell_values_gets_correct_owner_nations(self):
-        cell_data = [["1", "n", "s1,s2"]]
-        obj = loader.OwnerNationStore.load_from_range_cell_values(cell_data)
+    @pytest.mark.parametrize(
+        "cell_values,expected",
+        [
+            [
+                [["1", "n1", "s1,s2"], ["2", "n2", "s1"]],
+                {"1": OwnerNation("n1", ["s1", "s2"]), "2": OwnerNation("n2", ["s1"])},
+            ],
+            [
+                [["1", "n1", "s1"], ["1", "n2", "s2"]],
+                {"1": OwnerNation("n2", ["s2"])},
+            ],
+        ],
+    )
+    def test_load_from_range_cell_values_returns_obj_with_owner_nations(
+        self, cell_values, expected
+    ):
+        obj = loader.OwnerNationStore.load_from_range_cell_values(cell_values)
 
-        assert obj["1"] == loader.OwnerNation("n", ["s1", "s2"])
-
-    def test_load_from_range_cell_values_uses_last_conflicting_owner_id(self):
-        cell_data = [["1", "n1", "s1"], ["1", "n2", "s2"]]
-
-        obj = loader.OwnerNationStore.load_from_range_cell_values(cell_data)
-
-        assert obj["1"] == loader.OwnerNation("n2", ["s2"])
-
-
-class TestExtractNameFromHyperlink:
-    def test_valid_hyperlink_returns_name(self):
-        cell_value = (
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","foobar")'
-        )
-
-        assert loader.extract_name_from_hyperlink(cell_value) == "foobar"
-
-    def test_invalid_hyperlink_returns_input(self):
-        cell_value = "foobar"
-
-        assert loader.extract_name_from_hyperlink(cell_value) == "foobar"
+        assert obj == expected
 
 
-class TestExtractDispatchIdFromHyperlink:
-    def test_valid_hyperlink_returns_id_num(self):
-        cell_value = (
-            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","foobar")'
-        )
+@pytest.mark.parametrize(
+    "hyperlink,expected",
+    [
+        [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1234","abc")',
+            "abc",
+        ],
+        ["xyz", "xyz"],
+    ],
+)
+def test_extract_name_from_hyperlink_returns_name(hyperlink, expected):
+    result = loader.extract_name_from_hyperlink(hyperlink)
 
-        assert loader.extract_dispatch_id_from_hyperlink(cell_value) == "1234"
+    assert result == expected
 
-    def test_invalid_hyperlink_returns_none(self):
-        cell_value = "foobar"
 
-        assert loader.extract_dispatch_id_from_hyperlink(cell_value) is None
+@pytest.mark.parametrize(
+    "hyperlink,expected",
+    [
+        [
+            '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","abc")',
+            "1",
+        ],
+        ["xyz", None],
+    ],
+)
+def test_extract_dispatch_id_from_hyperlink_returns_dispatch_id(hyperlink, expected):
+    result = loader.extract_dispatch_id_from_hyperlink(hyperlink)
+
+    assert result == expected
 
 
 class TestUtilityTemplateRow:
@@ -316,7 +293,7 @@ class TestUtilityTemplateRow:
             [["u", "utp"], UtilityTemplateRow("u", "utp")],
         ],
     )
-    def test_create_from_api_row_returns_correct_obj(self, row, expected):
+    def test_create_from_api_row_returns_obj(self, row, expected):
         result = UtilityTemplateRow.from_api_row(row)
 
         assert result == expected
@@ -338,7 +315,7 @@ class TestUtilityTemplateRow:
             ],
         ],
     )
-    def test_get_rows_from_api_returns_correct_objs(self, row, expected):
+    def test_get_rows_from_api_returns_objs(self, row, expected):
         sheets_api = Mock(get_values_of_ranges=Mock(return_value=row))
 
         result = UtilityTemplateRow.get_many_from_api(sheets_api, [])
@@ -366,51 +343,47 @@ class TestUtilityTemplateRow:
         ],
     ],
 )
-def test_parse_utility_template_sheet_rows_returns_correct_utility_templates(
-    rows, expected
-):
+def test_parse_utility_template_sheet_rows_returns_utility_templates(rows, expected):
     result = loader.parse_utility_template_sheet_rows(rows)
 
     assert result == expected
 
 
 class TestDispatchConfig:
-    def test_get_canonical_dispatch_config_id_exists_returns_canonical_config(self):
-        dispatch_data = {
-            "name1": Dispatch(
-                ns_id="12345",
-                owner_nation="testopia",
-                operation=DispatchOperation.EDIT,
-                title="Hello Title",
-                template="Hello World",
-                category="meta",
-                subcategory="gameplay",
-            )
-        }
-        obj = loader.DispatchConfigStore(dispatch_data)
-
-        result = obj.get_canonical_dispatch_config()
-
-        assert result == {
-            "testopia": {
-                "name1": {
+    @pytest.mark.parametrize(
+        "old_dispatch_id,expected",
+        [
+            [
+                None,
+                {
                     "action": "edit",
-                    "ns_id": "12345",
-                    "title": "Hello Title",
+                    "title": "t",
                     "category": "meta",
                     "subcategory": "gameplay",
-                }
-            }
-        }
-
-    def test_get_canonical_dispatch_config_id_not_exist_returns_canonical_config(self):
+                },
+            ],
+            [
+                "1",
+                {
+                    "ns_id": "1",
+                    "action": "edit",
+                    "title": "t",
+                    "category": "meta",
+                    "subcategory": "gameplay",
+                },
+            ],
+        ],
+    )
+    def test_get_canonical_dispatch_config_id_exists_returns_canonical_config(
+        self, old_dispatch_id, expected
+    ):
         dispatch_data = {
-            "name1": Dispatch(
-                ns_id=None,
-                owner_nation="testopia",
-                operation=DispatchOperation.CREATE,
-                title="Hello Title",
-                template="Hello World",
+            "n": Dispatch(
+                ns_id=old_dispatch_id,
+                owner_nation="nat",
+                operation=DispatchOperation.EDIT,
+                title="t",
+                template="tp",
                 category="meta",
                 subcategory="gameplay",
             )
@@ -419,32 +392,23 @@ class TestDispatchConfig:
 
         result = obj.get_canonical_dispatch_config()
 
-        assert result == {
-            "testopia": {
-                "name1": {
-                    "action": "create",
-                    "title": "Hello Title",
-                    "category": "meta",
-                    "subcategory": "gameplay",
-                }
-            }
-        }
+        assert result == {"nat": {"n": expected}}
 
     def test_get_dispatch_template_returns_template_text(self):
         dispatch_data = {
-            "name1": Dispatch(
-                ns_id="12345",
-                owner_nation="testopia",
+            "n": Dispatch(
+                ns_id="1",
+                owner_nation="nat",
                 operation=DispatchOperation.EDIT,
-                title="Hello Title",
-                template="Hello World",
+                title="t",
+                template="tp",
                 category="meta",
                 subcategory="gameplay",
             )
         }
         obj = loader.DispatchConfigStore(dispatch_data)
 
-        assert obj.get_dispatch_template("name1") == "Hello World"
+        assert obj.get_dispatch_template("n") == "tp"
 
     def test_get_non_existent_dispatch_template_raises_exception(self):
         obj = loader.DispatchConfigStore({})
@@ -452,41 +416,25 @@ class TestDispatchConfig:
         with pytest.raises(KeyError):
             obj.get_dispatch_template("something non existent")
 
-    def test_add_dispatch_id_adds_id_into_new_dispatch(self):
+    @pytest.mark.parametrize("old_dispatch_id,expected", [[None, "1"], ["0", "1"]])
+    def test_add_dispatch_id_adds_id_into_dispatch(self, old_dispatch_id, expected):
         dispatch_data = {
-            "name1": Dispatch(
-                ns_id=None,
-                owner_nation="testopia",
+            "n": Dispatch(
+                ns_id=old_dispatch_id,
+                owner_nation="nat",
                 operation=DispatchOperation.CREATE,
-                title="Hello Title",
-                template="Hello World",
+                title="t",
+                template="tp",
                 category="meta",
                 subcategory="gameplay",
             )
         }
         obj = loader.DispatchConfigStore(dispatch_data)
 
-        obj.add_dispatch_id("name1", "54321")
+        obj.add_dispatch_id("n", "1")
+        result = obj["n"].ns_id
 
-        assert obj["name1"].ns_id == "54321"
-
-    def test_add_dispatch_id_overrides_old_id(self):
-        dispatch_data = {
-            "name1": Dispatch(
-                ns_id="12345",
-                owner_nation="testopia",
-                operation=DispatchOperation.EDIT,
-                title="Hello Title",
-                template="Hello World",
-                category="meta",
-                subcategory="gameplay",
-            )
-        }
-        obj = loader.DispatchConfigStore(dispatch_data)
-
-        obj.add_dispatch_id("name1", "54321")
-
-        assert obj["name1"].ns_id == "54321"
+        assert result == expected
 
 
 class TestDispatchRow:
@@ -505,7 +453,7 @@ class TestDispatchRow:
             ],
         ],
     )
-    def test_create_from_api_row_returns_correct_obj(self, row, expected):
+    def test_create_from_api_row_returns_obj(self, row, expected):
         result = DispatchRow.from_api_row(row)
 
         assert result == expected
@@ -544,17 +492,17 @@ class TestDispatchRow:
         assert result == expected
 
 
+@pytest.fixture(scope="module")
+def owner_nations():
+    return loader.OwnerNationStore({"1": loader.OwnerNation("nat", ["s"])})
+
+
+@pytest.fixture(scope="module")
+def category_setups():
+    return loader.CategorySetupStore({"1": loader.CategorySetup("meta", "gameplay")})
+
+
 class TestParseDispatchDataRow:
-    @pytest.fixture(scope="class")
-    def owner_nations(self):
-        return loader.OwnerNationStore({"1": loader.OwnerNation("n", ["s"])})
-
-    @pytest.fixture(scope="class")
-    def category_setups(self):
-        return loader.CategorySetupStore(
-            {"1": loader.CategorySetup("meta", "gameplay")}
-        )
-
     @pytest.mark.parametrize(
         "row,expected",
         [
@@ -571,7 +519,7 @@ class TestParseDispatchDataRow:
                 Dispatch(
                     "1",
                     DispatchOperation.EDIT,
-                    "n",
+                    "nat",
                     "t",
                     "meta",
                     "gameplay",
@@ -581,18 +529,18 @@ class TestParseDispatchDataRow:
             [
                 DispatchRow("n", "create", "1", "1", "t", "tp", ""),
                 Dispatch(
-                    None, DispatchOperation.CREATE, "n", "t", "meta", "gameplay", "tp"
+                    None, DispatchOperation.CREATE, "nat", "t", "meta", "gameplay", "tp"
                 ),
             ],
             [
                 DispatchRow("n", "create", "1", "1", "t", "", ""),
                 Dispatch(
-                    None, DispatchOperation.CREATE, "n", "t", "meta", "gameplay", ""
+                    None, DispatchOperation.CREATE, "nat", "t", "meta", "gameplay", ""
                 ),
             ],
         ],
     )
-    def test_with_valid_row_returns_correct_dispatch_obj(
+    def test_with_valid_row_returns_dispatch_obj(
         self, row, expected, owner_nations, category_setups
     ):
         spreadsheet_id = "s"
@@ -635,13 +583,92 @@ class TestParseDispatchDataRow:
             ],
         ],
     )
-    def test_with_invalid_row_raises_correct_exception(
+    def test_with_invalid_row_raises_exception(
         self, row, spreadsheet_id, expected, owner_nations, category_setups
     ):
         with pytest.raises(expected):
             loader.parse_dispatch_sheet_row(
                 row, spreadsheet_id, owner_nations, category_setups
             )
+
+
+class TestParseDispatchSheetRows:
+    @pytest.mark.parametrize(
+        "rows,expected",
+        [
+            [[], {}],
+            [
+                [
+                    DispatchRow("n1", "create", "1", "1", "t1", "tp1", ""),
+                    DispatchRow("n2", "create", "1", "1", "t2", "tp2", ""),
+                ],
+                {
+                    "n1": Dispatch(
+                        None,
+                        DispatchOperation.CREATE,
+                        "nat",
+                        "t1",
+                        "meta",
+                        "gameplay",
+                        "tp1",
+                    ),
+                    "n2": Dispatch(
+                        None,
+                        DispatchOperation.CREATE,
+                        "nat",
+                        "t2",
+                        "meta",
+                        "gameplay",
+                        "tp2",
+                    ),
+                },
+            ],
+        ],
+    )
+    def test_parse_valid_rows_returns_dispatches(
+        self, rows, expected, owner_nations, category_setups
+    ):
+        result = loader.parse_dispatch_sheet_rows(
+            rows, "s", owner_nations, category_setups, Mock()
+        )
+
+        assert result == expected
+
+    def test_skip_row_logs_message(
+        self, owner_nations, category_setups, caplog: pytest.LogCaptureFixture
+    ):
+        rows = [DispatchRow("n", "", "1", "1", "t", "tp", "")]
+
+        with caplog.at_level(logging.DEBUG):
+            loader.parse_dispatch_sheet_rows(
+                rows, "s", owner_nations, category_setups, Mock()
+            )
+
+    def test_parse_invalid_row_logs_message(
+        self, owner_nations, category_setups, caplog: pytest.LogCaptureFixture
+    ):
+        rows = [DispatchRow("n", "create", "", "", "", "", "")]
+
+        with caplog.at_level(logging.ERROR):
+            loader.parse_dispatch_sheet_rows(
+                rows, "s", owner_nations, category_setups, Mock()
+            )
+
+    @mock.patch(
+        "nsdu.loaders.google_dispatch_loader.parse_dispatch_sheet_row",
+        Mock(side_effect=loader.InvalidDispatchDataError(DispatchOperation.CREATE)),
+    )
+    def test_parse_invalid_row_calls_report_failure_cb(
+        self, owner_nations, category_setups
+    ):
+        rows = [DispatchRow("n", "create", "", "", "", "", "")]
+        report_failure_cb = Mock()
+
+        loader.parse_dispatch_sheet_rows(
+            rows, "s", owner_nations, category_setups, report_failure_cb
+        )
+
+        report_failure_cb.assert_called()
 
 
 class TestGenerateNewDispatchRangeCellValues:
@@ -674,7 +701,7 @@ class TestGenerateNewDispatchRangeCellValues:
             ],
         ],
     )
-    def test_with_successful_ops_returns_correct_new_op_and_hyperlink(
+    def test_with_succeed_ops_returns_updated_row_cell_values(
         self, hyperlink, op, op_enum, expected_hyperlink, expected_op, expected_status
     ):
         old_rows = [DispatchRow(hyperlink, op, "1", "1", "t", "tp", "")]
@@ -721,7 +748,7 @@ class TestGenerateNewDispatchRangeCellValues:
             ],
         ],
     )
-    def test_with_no_op_cases_returns_identical_row(
+    def test_with_no_op_cases_returns_identical_row_cell_values(
         self, hyperlink, dispatch_config, op_results
     ):
         old_rows = [DispatchRow(hyperlink, "create", "1", "1", "t", "tp", "")]
@@ -742,7 +769,7 @@ class TestGenerateNewDispatchRangeCellValues:
             ]
         ]
 
-    def test_with_failed_op_returns_identical_row_with_failed_status(self):
+    def test_with_failed_op_returns_identical_row_cell_values_with_failed_status(self):
         old_rows = [DispatchRow("n", "create", "1", "1", "t", "tp", "")]
         dispatch_config = {
             "n": Dispatch(
@@ -804,9 +831,9 @@ def test_flatten_dispatch_sheet_config_returns_flatten_list(config, expected):
 
 class TestGoogleDispatchLoader:
     @pytest.fixture(scope="class")
-    def prepared_loader(self):
+    def loader_obj(self):
         owner_nations = loader.OwnerNationStore(
-            {"1": OwnerNation("nation1", ["s"]), "2": OwnerNation("nation2", ["s"])}
+            {"1": OwnerNation("nat1", ["s"]), "2": OwnerNation("nat2", ["s"])}
         )
         category_setups = loader.CategorySetupStore(
             {"1": CategorySetup("meta", "gameplay")}
@@ -857,13 +884,13 @@ class TestGoogleDispatchLoader:
             Mock(),
         )
 
-    def test_get_dispatch_config_with_many_dispatches_returns_correct_dict_structure(
-        self, prepared_loader
+    def test_get_dispatch_config_with_many_dispatches_returns_canonical_format(
+        self, loader_obj
     ):
-        result = prepared_loader.get_dispatch_config()
+        result = loader_obj.get_dispatch_config()
 
         assert result == {
-            "nation1": {
+            "nat1": {
                 "n1": {
                     "action": "create",
                     "title": "t1",
@@ -878,7 +905,7 @@ class TestGoogleDispatchLoader:
                     "subcategory": "gameplay",
                 },
             },
-            "nation2": {
+            "nat2": {
                 "n3": {
                     "action": "edit",
                     "ns_id": "3",
@@ -889,17 +916,13 @@ class TestGoogleDispatchLoader:
             },
         }
 
-    def test_get_utility_dispatch_template_returns_correct_template(
-        self, prepared_loader
-    ):
-        result = prepared_loader.get_dispatch_template("u")
+    def test_get_utility_dispatch_template_returns_correct_template(self, loader_obj):
+        result = loader_obj.get_dispatch_template("u")
 
         assert result == "utp"
 
-    def test_get_normal_dispatch_template_returns_correct_template(
-        self, prepared_loader
-    ):
-        result = prepared_loader.get_dispatch_template("n1")
+    def test_get_normal_dispatch_template_returns_correct_template(self, loader_obj):
+        result = loader_obj.get_dispatch_template("n1")
 
         assert result == "tp1"
 

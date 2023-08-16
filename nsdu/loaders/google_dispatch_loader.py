@@ -733,7 +733,6 @@ def parse_dispatch_sheet_rows(
             dispatches[dispatch_name] = dispatch
         except SkipRow:
             logger.debug('Skipped spreadsheet row of dispatch "%s"', dispatch_name)
-            continue
         except InvalidDispatchDataError as err:
             logger.error(
                 'Spreadsheet row of dispatch "%s" is invalid: %s', dispatch_name, err
