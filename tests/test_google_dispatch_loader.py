@@ -14,6 +14,8 @@ from nsdu.loaders.google_dispatch_loader import (
     OwnerNation,
     SheetRange,
     UtilityTemplateRow,
+    InvalidDispatchRowError,
+    SkipRow,
     SuccessOpResult,
     FailureOpResult,
 )
@@ -134,15 +136,15 @@ class TestOpResultStore:
     @pytest.mark.parametrize(
         "err_details,result_time,expected_err_details,expected_result_time",
         [
-            [None, None, None, datetime(2023, 1, 1, tzinfo=timezone.utc)],
-            [None, datetime(2022, 1, 1), None, datetime(2022, 1, 1)],
-            ["d", None, "d", datetime(2023, 1, 1, tzinfo=timezone.utc)],
             [
                 Exception("e"),
-                None,
+                datetime(2023, 1, 1),
                 "e",
-                datetime(2023, 1, 1, tzinfo=timezone.utc),
+                datetime(2023, 1, 1),
             ],
+            ["d", datetime(2023, 1, 1), "d", datetime(2023, 1, 1)],
+            [None, datetime(2022, 1, 1), None, datetime(2022, 1, 1)],
+            [None, None, None, datetime(2023, 1, 1, tzinfo=timezone.utc)],
         ],
     )
     @freezegun.freeze_time("2023-01-01")
@@ -186,21 +188,24 @@ class TestCategorySetupStore:
             ],
             [[[1, "Meta", "Gameplay"]], {"1": CategorySetup("meta", "gameplay")}],
             [
-                [["1", "meta", "gameplay"], ["1", "overview", "factbook"]],
+                [[1, "meta", "gameplay"], [1, "overview", "factbook"]],
                 {"1": CategorySetup("overview", "factbook")},
             ],
+            [
+                [[1, "", ""], [2, "meta", "reference"]],
+                {"2": CategorySetup("meta", "reference")},
+            ],
+            [[], {}],
         ],
     )
-    def test_load_from_range_cell_values_gets_correct_setups(
-        self, cell_values, expected
-    ):
+    def test_load_from_range_cell_values_returns_obj(self, cell_values, expected):
         result = loader.CategorySetupStore.load_from_range_cell_values(cell_values)
 
         assert result == expected
 
 
 class TestOwnerNationData:
-    def test_get_owner_nation_returns_correct_nation(self):
+    def test_get_owner_nation_returns_nation(self):
         owner_nations = {"1": loader.OwnerNation("n", [])}
         obj = loader.OwnerNationStore(owner_nations)
 
@@ -242,11 +247,12 @@ class TestOwnerNationData:
                 [["1", "n1", "s1"], ["1", "n2", "s2"]],
                 {"1": OwnerNation("n2", ["s2"])},
             ],
+            [[["1", "n", ""]], {"1": OwnerNation("n", [])}],
+            [[["1", "", ""], ["2", "n2", "s1"]], {"2": OwnerNation("n2", ["s1"])}],
+            [[], {}],
         ],
     )
-    def test_load_from_range_cell_values_returns_obj_with_owner_nations(
-        self, cell_values, expected
-    ):
+    def test_load_from_range_cell_values_returns_obj(self, cell_values, expected):
         obj = loader.OwnerNationStore.load_from_range_cell_values(cell_values)
 
         assert obj == expected
@@ -260,6 +266,7 @@ class TestOwnerNationData:
             "abc",
         ],
         ["xyz", "xyz"],
+        ["", ""],
     ],
 )
 def test_extract_name_from_hyperlink_returns_name(hyperlink, expected):
@@ -276,6 +283,7 @@ def test_extract_name_from_hyperlink_returns_name(hyperlink, expected):
             "1",
         ],
         ["xyz", None],
+        ["", None],
     ],
 )
 def test_extract_dispatch_id_from_hyperlink_returns_dispatch_id(hyperlink, expected):
@@ -288,9 +296,9 @@ class TestUtilityTemplateRow:
     @pytest.mark.parametrize(
         "row,expected",
         [
-            [[], UtilityTemplateRow("", "")],
-            [["u"], UtilityTemplateRow("u", "")],
             [["u", "utp"], UtilityTemplateRow("u", "utp")],
+            [["u"], UtilityTemplateRow("u", "")],
+            [[], UtilityTemplateRow("", "")],
         ],
     )
     def test_create_from_api_row_returns_obj(self, row, expected):
@@ -301,7 +309,6 @@ class TestUtilityTemplateRow:
     @pytest.mark.parametrize(
         "row,expected",
         [
-            [{}, []],
             [
                 {
                     SheetRange("s", "a"): [["u1", "utp1"], ["u2", "utp2"]],
@@ -313,6 +320,7 @@ class TestUtilityTemplateRow:
                     UtilityTemplateRow("u3", "utp3"),
                 ],
             ],
+            [{}, []],
         ],
     )
     def test_get_rows_from_api_returns_objs(self, row, expected):
@@ -326,7 +334,6 @@ class TestUtilityTemplateRow:
 @pytest.mark.parametrize(
     "rows,expected",
     [
-        [[], {}],
         [
             [
                 UtilityTemplateRow("u1", "utp1"),
@@ -341,6 +348,7 @@ class TestUtilityTemplateRow:
             ],
             {"u1": "utp2"},
         ],
+        [[], {}],
     ],
 )
 def test_parse_utility_template_sheet_rows_returns_utility_templates(rows, expected):
@@ -349,108 +357,20 @@ def test_parse_utility_template_sheet_rows_returns_utility_templates(rows, expec
     assert result == expected
 
 
-class TestDispatchConfig:
-    @pytest.mark.parametrize(
-        "old_dispatch_id,expected",
-        [
-            [
-                None,
-                {
-                    "action": "edit",
-                    "title": "t",
-                    "category": "meta",
-                    "subcategory": "gameplay",
-                },
-            ],
-            [
-                "1",
-                {
-                    "ns_id": "1",
-                    "action": "edit",
-                    "title": "t",
-                    "category": "meta",
-                    "subcategory": "gameplay",
-                },
-            ],
-        ],
-    )
-    def test_get_canonical_dispatch_config_id_exists_returns_canonical_config(
-        self, old_dispatch_id, expected
-    ):
-        dispatch_data = {
-            "n": Dispatch(
-                ns_id=old_dispatch_id,
-                owner_nation="nat",
-                operation=DispatchOperation.EDIT,
-                title="t",
-                template="tp",
-                category="meta",
-                subcategory="gameplay",
-            )
-        }
-        obj = loader.DispatchConfigStore(dispatch_data)
-
-        result = obj.get_canonical_dispatch_config()
-
-        assert result == {"nat": {"n": expected}}
-
-    def test_get_dispatch_template_returns_template_text(self):
-        dispatch_data = {
-            "n": Dispatch(
-                ns_id="1",
-                owner_nation="nat",
-                operation=DispatchOperation.EDIT,
-                title="t",
-                template="tp",
-                category="meta",
-                subcategory="gameplay",
-            )
-        }
-        obj = loader.DispatchConfigStore(dispatch_data)
-
-        assert obj.get_dispatch_template("n") == "tp"
-
-    def test_get_non_existent_dispatch_template_raises_exception(self):
-        obj = loader.DispatchConfigStore({})
-
-        with pytest.raises(KeyError):
-            obj.get_dispatch_template("something non existent")
-
-    @pytest.mark.parametrize("old_dispatch_id,expected", [[None, "1"], ["0", "1"]])
-    def test_add_dispatch_id_adds_id_into_dispatch(self, old_dispatch_id, expected):
-        dispatch_data = {
-            "n": Dispatch(
-                ns_id=old_dispatch_id,
-                owner_nation="nat",
-                operation=DispatchOperation.CREATE,
-                title="t",
-                template="tp",
-                category="meta",
-                subcategory="gameplay",
-            )
-        }
-        obj = loader.DispatchConfigStore(dispatch_data)
-
-        obj.add_dispatch_id("n", "1")
-        result = obj["n"].ns_id
-
-        assert result == expected
-
-
 class TestDispatchRow:
     @pytest.mark.parametrize(
         "row,expected",
         [
-            [[], DispatchRow("", "", "", "", "", "", "")],
-            [["n"], DispatchRow("n", "", "", "", "", "", "")],
-            [
-                ["n", "create", "1", "1", "t", "tp"],
-                DispatchRow("n", "create", "1", "1", "t", "tp", ""),
-            ],
             [
                 ["n", "edit", "1", "1", "t", "tp", "stat"],
                 DispatchRow("n", "edit", "1", "1", "t", "tp", "stat"),
             ],
+            [
+                ["n", "create", "1", "1", "t", "tp"],
+                DispatchRow("n", "create", "1", "1", "t", "tp", ""),
+            ],
+            [["n"], DispatchRow("n", "", "", "", "", "", "")],
+            [[], DispatchRow("", "", "", "", "", "", "")],
         ],
     )
     def test_create_from_api_row_returns_obj(self, row, expected):
@@ -461,7 +381,6 @@ class TestDispatchRow:
     @pytest.mark.parametrize(
         "row,expected",
         [
-            [{}, {}],
             [
                 {
                     SheetRange("s", "a"): [
@@ -482,6 +401,11 @@ class TestDispatchRow:
                     ],
                 },
             ],
+            [
+                {SheetRange("s", "a"): []},
+                {SheetRange("s", "a"): []},
+            ],
+            [{}, {}],
         ],
     )
     def test_get_rows_from_api_returns_many_objs(self, row, expected):
@@ -554,32 +478,32 @@ class TestParseDispatchDataRow:
     @pytest.mark.parametrize(
         "row,spreadsheet_id,expected",
         [
-            [DispatchRow("", "create", "1", "1", "t", "tp", ""), "s", loader.SkipRow],
-            [DispatchRow("n", "", "1", "1", "t", "tp", ""), "s", loader.SkipRow],
+            [DispatchRow("", "create", "1", "1", "t", "tp", ""), "s", SkipRow],
+            [DispatchRow("n", "", "1", "1", "t", "tp", ""), "s", SkipRow],
             [
                 DispatchRow("n", "a", "1", "1", "t", "tp", ""),
                 "s",
-                loader.InvalidDispatchDataError,
+                InvalidDispatchRowError,
             ],
             [
                 DispatchRow("n", "create", "1", "1", "", "tp", ""),
                 "s",
-                loader.InvalidDispatchDataError,
+                InvalidDispatchRowError,
             ],
             [
-                DispatchRow("n", "create", "0", "1", "t", "tp", ""),
+                DispatchRow("n", "create", "invalid", "1", "t", "tp", ""),
                 "s",
-                loader.InvalidDispatchDataError,
+                InvalidDispatchRowError,
             ],
             [
-                DispatchRow("n", "create", "1", "0", "t", "tp", ""),
+                DispatchRow("n", "create", "1", "invalid", "t", "tp", ""),
                 "s",
-                loader.InvalidDispatchDataError,
+                InvalidDispatchRowError,
             ],
             [
-                DispatchRow("n", "create", "1", "0", "t", "tp", ""),
+                DispatchRow("n", "create", "1", "invalid", "t", "tp", ""),
                 "s2",
-                loader.InvalidDispatchDataError,
+                InvalidDispatchRowError,
             ],
         ],
     )
@@ -596,7 +520,6 @@ class TestParseDispatchSheetRows:
     @pytest.mark.parametrize(
         "rows,expected",
         [
-            [[], {}],
             [
                 [
                     DispatchRow("n1", "create", "1", "1", "t1", "tp1", ""),
@@ -623,9 +546,44 @@ class TestParseDispatchSheetRows:
                     ),
                 },
             ],
+            [
+                [
+                    DispatchRow("n1", "create", "1", "1", "t1", "tp1", ""),
+                    DispatchRow("", "", "", "", "", "", ""),
+                ],
+                {
+                    "n1": Dispatch(
+                        None,
+                        DispatchOperation.CREATE,
+                        "nat",
+                        "t1",
+                        "meta",
+                        "gameplay",
+                        "tp1",
+                    ),
+                },
+            ],
+            [
+                [
+                    DispatchRow("n1", "create", "1", "1", "t1", "tp1", ""),
+                    DispatchRow("n2", "create", "", "", "", "", ""),
+                ],
+                {
+                    "n1": Dispatch(
+                        None,
+                        DispatchOperation.CREATE,
+                        "nat",
+                        "t1",
+                        "meta",
+                        "gameplay",
+                        "tp1",
+                    ),
+                },
+            ],
+            [[], {}],
         ],
     )
-    def test_parse_valid_rows_returns_dispatches(
+    def test_with_rows_returns_dispatches(
         self, rows, expected, owner_nations, category_setups
     ):
         result = loader.parse_dispatch_sheet_rows(
@@ -644,7 +602,7 @@ class TestParseDispatchSheetRows:
                 rows, "s", owner_nations, category_setups, Mock()
             )
 
-    def test_parse_invalid_row_logs_message(
+    def test_with_invalid_row_logs_message(
         self, owner_nations, category_setups, caplog: pytest.LogCaptureFixture
     ):
         rows = [DispatchRow("n", "create", "", "", "", "", "")]
@@ -654,11 +612,7 @@ class TestParseDispatchSheetRows:
                 rows, "s", owner_nations, category_setups, Mock()
             )
 
-    @mock.patch(
-        "nsdu.loaders.google_dispatch_loader.parse_dispatch_sheet_row",
-        Mock(side_effect=loader.InvalidDispatchDataError(DispatchOperation.CREATE)),
-    )
-    def test_parse_invalid_row_calls_report_failure_cb(
+    def test_with_invalid_row_calls_report_failure_cb(
         self, owner_nations, category_setups
     ):
         rows = [DispatchRow("n", "create", "", "", "", "", "")]
@@ -666,6 +620,104 @@ class TestParseDispatchSheetRows:
 
         loader.parse_dispatch_sheet_rows(
             rows, "s", owner_nations, category_setups, report_failure_cb
+        )
+
+        report_failure_cb.assert_called()
+
+
+class TestParseDispatchSheetRanges:
+    @pytest.mark.parametrize(
+        "sheet_ranges,expected",
+        [
+            [
+                {
+                    SheetRange("s", "A!A1:F"): [
+                        DispatchRow("n1", "create", "1", "1", "t1", "tp1", ""),
+                        DispatchRow("n2", "create", "1", "1", "t2", "tp2", ""),
+                    ],
+                    SheetRange("s", "B!A1:F"): [
+                        DispatchRow("n3", "create", "1", "1", "t3", "tp3", ""),
+                    ],
+                },
+                {
+                    "n1": Dispatch(
+                        None,
+                        DispatchOperation.CREATE,
+                        "nat",
+                        "t1",
+                        "meta",
+                        "gameplay",
+                        "tp1",
+                    ),
+                    "n2": Dispatch(
+                        None,
+                        DispatchOperation.CREATE,
+                        "nat",
+                        "t2",
+                        "meta",
+                        "gameplay",
+                        "tp2",
+                    ),
+                    "n3": Dispatch(
+                        None,
+                        DispatchOperation.CREATE,
+                        "nat",
+                        "t3",
+                        "meta",
+                        "gameplay",
+                        "tp3",
+                    ),
+                },
+            ],
+            [
+                {
+                    SheetRange("s", "A!A1:F"): [
+                        DispatchRow("n1", "create", "1", "1", "t1", "tp1", ""),
+                    ],
+                    SheetRange("s", "B!A1:F"): [
+                        DispatchRow("n2", "create", "", "", "", "", ""),
+                    ],
+                },
+                {
+                    "n1": Dispatch(
+                        None,
+                        DispatchOperation.CREATE,
+                        "nat",
+                        "t1",
+                        "meta",
+                        "gameplay",
+                        "tp1",
+                    ),
+                },
+            ],
+            [
+                {
+                    SheetRange("s", "A!A1:F"): [],
+                },
+                {},
+            ],
+            [{}, {}],
+        ],
+    )
+    def test_with_valid_rows_returns_dispatches(
+        self, sheet_ranges, expected, owner_nations, category_setups
+    ):
+        result = loader.parse_dispatch_sheet_ranges(
+            sheet_ranges, owner_nations, category_setups, Mock()
+        )
+
+        assert result == expected
+
+    def test_with_invalid_rows_reports_failure_cb(self, owner_nations, category_setups):
+        sheet_ranges = {
+            SheetRange("s", "A!A1:F"): [
+                DispatchRow("n", "create", "", "", "t", "tp", ""),
+            ],
+        }
+        report_failure_cb = Mock()
+
+        loader.parse_dispatch_sheet_ranges(
+            sheet_ranges, owner_nations, category_setups, report_failure_cb
         )
 
         report_failure_cb.assert_called()
@@ -797,6 +849,112 @@ class TestGenerateNewDispatchRangeCellValues:
                 "Failed to create.\nDetails: d\nTime: 2023/01/01 00:00:00 ",
             ]
         ]
+
+
+class TestDispatchConfigStore:
+    @pytest.mark.parametrize(
+        "dispatch_config,expected",
+        [
+            [
+                {
+                    "n": Dispatch(
+                        ns_id="1",
+                        owner_nation="nat",
+                        operation=DispatchOperation.EDIT,
+                        title="t",
+                        template="tp",
+                        category="meta",
+                        subcategory="gameplay",
+                    )
+                },
+                {
+                    "nat": {
+                        "n": {
+                            "ns_id": "1",
+                            "action": "edit",
+                            "title": "t",
+                            "category": "meta",
+                            "subcategory": "gameplay",
+                        }
+                    }
+                },
+            ],
+            [
+                {
+                    "n": Dispatch(
+                        ns_id=None,
+                        owner_nation="nat",
+                        operation=DispatchOperation.EDIT,
+                        title="t",
+                        template="tp",
+                        category="meta",
+                        subcategory="gameplay",
+                    )
+                },
+                {
+                    "nat": {
+                        "n": {
+                            "action": "edit",
+                            "title": "t",
+                            "category": "meta",
+                            "subcategory": "gameplay",
+                        }
+                    }
+                },
+            ],
+            [{}, {}],
+        ],
+    )
+    def test_get_canonical_dispatch_config_returns_canonical_config(
+        self, dispatch_config, expected
+    ):
+        obj = loader.DispatchConfigStore(dispatch_config)
+
+        result = obj.get_canonical_dispatch_config()
+
+        assert result == expected
+
+    def test_get_dispatch_template_returns_template_text(self):
+        dispatch_data = {
+            "n": Dispatch(
+                ns_id="1",
+                owner_nation="nat",
+                operation=DispatchOperation.EDIT,
+                title="t",
+                template="tp",
+                category="meta",
+                subcategory="gameplay",
+            )
+        }
+        obj = loader.DispatchConfigStore(dispatch_data)
+
+        assert obj.get_dispatch_template("n") == "tp"
+
+    def test_get_non_existent_dispatch_template_raises_exception(self):
+        obj = loader.DispatchConfigStore({})
+
+        with pytest.raises(KeyError):
+            obj.get_dispatch_template("something non existent")
+
+    @pytest.mark.parametrize("old_dispatch_id,expected", [[None, "1"], ["0", "1"]])
+    def test_add_dispatch_id_adds_id_into_dispatch(self, old_dispatch_id, expected):
+        dispatch_data = {
+            "n": Dispatch(
+                ns_id=old_dispatch_id,
+                owner_nation="nat",
+                operation=DispatchOperation.CREATE,
+                title="t",
+                template="tp",
+                category="meta",
+                subcategory="gameplay",
+            )
+        }
+        obj = loader.DispatchConfigStore(dispatch_data)
+
+        obj.add_dispatch_id("n", "1")
+        result = obj["n"].ns_id
+
+        assert result == expected
 
 
 @pytest.mark.parametrize(

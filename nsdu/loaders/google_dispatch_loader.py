@@ -337,6 +337,10 @@ class CategorySetupStore(UserDict[str, CategorySetup]):
             setup_id = str(row[0])
             category_name = str(row[1]).lower()
             subcategory_name = str(row[2]).lower()
+
+            if not category_name or not subcategory_name:
+                continue
+
             setups[setup_id] = CategorySetup(category_name, subcategory_name)
 
         return cls(setups)
@@ -374,8 +378,16 @@ class OwnerNationStore(UserDict[str, OwnerNation]):
         # If there are similar IDs, the latest one is used
         for row in range_cell_values:
             owner_id = str(row[0])
+
             owner_nation_name = str(row[1])
-            allowed_spreadsheets = str(row[2]).split(",")
+            if not owner_nation_name:
+                continue
+
+            allowed_spreadsheets_cell = str(row[2])
+            if not allowed_spreadsheets_cell:
+                allowed_spreadsheets = []
+            else:
+                allowed_spreadsheets = str(row[2]).split(",")
 
             owner_nations[owner_id] = OwnerNation(
                 owner_nation_name, allowed_spreadsheets
@@ -519,7 +531,7 @@ def create_hyperlink(name: str, dispatch_id: str) -> str:
     return HYPERLINK_FORMAT.format(name=name, dispatch_id=dispatch_id)
 
 
-class InvalidDispatchDataError(GoogleDispatchLoaderError):
+class InvalidDispatchRowError(GoogleDispatchLoaderError):
     """Exception for invalid values on dispatch sheet rows."""
 
     def __init__(self, operation: DispatchOperation | str, *args: object) -> None:
@@ -651,39 +663,37 @@ def parse_dispatch_sheet_row(
     try:
         operation = DispatchOperation[operation_cell_value.upper()]
     except KeyError as err:
-        raise InvalidDispatchDataError(
+        raise InvalidDispatchRowError(
             operation_cell_value, "Invalid operation."
         ) from err
 
     if not row.owner_id:
-        raise InvalidDispatchDataError(operation, "Owner nation cell cannot be empty.")
+        raise InvalidDispatchRowError(operation, "Owner nation cell cannot be empty.")
     try:
         owner_nation = owner_nations[row.owner_id].nation_name
     except KeyError as err:
-        raise InvalidDispatchDataError(
+        raise InvalidDispatchRowError(
             operation, f"Invalid owner nation ID {row.owner_id}"
         ) from err
     if not owner_nations.check_spreadsheet_permission(row.owner_id, spreadsheet_id):
-        raise InvalidDispatchDataError(
+        raise InvalidDispatchRowError(
             operation,
             f"Owner nation {row.owner_id} cannot be used on this spreadsheet.",
         )
 
     if not row.category_setup_id:
-        raise InvalidDispatchDataError(
-            operation, "Category setup cell cannot be empty."
-        )
+        raise InvalidDispatchRowError(operation, "Category setup cell cannot be empty.")
     try:
         category_setup = category_setups[row.category_setup_id]
         category = category_setup.category_name
         subcategory = category_setup.subcategory_name
     except KeyError as err:
-        raise InvalidDispatchDataError(
+        raise InvalidDispatchRowError(
             operation, f"Invalid category setup ID {row.category_setup_id}"
         ) from err
 
     if not row.title:
-        raise InvalidDispatchDataError(operation, "Title column cannot be empty")
+        raise InvalidDispatchRowError(operation, "Title column cannot be empty")
 
     return Dispatch(
         dispatch_id,
@@ -697,7 +707,7 @@ def parse_dispatch_sheet_row(
 
 
 ReportFailureCb = Callable[
-    [str, DispatchOperation | str, InvalidDispatchDataError], None
+    [str, DispatchOperation | str, InvalidDispatchRowError], None
 ]
 
 
@@ -733,7 +743,7 @@ def parse_dispatch_sheet_rows(
             dispatches[dispatch_name] = dispatch
         except SkipRow:
             logger.debug('Skipped spreadsheet row of dispatch "%s"', dispatch_name)
-        except InvalidDispatchDataError as err:
+        except InvalidDispatchRowError as err:
             logger.error(
                 'Spreadsheet row of dispatch "%s" is invalid: %s', dispatch_name, err
             )
@@ -751,7 +761,7 @@ def parse_dispatch_sheet_ranges(
     """Parse dispatch data from many sheet ranges into Dispatch objects.
 
     Args:
-        sheet_ranges (Mapping[SheetRange, DispatchRows]): Cell data of many sheet ranges
+        sheet_ranges (Mapping[SheetRange, DispatchRows]): Cell values of sheet ranges
         owner_nations (OwnerNationStore): Owner nation data
         category_setups (CategorySetupStore): Category setup data
         report_failure (ReportFailureCb): Failure report callback
@@ -865,10 +875,11 @@ def generate_new_dispatch_spreadsheet_values(
 
 
 class DispatchConfigStore(UserDict[str, Dispatch]):
-    """Manage dispatch configs."""
+    """Manage configurations of dispatches
+    (e.g. ID, title, category, template,...)."""
 
     def get_canonical_dispatch_config(self):
-        """Get dispatch configs in NSDU format.
+        """Get dispatch config in NSDU format.
 
         Returns:
             dict: Canonical dispatch config
