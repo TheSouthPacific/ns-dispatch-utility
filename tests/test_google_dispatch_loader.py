@@ -426,7 +426,7 @@ def category_setups():
     return loader.CategorySetupStore({"1": loader.CategorySetup("meta", "gameplay")})
 
 
-class TestParseDispatchDataRow:
+class TestParseDispatchCellValuesOfRow:
     @pytest.mark.parametrize(
         "row,expected",
         [
@@ -469,7 +469,7 @@ class TestParseDispatchDataRow:
     ):
         spreadsheet_id = "s"
 
-        result = loader.parse_dispatch_sheet_row(
+        result = loader.parse_dispatch_cell_values_of_row(
             row, spreadsheet_id, owner_nations, category_setups
         )
 
@@ -511,12 +511,12 @@ class TestParseDispatchDataRow:
         self, row, spreadsheet_id, expected, owner_nations, category_setups
     ):
         with pytest.raises(expected):
-            loader.parse_dispatch_sheet_row(
+            loader.parse_dispatch_cell_values_of_row(
                 row, spreadsheet_id, owner_nations, category_setups
             )
 
 
-class TestParseDispatchSheetRows:
+class TestParseDispatchCellValuesOfRows:
     @pytest.mark.parametrize(
         "rows,expected",
         [
@@ -586,7 +586,7 @@ class TestParseDispatchSheetRows:
     def test_with_rows_returns_dispatches(
         self, rows, expected, owner_nations, category_setups
     ):
-        result = loader.parse_dispatch_sheet_rows(
+        result = loader.parse_dispatch_cell_values_of_rows(
             rows, "s", owner_nations, category_setups, Mock()
         )
 
@@ -598,7 +598,7 @@ class TestParseDispatchSheetRows:
         rows = [DispatchRow("n", "", "1", "1", "t", "tp", "")]
 
         with caplog.at_level(logging.DEBUG):
-            loader.parse_dispatch_sheet_rows(
+            loader.parse_dispatch_cell_values_of_rows(
                 rows, "s", owner_nations, category_setups, Mock()
             )
 
@@ -608,7 +608,7 @@ class TestParseDispatchSheetRows:
         rows = [DispatchRow("n", "create", "", "", "", "", "")]
 
         with caplog.at_level(logging.ERROR):
-            loader.parse_dispatch_sheet_rows(
+            loader.parse_dispatch_cell_values_of_rows(
                 rows, "s", owner_nations, category_setups, Mock()
             )
 
@@ -618,14 +618,14 @@ class TestParseDispatchSheetRows:
         rows = [DispatchRow("n", "create", "", "", "", "", "")]
         report_failure_cb = Mock()
 
-        loader.parse_dispatch_sheet_rows(
+        loader.parse_dispatch_cell_values_of_rows(
             rows, "s", owner_nations, category_setups, report_failure_cb
         )
 
         report_failure_cb.assert_called()
 
 
-class TestParseDispatchSheetRanges:
+class TestParseDispatchCellValuesOfRanges:
     @pytest.mark.parametrize(
         "sheet_ranges,expected",
         [
@@ -702,7 +702,7 @@ class TestParseDispatchSheetRanges:
     def test_with_valid_rows_returns_dispatches(
         self, sheet_ranges, expected, owner_nations, category_setups
     ):
-        result = loader.parse_dispatch_sheet_ranges(
+        result = loader.parse_dispatch_cell_values_of_ranges(
             sheet_ranges, owner_nations, category_setups, Mock()
         )
 
@@ -716,7 +716,7 @@ class TestParseDispatchSheetRanges:
         }
         report_failure_cb = Mock()
 
-        loader.parse_dispatch_sheet_ranges(
+        loader.parse_dispatch_cell_values_of_ranges(
             sheet_ranges, owner_nations, category_setups, report_failure_cb
         )
 
@@ -762,7 +762,7 @@ class TestGenerateNewDispatchRangeCellValues:
         }
         op_results = {"n": SuccessOpResult("n", op_enum, datetime(2023, 1, 1))}
 
-        result = loader.generate_new_dispatch_range_cell_values(
+        result = loader.generate_new_dispatch_cell_values_of_range(
             old_rows, dispatch_config, op_results
         )
 
@@ -805,7 +805,7 @@ class TestGenerateNewDispatchRangeCellValues:
     ):
         old_rows = [DispatchRow(hyperlink, "create", "1", "1", "t", "tp", "")]
 
-        result = loader.generate_new_dispatch_range_cell_values(
+        result = loader.generate_new_dispatch_cell_values_of_range(
             old_rows, dispatch_config, op_results
         )
 
@@ -834,7 +834,7 @@ class TestGenerateNewDispatchRangeCellValues:
             )
         }
 
-        result = loader.generate_new_dispatch_range_cell_values(
+        result = loader.generate_new_dispatch_cell_values_of_range(
             old_rows, dispatch_config, op_results
         )
 
@@ -849,6 +849,70 @@ class TestGenerateNewDispatchRangeCellValues:
                 "Failed to create.\nDetails: d\nTime: 2023/01/01 00:00:00 ",
             ]
         ]
+
+
+@pytest.mark.parametrize(
+    "old_rows,expected_result",
+    [
+        [
+            {
+                SheetRange("s1", "A!A1:F"): [
+                    DispatchRow("n1", "create", "1", "1", "t1", "tp1", "")
+                ],
+                SheetRange("s2", "A!A1:F"): [
+                    DispatchRow("n2", "create", "1", "1", "t2", "tp2", "")
+                ],
+            },
+            {
+                SheetRange("s1", "A!A1:F"): [
+                    [
+                        '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n1")',
+                        "edit",
+                        "1",
+                        "1",
+                        "t1",
+                        "tp1",
+                        "Created successfully.\nTime: 2023/01/01 00:00:00 ",
+                    ]
+                ],
+                SheetRange("s2", "A!A1:F"): [
+                    [
+                        '=hyperlink("https://www.nationstates.net/page=dispatch/id=2","n2")',
+                        "edit",
+                        "1",
+                        "1",
+                        "t2",
+                        "tp2",
+                        "Created successfully.\nTime: 2023/01/01 00:00:00 ",
+                    ]
+                ],
+            },
+        ],
+        [{SheetRange("s1", "A!A1:F"): []}, {SheetRange("s1", "A!A1:F"): []}],
+        [{}, {}],
+    ],
+)
+def test_generate_new_dispatch_cell_values_for_ranges_returns_updated_cell_values(
+    old_rows, expected_result
+):
+    dispatch_config = {
+        "n1": Dispatch(
+            "1", DispatchOperation.CREATE, "nat", "t1", "meta", "gameplay", "tp1"
+        ),
+        "n2": Dispatch(
+            "2", DispatchOperation.CREATE, "nat", "t2", "meta", "gameplay", "tp2"
+        ),
+    }
+    op_results = {
+        "n1": SuccessOpResult("n1", DispatchOperation.CREATE, datetime(2023, 1, 1)),
+        "n2": SuccessOpResult("n2", DispatchOperation.CREATE, datetime(2023, 1, 1)),
+    }
+
+    result = loader.generate_new_dispatch_cell_values_for_ranges(
+        old_rows, dispatch_config, op_results
+    )
+
+    assert result == expected_result
 
 
 class TestDispatchConfigStore:
@@ -905,7 +969,7 @@ class TestDispatchConfigStore:
             [{}, {}],
         ],
     )
-    def test_get_canonical_dispatch_config_returns_canonical_config(
+    def test_get_canonical_dispatch_config_returns_canonical_format(
         self, dispatch_config, expected
     ):
         obj = loader.DispatchConfigStore(dispatch_config)
@@ -1025,7 +1089,7 @@ class TestGoogleDispatchLoader:
             SheetRange("s", "B!A1:F"): range_2_rows,
         }
         dispatches = loader.DispatchConfigStore(
-            loader.parse_dispatch_sheet_ranges(
+            loader.parse_dispatch_cell_values_of_ranges(
                 dispatch_ranges, owner_nations, category_setups, Mock()
             )
         )
@@ -1084,7 +1148,7 @@ class TestGoogleDispatchLoader:
 
         assert result == "tp1"
 
-    def test_update_spreadsheets_after_new_dispatch_created_changes_its_operation_to_edit(
+    def test_update_spreadsheets_after_new_dispatch_created_changes_op_to_edit(
         self,
     ):
         owner_nations = loader.OwnerNationStore({"1": OwnerNation("nation1", ["s"])})
@@ -1097,7 +1161,7 @@ class TestGoogleDispatchLoader:
             SheetRange("s", "A!A1:F"): range_1_rows,
         }
         dispatches = loader.DispatchConfigStore(
-            loader.parse_dispatch_sheet_ranges(
+            loader.parse_dispatch_cell_values_of_ranges(
                 dispatch_ranges, owner_nations, category_setups, Mock()
             )
         )

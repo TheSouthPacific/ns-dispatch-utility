@@ -143,7 +143,7 @@ class GoogleSheetsApiAdapter:
             )
             resp = GoogleSheetsApiAdapter.execute(req)
             logger.debug(
-                'API response for pulling cell values from ranges "%r" of spreadsheet "%s": "%r"',
+                'Pulled cell values from ranges "%r" of spreadsheet "%s": "%r"',
                 range_cell_values,
                 spreadsheet_id,
                 resp,
@@ -199,7 +199,7 @@ class GoogleSheetsApiAdapter:
             req = self._api.batchUpdate(spreadsheetId=spreadsheet_id, body=body)
             resp = GoogleSheetsApiAdapter.execute(req)
             logger.debug(
-                'API response for updating cell values of ranges "%r" from spreadsheet "%s": %r',
+                'Updated cell values of ranges "%r" from spreadsheet "%s": %r',
                 spreadsheet_ranges,
                 spreadsheet_id,
                 resp,
@@ -273,7 +273,8 @@ class OpResultStore(UserDict[str, OpResult]):
         Args:
             dispatch_name (str): Dispatch name
             operation (DispatchOperation): Dispatch operation
-            result_time (datetime | None): Time the result happened. Use current time if None.
+            result_time (datetime | None): Time the result happened.
+            Use current time if None.
         """
 
         if result_time is None:
@@ -296,7 +297,8 @@ class OpResultStore(UserDict[str, OpResult]):
             operation (DispatchOperation | str): Dispatch operation.
             Use a normal string for an invalid operation
             details (str | Exception | None): Error details. Defaults to None.
-            result_time (datetime.datetime) Time the result happened. Use current time if None.
+            result_time (datetime.datetime) Time the result happened.
+            Use current time if None.
         """
 
         if result_time is None:
@@ -600,7 +602,7 @@ class DispatchRow:
             sheet_ranges (Sequence[SheetRange]): Ranges to get
 
         Returns:
-            dict[SheetRange, DispatchRows]: Dispatch row objects keyed by their sheet range
+            dict[SheetRange, DispatchRows]: Dispatch row objects
         """
 
         resp = api.get_values_of_ranges(sheet_ranges)
@@ -630,13 +632,14 @@ class DispatchRow:
 DispatchRows = Sequence[DispatchRow]
 
 
-def parse_dispatch_sheet_row(
+def parse_dispatch_cell_values_of_row(
     row: DispatchRow,
     spreadsheet_id: str,
     owner_nations: OwnerNationStore,
     category_setups: CategorySetupStore,
 ) -> Dispatch:
-    """Parse a dispatch sheet row's data into a Dispatch object.
+    """Parse a dispatch sheet row's cell values
+    and return a Dispatch object.
 
     Args:
         rows (RowData): Dispatch row data
@@ -711,14 +714,14 @@ ReportFailureCb = Callable[
 ]
 
 
-def parse_dispatch_sheet_rows(
+def parse_dispatch_cell_values_of_rows(
     rows: DispatchRows,
     spreadsheet_id: str,
     owner_nations: OwnerNationStore,
     category_setups: CategorySetupStore,
     report_failure: ReportFailureCb,
 ) -> dict[str, Dispatch]:
-    """Parse dispatch sheet rows' data into Dispatch objects.
+    """Parse dispatch sheet rows' cell values and return Dispatch objects.
 
     Args:
         rows (DispatchRows): Dispatch data rows
@@ -737,7 +740,7 @@ def parse_dispatch_sheet_rows(
         dispatch_name = extract_name_from_hyperlink(row.hyperlink)
 
         try:
-            dispatch = parse_dispatch_sheet_row(
+            dispatch = parse_dispatch_cell_values_of_row(
                 row, spreadsheet_id, owner_nations, category_setups
             )
             dispatches[dispatch_name] = dispatch
@@ -752,13 +755,14 @@ def parse_dispatch_sheet_rows(
     return dispatches
 
 
-def parse_dispatch_sheet_ranges(
+def parse_dispatch_cell_values_of_ranges(
     sheet_ranges: Mapping[SheetRange, DispatchRows],
     owner_nations: OwnerNationStore,
     category_setups: CategorySetupStore,
     report_failure: ReportFailureCb,
 ) -> dict[str, Dispatch]:
-    """Parse dispatch data from many sheet ranges into Dispatch objects.
+    """Parse dispatch cell values from many spreadsheet ranges
+    and return Dispatch objects.
 
     Args:
         sheet_ranges (Mapping[SheetRange, DispatchRows]): Cell values of sheet ranges
@@ -772,7 +776,7 @@ def parse_dispatch_sheet_ranges(
 
     dispatches: dict[str, Dispatch] = {}
     for sheet_range, rows in sheet_ranges.items():
-        row_dispatches = parse_dispatch_sheet_rows(
+        row_dispatches = parse_dispatch_cell_values_of_rows(
             rows,
             sheet_range.spreadsheet_id,
             owner_nations,
@@ -783,13 +787,13 @@ def parse_dispatch_sheet_ranges(
     return dispatches
 
 
-def generate_new_dispatch_range_cell_values(
+def generate_new_dispatch_cell_values_of_range(
     old_rows: DispatchRows,
     dispatch_config: Mapping[str, Dispatch],
     op_results: Mapping[str, OpResult],
 ) -> RangeCellValues:
-    """Generate new dispatch data row values for a sheet range
-    with updated dispatch IDs and status messages.
+    """Generate new dispatch cell values for a spreadsheet range
+    with updated values such as dispatch IDs, status messages,...
 
     Args:
         old_rows (DispatchRows): Old cell data of a dispatch sheet range
@@ -849,12 +853,13 @@ def generate_new_dispatch_range_cell_values(
     return new_row_values
 
 
-def generate_new_dispatch_spreadsheet_values(
+def generate_new_dispatch_cell_values_for_ranges(
     old_spreadsheet_cell_values: Mapping[SheetRange, DispatchRows],
     dispatch_config: Mapping[str, Dispatch],
     op_results: Mapping[str, OpResult],
 ) -> MultiRangeCellValues:
-    """Generate new cell values for all dispatch spreadsheet ranges.
+    """Generate new dispatch cell values for many spreadsheet ranges
+    with updated values such as dispatch IDs, status messages,...
 
     Args:
         old_spreadsheet_values (Mapping[SheetRange, DispatchRows]): Old cell values
@@ -867,7 +872,7 @@ def generate_new_dispatch_spreadsheet_values(
 
     new_spreadsheet_cell_values: Mapping[SheetRange, RangeCellValues] = {}
     for sheet_range, cell_values in old_spreadsheet_cell_values.items():
-        new_range_cell_values = generate_new_dispatch_range_cell_values(
+        new_range_cell_values = generate_new_dispatch_cell_values_of_range(
             cell_values, dispatch_config, op_results
         )
         new_spreadsheet_cell_values[sheet_range] = new_range_cell_values
@@ -1021,7 +1026,7 @@ class GoogleDispatchLoader:
     def update_spreadsheets(self) -> None:
         """Update spreadsheets."""
 
-        new_dispatch_values = generate_new_dispatch_spreadsheet_values(
+        new_dispatch_values = generate_new_dispatch_cell_values_for_ranges(
             self.dispatch_rows,
             self.dispatches,
             self.op_result_store,
@@ -1094,7 +1099,7 @@ def init_dispatch_loader(config: Mapping):
         flatten_spreadsheet_config(config["dispatch_spreadsheets"]),
     )
     dispatches = DispatchConfigStore(
-        parse_dispatch_sheet_ranges(
+        parse_dispatch_cell_values_of_ranges(
             dispatch_rows,
             owner_nations,
             category_setups,
