@@ -1,5 +1,5 @@
 [tool.poetry]
-authors = ["watarinishin <watarichanno@gmail.com>"]
+authors = ["USoVietnam <watarichanno@gmail.com>"]
 description = "A tool to format and update NationStates dispatches."
 license = "MIT"
 name = "nsdu"
@@ -16,7 +16,7 @@ google-auth-httplib2 = "^0.1.0"
 google-auth-oauthlib = "^0.4.5"
 nationstates = "^3.0.2"
 pluggy = "^1.0.0"
-python = "^3.9"
+python = "^3.11"
 toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
@@ -26,6 +26,7 @@ freezegun = "^1.2.2"
 pytest = "^7.2.0"
 pytest-cov = "^4.0.0"
 ruff = "^0.0.285"
+pre-commit = "^3.3.3"
 
 [build-system]
 build-backend = "poetry.core.masonry.api"
