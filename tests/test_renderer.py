@@ -1,12 +1,7 @@
-import os
-import shutil
-import logging
 from unittest import mock
 
 import pytest
-import toml
 
-from nsdu import info
 from nsdu import exceptions
 from nsdu import renderer
 

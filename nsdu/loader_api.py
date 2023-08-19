@@ -68,7 +68,7 @@ def get_dispatch_config(loader: object) -> dict[str, dict]:
         dict[str, dict]: Dispatch configuration
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @dispatch_loader_specs(firstresult=True)
@@ -82,7 +82,7 @@ def get_dispatch_template(loader: object, name: str) -> str:
         str: Dispatch content text
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @dispatch_loader_specs(firstresult=True)
@@ -100,7 +100,7 @@ def after_update(
         result_time (datetime): Time of the update
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @dispatch_loader_specs(firstresult=True)
@@ -113,7 +113,7 @@ def add_dispatch_id(loader: object, name: str, dispatch_id: str) -> None:
         dispatch_id (str): Dispatch ID
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @dispatch_loader_specs(firstresult=True)
@@ -125,7 +125,7 @@ def cleanup_dispatch_loader(loader: object) -> None:
         loader: Loader object
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @template_var_loader_specs
@@ -139,7 +139,7 @@ def get_template_vars(config: Mapping[str, dict]) -> dict[str, Any]:
         dict[str, Any]: Placeholder variables
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @simple_bb_loader_specs(firstresult=True)
@@ -153,7 +153,7 @@ def get_simple_bb_config(config: Mapping[str, dict]) -> dict[str, Any]:
         dict[str, dict]: Config for simple BBCode formatters
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @cred_loader_specs(firstresult=True)
@@ -167,7 +167,7 @@ def init_cred_loader(config: Mapping[str, dict]) -> object:
         Loader object
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @cred_loader_specs(firstresult=True)
@@ -181,7 +181,7 @@ def get_creds(loader: object) -> dict[str, str]:
         dict[str, str]: Login credentials
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @cred_loader_specs(firstresult=True)
@@ -194,7 +194,7 @@ def add_cred(loader: object, name: str, x_autologin: str) -> None:
         x_autologin (str): Nation's X-Autologin value.
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @cred_loader_specs(firstresult=True)
@@ -206,7 +206,7 @@ def remove_cred(loader: object, name: str) -> None:
         name (str): Nation's name
     """
 
-    raise NotImplemented
+    raise NotImplementedError
 
 
 @cred_loader_specs(firstresult=True)
@@ -218,4 +218,4 @@ def cleanup_cred_loader(loader: object) -> None:
         loader: Loader object
     """
 
-    raise NotImplemented
+    raise NotImplementedError

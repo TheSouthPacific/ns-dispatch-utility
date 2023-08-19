@@ -85,7 +85,7 @@ class AuthApi:
         try:
             nation.get_shards("ping")
             return True
-        except nationstates.exceptions.Forbidden as err:
+        except nationstates.exceptions.Forbidden:
             return False
 
 

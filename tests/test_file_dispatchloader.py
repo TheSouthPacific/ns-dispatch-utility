@@ -426,7 +426,7 @@ class TestFileDispatchLoaderObj:
     def test_get_dispatch_template_with_non_existing_file(self, tmp_path):
         obj = file_dispatchloader.FileDispatchLoader(mock.Mock(), tmp_path, ".txt")
 
-        assert obj.get_dispatch_template("test2") == None
+        assert obj.get_dispatch_template("test2") is None
 
 
 class TestFileDispatchLoaderIntegration:

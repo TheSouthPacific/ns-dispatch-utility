@@ -38,7 +38,7 @@ class DispatchConfigManager:
                 self.all_dispatch_config[
                     dispatch_config_path
                 ] = utils.get_config_from_toml(dispatch_config_path)
-            except FileNotFoundError as err:
+            except FileNotFoundError:
                 raise exceptions.LoaderConfigError(
                     f"Dispatch config file {dispatch_config_path} not found."
                 )

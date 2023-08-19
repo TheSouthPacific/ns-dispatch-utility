@@ -1,14 +1,9 @@
-import os
-import pathlib
-import shutil
 from unittest import mock
 import json
 
 import pytest
-import toml
 
 from nsdu import exceptions
-from nsdu import info
 from nsdu.loaders import json_credloader
 
 

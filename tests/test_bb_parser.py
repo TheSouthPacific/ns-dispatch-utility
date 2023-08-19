@@ -1,10 +1,6 @@
-import os
-import logging
 import pathlib
-from unittest import mock
 
 import pytest
-import toml
 
 from nsdu import BBCode
 from nsdu import bb_parser
@@ -19,7 +15,7 @@ class TestBBRegistry:
 
         r = bb_parser.BBRegistry().complex_formatters[0]
 
-        assert r["tag_name"] == "test" and r["same_tag_closes"] == True
+        assert r["tag_name"] == "test" and r["same_tag_closes"] is True
         assert r["obj"].a == 1
 
     def test_init_complex_formatters_instances_exist(self):

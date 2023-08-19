@@ -1,6 +1,4 @@
-import os
 import json
-from unittest import mock
 
 import toml
 import pytest

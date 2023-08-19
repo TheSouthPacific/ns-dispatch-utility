@@ -1,7 +1,7 @@
 import pathlib
 import importlib
 from unittest import mock
-from importlib.metadata import EntryPoint, entry_points
+from importlib.metadata import EntryPoint
 
 import pytest
 
@@ -59,7 +59,7 @@ class TestLoadModuleFromEntryPoint:
 
         r = loader.load_module_from_entry_points(entry_points, "zoo")
 
-        assert r == None
+        assert r is None
 
 
 class TestLoadAllModulesFromEntryPoint:

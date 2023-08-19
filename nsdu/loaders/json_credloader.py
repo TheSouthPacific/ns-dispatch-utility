@@ -79,7 +79,7 @@ class JSONCredLoader:
 @loader_api.cred_loader
 def init_cred_loader(config: dict[str, Any]) -> JSONCredLoader:
     config = config.get("json_credloader")
-    if config is None or not "cred_path" in config:
+    if config is None or "cred_path" not in config:
         json_path = info.DATA_DIR / CRED_FILENAME
     else:
         json_path = config["cred_path"]

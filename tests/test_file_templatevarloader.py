@@ -1,7 +1,4 @@
-import os
-
 import pytest
-import toml
 
 from nsdu import exceptions
 from nsdu.loaders import file_templatevarloader

@@ -1,11 +1,6 @@
-import os
-import logging
-import json
 from unittest import mock
 
-import pytest
 
-from nsdu import exceptions
 from nsdu import updater_api
 
 
