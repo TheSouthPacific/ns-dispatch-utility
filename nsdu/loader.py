@@ -2,7 +2,6 @@
 """
 
 from abc import ABC
-from typing import Union
 import importlib.metadata as import_metadata
 from types import ModuleType
 from typing import Any, Mapping, Sequence
@@ -160,7 +159,7 @@ class CredLoaderManager(PersistentLoaderManager):
 
 def load_module_from_entry_points(
     entry_points: Sequence[import_metadata.EntryPoint], name: Sequence[str]
-) -> Union[ModuleType, None]:
+) -> ModuleType | None:
     """Load a module found via package metadata entry points.
 
     Args:
@@ -179,18 +178,18 @@ def load_module_from_entry_points(
 
 def load_all_modules_from_entry_points(
     entry_points: Sequence[import_metadata.EntryPoint], names: Sequence[str]
-) -> list[ModuleType]:
+) -> dict[str, ModuleType]:
     """Load all modules with provided names via package entry points.
 
     Args:
-        entry_points (Sequence[import_metadata.EntryPoint]): Package entry points
+        entry_points (Sequence[EntryPoint]): Package entry points
         names (Sequence[str]): Entry point names
 
     Returns:
-        list[Any]: Loaded Python modules
+        dict[str, ModuleType: Loaded Python modules
     """
 
-    modules = {}
+    modules: dict[str, ModuleType] = {}
     for entry_point in entry_points:
         if entry_point.name in names:
             modules[entry_point.name] = entry_point.load()
@@ -251,7 +250,8 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
             )
         except FileNotFoundError:
             raise exceptions.LoaderNotFound
-        self.loader_manager.load_loader(loader_module)
+        if self.loader_manager is not None:
+            self.loader_manager.load_loader(loader_module)
 
     def load_from_custom_dir(self, name: str) -> None:
         """Load a loader into loader manager from custom loader directory.
@@ -272,7 +272,8 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
             )
         except FileNotFoundError:
             raise exceptions.LoaderNotFound
-        self.loader_manager.load_loader(loader_module)
+        if self.loader_manager is not None:
+            self.loader_manager.load_loader(loader_module)
 
     def load_from_entry_points(self, name: str) -> None:
         """Load a loader into loader manager from package entry points.
@@ -287,7 +288,8 @@ class SingleLoaderManagerBuilder(LoaderManagerBuilder):
         loader_module = load_module_from_entry_points(self.entry_points, name)
         if loader_module is None:
             raise exceptions.LoaderNotFound
-        self.loader_manager.load_loader(loader_module)
+        if self.loader_manager is not None:
+            self.loader_manager.load_loader(loader_module)
 
     def load_loader(self, loader_name: str) -> None:
         """Load one loader into loader manager.
@@ -327,7 +329,8 @@ class MultiLoadersManagerBuilder(LoaderManagerBuilder):
         """
 
         for module in loader_modules.values():
-            self.loader_manager.load_loader(module)
+            if self.loader_manager is not None:
+                self.loader_manager.load_loader(module)
 
     def load_from_default_dir(self, names: Sequence[str]) -> Sequence[str]:
         """Load loaders into loader manager from default loader directory.

@@ -5,10 +5,10 @@ import os
 import shutil
 import inspect
 import logging
-import importlib
+import importlib.util
 from pathlib import Path
 from types import ModuleType
-from typing import Callable, Mapping, Union
+from typing import Any, Mapping
 
 import toml
 
@@ -19,11 +19,12 @@ from nsdu import exceptions
 logger = logging.getLogger(__name__)
 
 
-def get_config_from_toml(config_path: Union[str, Path]) -> dict:
+def get_config_from_toml(config_path: str | Path) -> dict:
     """Get configuration from a TOML file as a dictionary.
 
     Args:
-        config_path (Union[str, Path]): Path to a TOML file. The user symbol will be expanded
+        config_path (Union[str, Path]): Path to a TOML file.
+        The user symbol will be expanded.
 
     Returns:
         dict: Configuration
@@ -54,15 +55,15 @@ def get_config_from_env(config_path: Path) -> dict:
 
 
 def get_config_from_default(
-    config_dir: Path, default_config_path: Path, config_name: Path
+    config_dir: Path | str, default_config_path: Path | str, config_name: Path | str
 ) -> dict:
     """Get configuration from file at default location.
     Create default config file if there is none.
 
     Args:
-        config_dir (Path): Path to the default config directory
-        default_config_path (Path): Path to sample config directory
-        config_name (Path): Name of config file
+        config_dir (Path | str): Path to the default config directory
+        default_config_path (Path | str): Path to sample config directory
+        config_name (Path | str): Name of config file
 
     Raises:
         exceptions.ConfigError: Could not find config file
@@ -71,7 +72,7 @@ def get_config_from_default(
         dict: Configuration
     """
 
-    config_path = config_dir / config_name
+    config_path = Path(config_dir) / Path(config_name)
     try:
         return get_config_from_toml(config_path)
     except FileNotFoundError as err:
@@ -121,25 +122,25 @@ def get_dispatch_info(dispatch_config: Mapping) -> dict:
     return dispatch_info
 
 
-def get_functions_from_module(path: str) -> list[Callable]:
+def get_functions_from_module(path: Path | str) -> list[Any]:
     """Get all functions from a Python module file.
 
     Args:
-        path (str): Path to the module file
+        path (Path | str): Path to the module file
 
     Returns:
-        list[Callable]: Functions
+        list[Any]: Functions
     """
 
-    module = load_module(path)
+    module = load_module(Path(path))
     return inspect.getmembers(module, inspect.isfunction)
 
 
-def load_module(path: Path) -> ModuleType:
+def load_module(path: Path | str) -> ModuleType:
     """Load Python module at the provided path.
 
     Args:
-        path (Path): Path to the module file
+        path (Path | str): Path to the module file
 
     Raises:
         FileNotFoundError: Could not find the module file
@@ -148,10 +149,12 @@ def load_module(path: Path) -> ModuleType:
         ModuleType: Loaded module
     """
 
+    path = Path(path)
     spec = importlib.util.spec_from_file_location(path.name, path.expanduser())
     if spec is not None:
         module = importlib.util.module_from_spec(spec)
-        spec.loader.exec_module(module)
+        if spec.loader:
+            spec.loader.exec_module(module)
         return module
 
     raise FileNotFoundError

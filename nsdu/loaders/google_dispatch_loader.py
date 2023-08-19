@@ -127,37 +127,38 @@ class GoogleSheetsApiAdapter:
             dict[SheetRange, SheetRangeValues]: Cell values
         """
 
-        all_spreadsheets_cell_values: dict[SheetRange, RangeCellValues] = {}
+        spreadsheets_cell_values: dict[SheetRange, RangeCellValues] = {}
 
         spreadsheets = itertools.groupby(
             sheet_ranges, lambda range: range.spreadsheet_id
         )
         for spreadsheet_id, spreadsheet_ranges in spreadsheets:
-            range_cell_values = list(
-                map(lambda cell_range: cell_range.range_value, spreadsheet_ranges)
+            range_values = list(
+                map(lambda sheet_range: sheet_range.range_value, spreadsheet_ranges)
             )
+
             req = self._api.batchGet(
                 spreadsheetId=spreadsheet_id,
-                ranges=range_cell_values,
+                ranges=range_values,
                 valueRenderOption="FORMULA",
             )
             resp = GoogleSheetsApiAdapter.execute(req)
             logger.debug(
                 'Pulled cell values from ranges "%r" of spreadsheet "%s": "%r"',
-                range_cell_values,
+                range_values,
                 spreadsheet_id,
                 resp,
             )
 
-            sheet_cell_values = {
+            cell_values = {
                 SheetRange(spreadsheet_id, valueRange["range"]): valueRange.get(
                     "values", []
                 )
                 for valueRange in resp["valueRanges"]
             }
-            all_spreadsheets_cell_values.update(sheet_cell_values)
+            spreadsheets_cell_values.update(cell_values)
 
-        return all_spreadsheets_cell_values
+        return spreadsheets_cell_values
 
     def get_values_of_range(self, sheet_range: SheetRange) -> RangeCellValues:
         """Get cell values of a spreadsheet range.
