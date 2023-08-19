@@ -7,6 +7,7 @@ import inspect
 import logging
 import importlib.util
 from pathlib import Path
+import sys
 from types import ModuleType
 from typing import Any, Mapping
 
@@ -150,11 +151,14 @@ def load_module(path: Path | str) -> ModuleType:
     """
 
     path = Path(path)
-    spec = importlib.util.spec_from_file_location(path.name, path.expanduser())
+    module_name = path.name
+    spec = importlib.util.spec_from_file_location(module_name, path.expanduser())
     if spec is not None:
+        if not spec.loader:
+            raise exceptions.NSDUError(f"Failed to load loader {module_name}")
         module = importlib.util.module_from_spec(spec)
-        if spec.loader:
-            spec.loader.exec_module(module)
+        sys.modules[module_name] = module
+        spec.loader.exec_module(module)
         return module
 
     raise FileNotFoundError
