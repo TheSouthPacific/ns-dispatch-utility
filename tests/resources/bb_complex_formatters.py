@@ -1,21 +1,25 @@
-from nsdu import BBCode
+from nsdu import BBCode, ComplexFormatter, Config
 
 
-@BBCode.register("complex")
-class Complex:
-    def format(self, tag_name, value, options, parent, context):
-        return "[simple1]{}[/simple1]".format(value)
+@BBCode.register("c1")
+class Complex(ComplexFormatter):
+    def format(
+        self, tag_name: str, value: str, options: Config, parent, context
+    ) -> str:
+        return f"[cr1]{value}[/cr1]"
 
 
-@BBCode.register("complexctx", render_embedded=False)
-class ComplexCtx:
-    def format(self, tag_name, value, options, parent, context):
-        return "[complexctxr={}]{}[/complexctxr]".format(
-            context["example"]["foo"], value
-        )
+@BBCode.register("c2", render_embedded=False)
+class ComplexCtx(ComplexFormatter):
+    def format(
+        self, tag_name: str, value: str, options: Config, parent, context
+    ) -> str:
+        return f'[cr2={context.get("foo", "")}]{value}[/cr2]'
 
 
-@BBCode.register("complexopt")
-class ComplexOpt:
-    def format(self, tag_name, value, options, parent, context):
-        return "[complexoptr={}]{}[/complexoptr]".format(options["opt"], value)
+@BBCode.register("c3")
+class ComplexOpt(ComplexFormatter):
+    def format(
+        self, tag_name: str, value: str, options: Config, parent, context
+    ) -> str:
+        return f'[cr3={options.get("foo", "")}]{value}[/cr3]'

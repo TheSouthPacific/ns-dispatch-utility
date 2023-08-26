@@ -1,6 +1,9 @@
-def filter1(a):
-    return "[{}]".format(a)
+from typing import Any
 
 
-def filter2(c, d):
-    return "{}and{}".format(c, d)
+def filterA(a: Any):
+    return f"fA-{a}"
+
+
+def filterB(a: Any):
+    return f"fB-{a}"

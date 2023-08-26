@@ -1,139 +1,135 @@
-import pathlib
+from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
 
 from nsdu import BBCode
-from nsdu import bb_parser
+from nsdu import bbc_parser
 from nsdu import exceptions
+from nsdu.config import Config
 
 
-class TestBBRegistry:
-    def test_formatter_class_is_registered(self):
-        @BBCode.register("test", same_tag_closes=True)
-        class Test:
-            a = 1
+class TestBBCRegistry:
+    def test_init_complex_formatters_returns_inited_formatters(self):
+        @BBCode.register("a")
+        class FormatterA(bbc_parser.ComplexFormatter):
+            def format(
+                self,
+                tag_name: str,
+                value: str,
+                options: Config,
+                parent,
+                context: Config,
+            ) -> str:
+                return "ar"
 
-        r = bb_parser.BBRegistry().complex_formatters[0]
+        @BBCode.register("b")
+        class FormatterB(bbc_parser.ComplexFormatter):
+            def format(
+                self,
+                tag_name: str,
+                value: str,
+                options: Config,
+                parent,
+                context: Config,
+            ) -> str:
+                return "br"
 
-        assert r["tag_name"] == "test" and r["same_tag_closes"] is True
-        assert r["obj"].a == 1
+        formatters = bbc_parser.BBCRegistry.init_complex_formatters()
+        result1 = formatters[0][0].format("a", "v", {}, Mock, {})
+        result2 = formatters[1][0].format("b", "v", {}, Mock, {})
 
-    def test_init_complex_formatters_instances_exist(self):
-        ins = bb_parser.BBRegistry
+        assert result1 == "ar" and result2 == "br"
 
-        class Formatter1:
+    def test_init_complex_formatters_with_no_format_method_class_raises_exception(self):
+        @BBCode.register("a")
+        class FormatterA:
             pass
 
-        ins.complex_formatters = [
-            {"tag_name": "test1", "obj": Formatter1, "same_tag_closes": True}
-        ]
-
-        r = ins.init_complex_formatters()
-
-        assert r[0]["obj"].__class__ == Formatter1
+        with pytest.raises(bbc_parser.BBCFormatterLoadingError):
+            bbc_parser.BBCRegistry.init_complex_formatters()
 
 
-class TestBuildSimpleParserFromConfig:
-    def test_formatters_loaded(self):
-        config = {
-            "tag1": {"format_string": "[r1]%(value)s[/r1]", "same_tag_closes": True}
-        }
+@pytest.mark.parametrize(
+    "config,result",
+    [
+        [
+            {
+                "t1": {"format_string": "[r1]%(value)s[/r1]"},
+                "t2": {"format_string": "[r2]%(value)s[/r2]", "same_tag_closes": True},
+            },
+            "[r1]a[/r1][r2]b[/r2]",
+        ],
+        [
+            {},
+            "[t1]a[/t1][t2]b",
+        ],
+    ],
+)
+def test_build_simple_parser_from_config(config, result):
+    parser = bbc_parser.build_simple_parser_from_config(config)
+    r = parser.format("[t1]a[/t1][t2]b")
 
-        parser = bb_parser.build_simple_parser_from_config(config)
-        r = parser.format("[tag1]madoka")
-
-        assert r == "[r1]madoka[/r1]"
+    assert r == result
 
 
 class TestBuildComplexParserFromSource:
-    @pytest.fixture
-    def mock_bb_registry(self):
-        @BBCode.register("tag1")
-        class Tag1:
-            def format(self, tag_name, value, options, parent, context):
-                return "[r1]{}[/r1]".format(value)
-
-        @BBCode.register("tag2")
-        class Tag2:
-            def format(self, tag_name, value, options, parent, context):
-                return "[r2]{}[/r2]".format(value)
-
-    def test_source_file_not_exists_raises_exception(self):
+    def test_source_file_not_exist_raises_exception(self):
         with pytest.raises(exceptions.ConfigError):
-            bb_parser.build_complex_parser_from_source(pathlib.Path("non_existent.py"))
+            bbc_parser.build_complex_parser_from_source(Path(""))
 
-    def test_source_file_exists_formatters_loaded(self, mock_bb_registry):
-        parser = bb_parser.build_complex_parser_from_source(
-            pathlib.Path("tests/test_bb_parser.py")
+    def test_source_file_exists_returns_loaded_parser(self):
+        obj = bbc_parser.build_complex_parser_from_source(
+            "tests/resources/bb_complex_formatters.py"
         )
-        r = parser.format("[tag1]sayaka[/tag1]")
 
-        assert r == "[r1]sayaka[/r1]"
+        r = obj.format("[c1]a[/c1][c2]B[/c2]")
+
+        assert r == "[cr1]a[/cr1][cr2=]B[/cr2]"
 
 
-class TestIntegrationBBParser:
-    def test_simple_and_complex_formatters_returns_formatted_text(self):
+class TestBBCParser:
+    def test_format_with_both_formatter_types_returns_formatted_text(self):
         simple_formatter_config = {
-            "simple1": {"format_string": "[simple1r]%(value)s[/simple1r]"},
-            "simple2": {"format_string": "[simple2r]%(value)s[/simple2r]"},
-            "simple3": {
-                "format_string": "[simple3r]%(value)s[/simple3r]",
-                "render_embedded": False,
-            },
+            "s1": {"format_string": "[sr1]%(value)s[/sr1]"},
+            "s2": {"format_string": "[sr2]%(value)s[/sr2]"},
         }
         complex_formatter_source_path = "tests/resources/bb_complex_formatters.py"
-        ins = bb_parser.BBParser(simple_formatter_config, complex_formatter_source_path)
-        text = (
-            "[simple1]Simple[/simple1][simple2]Simple [simple3]nested[/simple3][/simple2]"
-            "[complex]Complex[/complex][complexctx][complex]Complex context[/complex][/complexctx]"
-            "[complexopt opt=test]option[/complexopt]"
+        obj = bbc_parser.BBCParser(
+            simple_formatter_config, complex_formatter_source_path
         )
 
-        r = ins.format(text, example={"foo": "bar"})
+        text = "[s1]a[/s1][s2]b[/s2][c1]complex[/c1][c2]context[/c2][c3]options[/c3]"
+        result = obj.format(text, foo="bar")
 
-        assert r == (
-            "[simple1r]Simple[/simple1r][simple2r]Simple [simple3r]nested[/simple3r][/simple2r]"
-            "[simple1r]Complex[/simple1r][complexctxr=bar][complex]Complex context[/complex][/complexctxr]"
-            "[complexoptr=test]option[/complexoptr]"
+        assert result == (
+            "[sr1]a[/sr1][sr2]b[/sr2]"
+            "[cr1]complex[/cr1][cr2=bar]context[/cr2][cr3=]options[/cr3]"
         )
 
-    def test_simple_formatters_and_no_complex_formatters_returns_formatted_text(self):
+    def test_format_with_only_simple_formatters_returns_formatted_text(self):
         simple_formatter_config = {
-            "simple1": {"format_string": "[simple1r]%(value)s[/simple1r]"},
-            "simple2": {"format_string": "[simple2r]%(value)s[/simple2r]"},
-            "simple3": {
-                "format_string": "[simple3r]%(value)s[/simple3r]",
-                "render_embedded": False,
-            },
+            "s1": {"format_string": "[sr1]%(value)s[/sr1]"},
+            "s2": {"format_string": "[sr2]%(value)s[/sr2]"},
         }
-        ins = bb_parser.BBParser(simple_formatter_config, None)
-        text = (
-            "[simple1]Simple[/simple1][simple2]Simple [simple3]nested[/simple3][/simple2]"
-            "[complex]Complex[/complex][complexctx][complex]Complex context[/complex][/complexctx]"
-            "[complexopt opt=test]option[/complexopt]"
+        complex_formatter_source_path = None
+        obj = bbc_parser.BBCParser(
+            simple_formatter_config, complex_formatter_source_path
         )
 
-        r = ins.format(text, example={"foo": "bar"})
+        text = "[s1]a[/s1][s2]b[/s2]"
+        result = obj.format(text)
 
-        assert r == (
-            "[simple1r]Simple[/simple1r][simple2r]Simple [simple3r]nested[/simple3r][/simple2r]"
-            "[complex]Complex[/complex][complexctx][complex]Complex context[/complex][/complexctx]"
-            "[complexopt opt=test]option[/complexopt]"
-        )
+        assert result == "[sr1]a[/sr1][sr2]b[/sr2]"
 
-    def test_complex_formatters_and_no_simple_formatters_returns_formatted_text(self):
+    def test_format_with_only_complex_formatters_returns_formatted_text(self):
+        simple_formatter_config = None
         complex_formatter_source_path = "tests/resources/bb_complex_formatters.py"
-        ins = bb_parser.BBParser(None, complex_formatter_source_path)
-        text = (
-            "[simple1]Simple[/simple1][simple2]Simple [simple3]nested[/simple3][/simple2]"
-            "[complex]Complex[/complex][complexctx][complex]Complex context[/complex][/complexctx]"
-            "[complexopt opt=test]option[/complexopt]"
+        obj = bbc_parser.BBCParser(
+            simple_formatter_config, complex_formatter_source_path
         )
 
-        r = ins.format(text, example={"foo": "bar"})
+        text = "[c1]complex[/c1][c2]context[/c2][c3]options[/c3]"
+        result = obj.format(text, foo="bar")
 
-        assert r == (
-            "[simple1]Simple[/simple1][simple2]Simple [simple3]nested[/simple3][/simple2]"
-            "[simple1]Complex[/simple1][complexctxr=bar][complex]Complex context[/complex][/complexctxr]"
-            "[complexoptr=test]option[/complexoptr]"
-        )
+        assert result == ("[cr1]complex[/cr1][cr2=bar]context[/cr2][cr3=]options[/cr3]")

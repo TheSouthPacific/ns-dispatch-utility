@@ -8,7 +8,7 @@ from typing import Any, Callable, Mapping, Sequence
 import jinja2
 
 from nsdu import exceptions
-from nsdu import bb_parser
+from nsdu import bbc_parser
 from nsdu import utils
 
 
@@ -21,7 +21,7 @@ class JinjaTemplateLoader(jinja2.BaseLoader):
     def __init__(self, template_load_func):
         self.template_load_func = template_load_func
 
-    def get_source(self, environment, template):
+    def get_source(self, _, template):
         text = self.template_load_func(template)
 
         return text, template, lambda: True
@@ -34,7 +34,8 @@ class TemplateRenderer:
         """Render a dispatch from its template using Jinja.
 
         Args:
-            template_load_func (Callable[[str], str]): A callable that receives a dispatch name and returns its template
+            template_load_func (Callable[[str], str]): A callable that receives a
+            dispatch name and returns its template
         """
 
         template_loader = JinjaTemplateLoader(template_load_func)
@@ -110,8 +111,10 @@ class DispatchRenderer:
         """Render dispatches from templates and process custom BBCode tags.
 
         Args:
-            template_load_func (Callable[[str], str]): A callable that receives a dispatch name and returns its template
-            simple_formatter_config (Mapping[str, Mapping[str, str]]): Config for simple formatters
+            template_load_func (Callable[[str], str]): A callable that receives
+            a dispatch name and returns its template
+            simple_formatter_config (Mapping[str, Mapping[str, str]]): Config for
+            simple formatters
             complex_formatter_source_path (str): Path to complex formatter source file
             template_filter_paths (Sequence[str]): Paths to filter source files
             template_vars (Mapping[str, Any]): Template variables
@@ -121,12 +124,12 @@ class DispatchRenderer:
         if template_filter_paths is not None:
             load_filters_from_source(self.template_renderer, template_filter_paths)
 
-        self.bb_parser = bb_parser.BBParser(
+        self.bb_parser = bbc_parser.BBCParser(
             simple_formatter_config, complex_formatter_source_path
         )
 
         # Rendering context all dispatches will have
-        self.global_context = template_vars
+        self.global_context = dict(template_vars)
 
     def render(self, name: str) -> str:
         """Render a dispatch.
