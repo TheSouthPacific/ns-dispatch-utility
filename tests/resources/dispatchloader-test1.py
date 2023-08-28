@@ -2,12 +2,12 @@
 """
 
 
-from nsdu import loader_api
+from nsdu import config, loader_api
 
 
 class DispatchLoaderTest1:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, loader_config):
+        self.config = loader_config
         self.dispatch_id = {}
         self.result = ""
 
@@ -33,8 +33,8 @@ class DispatchLoaderTest1:
 
 
 @loader_api.dispatch_loader
-def init_dispatch_loader(config):
-    return DispatchLoaderTest1(config["dispatchloader-test1"])
+def init_dispatch_loader(loader_configs: config.Config):
+    return DispatchLoaderTest1(loader_configs["dispatchloader-test1"])
 
 
 @loader_api.dispatch_loader

@@ -1,15 +1,16 @@
-"""Load dispatch content from plain text files and dispatch configuration from TOML files.
+"""Load dispatch content from plain text files and
+dispatch configuration from TOML files.
 """
 
 import copy
-import pathlib
 import logging
+from pathlib import Path
 from typing import Sequence
+
 import toml
 
-from nsdu import exceptions
-from nsdu import loader_api
-from nsdu import utils
+import nsdu
+from nsdu import config, exceptions, loader_api
 
 DEFAULT_ID_STORE_FILENAME = "dispatch_id.json"
 DEFAULT_EXT = ".txt"
@@ -37,7 +38,7 @@ class DispatchConfigManager:
             try:
                 self.all_dispatch_config[
                     dispatch_config_path
-                ] = utils.get_config_from_toml(dispatch_config_path)
+                ] = nsdu.get_config_from_toml(dispatch_config_path)
             except FileNotFoundError:
                 raise exceptions.LoaderConfigError(
                     f"Dispatch config file {dispatch_config_path} not found."
@@ -49,7 +50,7 @@ class DispatchConfigManager:
         """Get dispatch configuration in NSDU's standard format.
 
         Returns:
-            dict[str, dict]: Canonicalized dispatch configuration
+            dict[str, dict]: Canonical dispatch configuration
         """
 
         canonical_dispatch_config = {}
@@ -58,11 +59,11 @@ class DispatchConfigManager:
             for owner_nation, owner_dispatches in dispatch_config.items():
                 if owner_nation not in canonical_dispatch_config:
                     canonical_dispatch_config[owner_nation] = {}
-                for name, config in owner_dispatches.items():
-                    canonical_config = copy.deepcopy(config)
-                    if "ns_id" not in config and "action" not in config:
+                for name, conf in owner_dispatches.items():
+                    canonical_config = copy.deepcopy(conf)
+                    if "ns_id" not in conf and "action" not in conf:
                         canonical_config["action"] = "create"
-                    elif "action" not in config:
+                    elif "action" not in conf:
                         canonical_config["action"] = "edit"
                     elif canonical_config["action"] == "remove":
                         canonical_config["action"] = "remove"
@@ -91,14 +92,14 @@ class DispatchConfigManager:
 
         for dispatch_config_path, dispatch_config in self.all_dispatch_config.items():
             for owner_nation, owner_dispatches in dispatch_config.items():
-                for name, config in owner_dispatches.items():
-                    if "ns_id" not in config and name in self.new_dispatch_id:
+                for name, conf in owner_dispatches.items():
+                    if "ns_id" not in conf and name in self.new_dispatch_id:
                         self.all_dispatch_config[dispatch_config_path][owner_nation][
                             name
                         ]["ns_id"] = self.new_dispatch_id.pop(name)
 
         for dispatch_config_path, dispatch_config in self.all_dispatch_config.items():
-            with open(pathlib.Path(dispatch_config_path).expanduser(), "w") as f:
+            with open(Path(dispatch_config_path).expanduser(), "w") as f:
                 toml.dump(dispatch_config, f)
 
         self.saved = True
@@ -111,14 +112,14 @@ class FileDispatchLoader:
     def __init__(
         self,
         dispatch_config_manager: DispatchConfigManager,
-        template_path: str,
+        template_path: Path,
         file_ext: str,
     ) -> None:
         """Wrapper to persist state and expose standard operations.
 
         Args:
             dispatch_config_manager (DispatchConfigManager): Dispatch config manager
-            template_path (str): Dispatch template folder path
+            template_path (Path): Dispatch template folder path
             file_ext (str): Dispatch file extension
         """
 
@@ -135,7 +136,7 @@ class FileDispatchLoader:
 
         return self.dispatch_config_manager.get_canonical_dispatch_config()
 
-    def get_dispatch_template(self, name: str) -> str:
+    def get_dispatch_template(self, name: str) -> str | None:
         """Get the template text of a dispatch.
 
         Args:
@@ -145,10 +146,10 @@ class FileDispatchLoader:
             exceptions.LoaderError: Could not find dispatch file
 
         Returns:
-            str: Template text
+            str | None: Template text
         """
 
-        file_path = pathlib.Path(self.template_path, name).with_suffix(self.file_ext)
+        file_path = Path(self.template_path, name).with_suffix(self.file_ext)
         try:
             return file_path.read_text()
         except FileNotFoundError:
@@ -172,14 +173,14 @@ class FileDispatchLoader:
 
 
 @loader_api.dispatch_loader
-def init_dispatch_loader(config):
+def init_dispatch_loader(loader_configs: config.Config):
     try:
-        config = config["file_dispatchloader"]
+        loader_config = loader_configs["file_dispatch_loader"]
     except KeyError:
         raise exceptions.LoaderConfigError("File dispatch loader does not have config.")
 
     try:
-        dispatch_config_paths = config["dispatch_config_paths"]
+        dispatch_config_paths = loader_config["dispatch_config_paths"]
     except KeyError:
         raise exceptions.LoaderConfigError("There is no dispatch config path!")
 
@@ -187,8 +188,8 @@ def init_dispatch_loader(config):
     dispatch_config_manager.load_from_files(dispatch_config_paths)
 
     try:
-        dispatch_template_path = pathlib.Path(
-            config["dispatch_template_path"]
+        dispatch_template_path = Path(
+            loader_config["dispatch_template_path"]
         ).expanduser()
     except KeyError:
         raise exceptions.LoaderConfigError("There is no dispatch template path!")
@@ -196,7 +197,7 @@ def init_dispatch_loader(config):
     loader = FileDispatchLoader(
         dispatch_config_manager,
         dispatch_template_path,
-        config.get("file_ext", DEFAULT_EXT),
+        loader_config.get("file_ext", DEFAULT_EXT),
     )
 
     return loader

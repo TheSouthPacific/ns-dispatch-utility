@@ -17,7 +17,7 @@ from google.oauth2 import service_account
 from googleapiclient import discovery
 from googleapiclient.http import HttpError
 
-from nsdu import exceptions, loader_api
+from nsdu import config, exceptions, loader_api
 from nsdu.loader_api import Dispatch, DispatchOperation
 
 GOOGLE_API_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -1054,11 +1054,11 @@ def flatten_spreadsheet_config(config: Any) -> Sequence[SheetRange]:
 
 
 @loader_api.dispatch_loader
-def init_dispatch_loader(config: Mapping):
-    config = config["google_dispatch_loader"]
+def init_dispatch_loader(loader_configs: config.Config):
+    loader_config = loader_configs["google_dispatch_loader"]
 
     google_api_creds = service_account.Credentials.from_service_account_file(
-        config["google_cred_path"], scopes=GOOGLE_API_SCOPES
+        loader_config["google_cred_path"], scopes=GOOGLE_API_SCOPES
     )
     # pylint: disable=maybe-no-member
     google_api = (
@@ -1073,16 +1073,16 @@ def init_dispatch_loader(config: Mapping):
 
     owner_nation_rows = sheets_api.get_values_of_range(
         SheetRange(
-            config["owner_nation_sheet"]["spreadsheet_id"],
-            config["owner_nation_sheet"]["range"],
+            loader_config["owner_nation_sheet"]["spreadsheet_id"],
+            loader_config["owner_nation_sheet"]["range"],
         )
     )
     owner_nations = OwnerNationStore.load_from_range_cell_values(owner_nation_rows)
 
     category_setup_rows = sheets_api.get_values_of_range(
         SheetRange(
-            config["category_setup_sheet"]["spreadsheet_id"],
-            config["category_setup_sheet"]["range"],
+            loader_config["category_setup_sheet"]["spreadsheet_id"],
+            loader_config["category_setup_sheet"]["range"],
         )
     )
     category_setups = CategorySetupStore.load_from_range_cell_values(
@@ -1091,13 +1091,13 @@ def init_dispatch_loader(config: Mapping):
 
     utility_template_rows = UtilityTemplateRow.get_many_from_api(
         sheets_api,
-        flatten_spreadsheet_config(config["utility_template_spreadsheets"]),
+        flatten_spreadsheet_config(loader_config["utility_template_spreadsheets"]),
     )
     utility_templates = parse_utility_template_sheet_rows(utility_template_rows)
 
     dispatch_rows = DispatchRow.get_many_from_api(
         sheets_api,
-        flatten_spreadsheet_config(config["dispatch_spreadsheets"]),
+        flatten_spreadsheet_config(loader_config["dispatch_spreadsheets"]),
     )
     dispatches = DispatchConfigStore(
         parse_dispatch_cell_values_of_ranges(

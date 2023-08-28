@@ -22,7 +22,8 @@ def get_category_number(category: str, subcategory: str) -> Tuple[str, str]:
         subcategory (str): Subcategory name or number
 
     Raises:
-        exceptions.DispatchUpdatingError: Could not find (sub)category number from provided name
+        exceptions.DispatchUpdatingError: Could not find (sub)category number
+        from provided name
 
     Returns:
         Tuple[str, str]: Category and subcategory number
@@ -64,10 +65,14 @@ class DispatchUpdater:
 
         Args:
             user_agent (str): User agent for NationStates API calls
-            template_filter_paths (Sequence[str]): List of paths to template filter source files
-            simple_formatter_config (Mapping[str, Mapping[str, str]]): Simple BBCode formatter config
-            complex_formatter_source_path (str): Path to complex BBCode formatter source file
-            template_load_func (Callable[[str], str]): A callable that receives a dispatch name and returns its template
+            template_filter_paths (Sequence[str]): List of paths to template filter
+            source files
+            simple_formatter_config (Mapping[str, Mapping[str, str]]): Simple BBCode
+            formatter config
+            complex_formatter_source_path (str): Path to complex BBCode formatter
+            source file
+            template_load_func (Callable[[str], str]): A callable that receives a
+            dispatch name and returns its template
             template_vars (Mapping[str, Any]): Template variables
         """
 

@@ -4,7 +4,7 @@ from unittest import mock
 import pytest
 
 from nsdu import exceptions
-from nsdu.loaders import file_dispatchloader
+from nsdu.loaders import file_dispatch_loader
 
 
 class TestDispatchConfigManager:
@@ -61,7 +61,7 @@ class TestDispatchConfigManager:
                 "dispatch_config_2.toml": dispatch_config_2,
             }
         )
-        ins = file_dispatchloader.DispatchConfigManager()
+        ins = file_dispatch_loader.DispatchConfigManager()
 
         file_1_path_str = str(dispatch_config_dir / "dispatch_config_1.toml")
         file_2_path_str = str(dispatch_config_dir / "dispatch_config_2.toml")
@@ -84,7 +84,7 @@ class TestDispatchConfigManager:
             }
         }
         file_path = toml_files({"dispatch_config.toml": dispatch_config})
-        ins = file_dispatchloader.DispatchConfigManager()
+        ins = file_dispatch_loader.DispatchConfigManager()
 
         with pytest.raises(exceptions.LoaderConfigError):
             ins.load_from_files([str(file_path), "abcd.toml"])
@@ -144,7 +144,7 @@ class TestDispatchConfigManager:
                 },
             },
         }
-        ins = file_dispatchloader.DispatchConfigManager()
+        ins = file_dispatch_loader.DispatchConfigManager()
         ins.all_dispatch_config = {
             "config1.toml": dispatch_config_1,
             "config2.toml": dispatch_config_2,
@@ -253,7 +253,7 @@ class TestDispatchConfigManager:
                 "dispatch_config_2.toml": dispatch_config_2,
             }
         )
-        ins = file_dispatchloader.DispatchConfigManager()
+        ins = file_dispatch_loader.DispatchConfigManager()
         dispatch_config_file_1_path = dispatch_config_dir / "dispatch_config_1.toml"
         dispatch_config_file_2_path = dispatch_config_dir / "dispatch_config_2.toml"
         ins.load_from_files(
@@ -357,7 +357,7 @@ class TestDispatchConfigManager:
                 "dispatch_config_2.toml": dispatch_config_2,
             }
         )
-        ins = file_dispatchloader.DispatchConfigManager()
+        ins = file_dispatch_loader.DispatchConfigManager()
         dispatch_config_file_1_path = dispatch_config_dir / "dispatch_config_1.toml"
         dispatch_config_file_2_path = dispatch_config_dir / "dispatch_config_2.toml"
         ins.load_from_files(
@@ -419,12 +419,14 @@ class TestFileDispatchLoaderObj:
             {"test1.txt": "Test text 1", "test2.txt": "Test text 2"}
         )
 
-        obj = file_dispatchloader.FileDispatchLoader(mock.Mock(), template_path, ".txt")
+        obj = file_dispatch_loader.FileDispatchLoader(
+            mock.Mock(), template_path, ".txt"
+        )
 
         assert obj.get_dispatch_template("test1") == "Test text 1"
 
     def test_get_dispatch_template_with_non_existing_file(self, tmp_path):
-        obj = file_dispatchloader.FileDispatchLoader(mock.Mock(), tmp_path, ".txt")
+        obj = file_dispatch_loader.FileDispatchLoader(mock.Mock(), tmp_path, ".txt")
 
         assert obj.get_dispatch_template("test2") is None
 
@@ -490,12 +492,12 @@ class TestFileDispatchLoaderIntegration:
             "dispatch_template_path": str(dispatch_files),
         }
 
-        loader = file_dispatchloader.init_dispatch_loader(
-            {"file_dispatchloader": loader_config}
+        loader = file_dispatch_loader.init_dispatch_loader(
+            {"file_dispatch_loader": loader_config}
         )
-        r_dispatch_config = file_dispatchloader.get_dispatch_config(loader)
-        r_dispatch_text = file_dispatchloader.get_dispatch_template(loader, "test1")
-        file_dispatchloader.cleanup_dispatch_loader(loader)
+        r_dispatch_config = file_dispatch_loader.get_dispatch_config(loader)
+        r_dispatch_text = file_dispatch_loader.get_dispatch_template(loader, "test1")
+        file_dispatch_loader.cleanup_dispatch_loader(loader)
 
         assert r_dispatch_config["nation1"]["test4"]["ns_id"] == "98765"
         assert r_dispatch_text == "Test text 1"
@@ -551,17 +553,17 @@ class TestFileDispatchLoaderIntegration:
             "dispatch_template_path": str(dispatch_files),
         }
 
-        loader = file_dispatchloader.init_dispatch_loader(
-            {"file_dispatchloader": loader_config}
+        loader = file_dispatch_loader.init_dispatch_loader(
+            {"file_dispatch_loader": loader_config}
         )
 
-        loader = file_dispatchloader.init_dispatch_loader(
-            {"file_dispatchloader": loader_config}
+        loader = file_dispatch_loader.init_dispatch_loader(
+            {"file_dispatch_loader": loader_config}
         )
-        r_dispatch_config = file_dispatchloader.get_dispatch_config(loader)
-        r_dispatch_text = file_dispatchloader.get_dispatch_template(loader, "test1")
-        file_dispatchloader.add_dispatch_id(loader, "test2", "54321")
-        file_dispatchloader.cleanup_dispatch_loader(loader)
+        r_dispatch_config = file_dispatch_loader.get_dispatch_config(loader)
+        r_dispatch_text = file_dispatch_loader.get_dispatch_template(loader, "test1")
+        file_dispatch_loader.add_dispatch_id(loader, "test2", "54321")
+        file_dispatch_loader.cleanup_dispatch_loader(loader)
 
         assert r_dispatch_config["nation1"]["test4"]["action"] == "remove"
         assert r_dispatch_text == "Test text 1"

@@ -4,10 +4,11 @@
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
-from typing import Any, Mapping
+from typing import Any
 
 import pluggy
 
+from nsdu.config import Config
 from nsdu import info
 
 
@@ -46,11 +47,11 @@ cred_loader = pluggy.HookimplMarker(info.CRED_LOADER_PROJ)
 
 
 @dispatch_loader_specs(firstresult=True)
-def init_dispatch_loader(config: Mapping[str, dict]) -> object:
+def init_dispatch_loader(loader_configs: Config) -> object:
     """Create and return a loader object to persist.
 
     Args:
-        config (Mapping[str, dict]): Loader's configuration
+        loader_configs (Config): Loader's configuration
 
     Return:
         Loader object
@@ -129,11 +130,11 @@ def cleanup_dispatch_loader(loader: object) -> None:
 
 
 @template_var_loader_specs
-def get_template_vars(config: Mapping[str, dict]) -> dict[str, Any]:
+def get_template_vars(loader_configs: Config) -> dict[str, Any]:
     """Get variables for template placeholders.
 
     Args:
-        config (Mapping[str, dict]): Loader's configuration
+        loader_configs (Config): Loader's configuration
 
     Return:
         dict[str, Any]: Placeholder variables
@@ -143,11 +144,11 @@ def get_template_vars(config: Mapping[str, dict]) -> dict[str, Any]:
 
 
 @simple_bb_loader_specs(firstresult=True)
-def get_simple_bb_config(config: Mapping[str, dict]) -> dict[str, Any]:
+def get_simple_bb_config(loader_configs: Config) -> dict[str, Any]:
     """Get configuration for simple BBCode formatters.
 
     Args:
-        config (dict[str, dict]): Loader's configuration
+        loader_configs (Config): Loader's configuration
 
     Return:
         dict[str, dict]: Config for simple BBCode formatters
@@ -157,11 +158,11 @@ def get_simple_bb_config(config: Mapping[str, dict]) -> dict[str, Any]:
 
 
 @cred_loader_specs(firstresult=True)
-def init_cred_loader(config: Mapping[str, dict]) -> object:
+def init_cred_loader(loader_configs: Config) -> object:
     """Create and return a loader object to persist.
 
     Args:
-        config (dict): Loader's configuration
+        loader_configs (Config): Loader's configuration
 
     Return:
         Loader object

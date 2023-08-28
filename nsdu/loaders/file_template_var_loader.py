@@ -5,10 +5,7 @@ import copy
 import logging
 import pathlib
 
-from nsdu import loader_api
-from nsdu import exceptions
-from nsdu import utils
-
+from nsdu import config, exceptions, loader_api
 
 logger = logging.getLogger(__name__)
 
@@ -27,7 +24,7 @@ def load_template_vars_from_files(paths):
 
     for path in paths:
         try:
-            file_vars = utils.get_config_from_toml(pathlib.Path(path))
+            file_vars = config.get_config_from_toml(pathlib.Path(path))
             logger.debug('Loaded var file "%s"', path)
         except FileNotFoundError:
             raise exceptions.LoaderConfigError('Var file "{}" not found'.format(path))
@@ -96,8 +93,8 @@ def add_personnel_info(template_vars, personnel_groups, personnel_info_groups):
 
 
 @loader_api.template_var_loader
-def get_template_vars(config):
-    loader_config = config["file_templatevarloader"]
+def get_template_vars(loader_configs: config.Config):
+    loader_config = loader_configs["file_template_var_loader"]
 
     template_vars = load_template_vars_from_files(loader_config["template_var_paths"])
     add_personnel_info(

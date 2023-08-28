@@ -3,11 +3,9 @@
 
 import json
 import logging
-from typing import Any
+from pathlib import Path
 
-from nsdu import exceptions
-from nsdu import info
-from nsdu import loader_api
+from nsdu import config, exceptions, info, loader_api
 
 
 CRED_FILENAME = "creds.json"
@@ -21,10 +19,10 @@ class JSONCredLoader:
 
     Args:
         config (dict): Configuration
-        json_path (str): Path to JSON file
+        json_path (Path): Path to JSON file
     """
 
-    def __init__(self, json_path: str):
+    def __init__(self, json_path: Path):
         super().__init__()
         self.creds = {}
         self.json_path = json_path
@@ -77,12 +75,12 @@ class JSONCredLoader:
 
 
 @loader_api.cred_loader
-def init_cred_loader(config: dict[str, Any]) -> JSONCredLoader:
-    config = config.get("json_credloader")
-    if config is None or "cred_path" not in config:
+def init_cred_loader(loader_configs: config.Config) -> JSONCredLoader:
+    loader_config = loader_configs.get("json_cred_loader")
+    if loader_config is None or "cred_path" not in loader_config:
         json_path = info.DATA_DIR / CRED_FILENAME
     else:
-        json_path = config["cred_path"]
+        json_path = Path(loader_config["cred_path"])
 
     loader = JSONCredLoader(json_path)
     loader.load_creds()

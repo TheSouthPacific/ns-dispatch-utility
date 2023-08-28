@@ -4,32 +4,30 @@
 from abc import ABC
 import importlib.metadata as import_metadata
 from types import ModuleType
-from typing import Any, Mapping, Sequence
+from typing import Mapping, Sequence
 import collections
 from pathlib import Path
 
 import pluggy
 
-from nsdu import exceptions
-from nsdu import info
-from nsdu import loader_api
-from nsdu import utils
+from nsdu import exceptions, info, loader_api, utils
+from nsdu.config import Config
 
 
 class LoaderManager:
     """Manager for loaded loaders."""
 
-    def __init__(self, proj_name: str, loader_config: Mapping[str, Any]) -> None:
+    def __init__(self, proj_name: str, loader_config: Config) -> None:
         """Manager for loaded loaders.
 
         Args:
             proj_name (str): Pluggy project name for this loader plugin type
-            loader_config (Mapping[str, Any]): Loaders' configuration
+            loader_config (Config): Loaders' configuration
         """
 
         self.manager = pluggy.PluginManager(proj_name)
         self.manager.add_hookspecs(loader_api)
-        self.loader_config = loader_config
+        self.loader_configs = loader_config
 
     def load_loader(self, module) -> None:
         """Load the Python module of a loader.
@@ -53,12 +51,12 @@ class LoaderManager:
 class PersistentLoaderManager(LoaderManager):
     """Manager for loaders that live for the entire run of the app."""
 
-    def __init__(self, proj_name: str, loader_config: Mapping[str, Any]) -> None:
+    def __init__(self, proj_name: str, loader_config: Config) -> None:
         """Manager for loaders that live for the entire run of the app.
 
         Args:
             proj_name (str): Pluggy project name for this loader plugin type
-            loader_config (Mapping[str, Any]): Loaders' configuration
+            loader_config (Config): Loaders' configuration
         """
 
         super().__init__(proj_name, loader_config)
@@ -77,11 +75,13 @@ class PersistentLoaderManager(LoaderManager):
 class TemplateVarLoaderManager(LoaderManager):
     """Manager for template variable loaders."""
 
-    def __init__(self, loader_config):
-        super().__init__(info.TEMPLATE_VAR_LOADER_PROJ, loader_config)
+    def __init__(self, loader_configs: Config):
+        super().__init__(info.TEMPLATE_VAR_LOADER_PROJ, loader_configs)
 
     def get_all_template_vars(self):
-        template_vars = self.manager.hook.get_template_vars(config=self.loader_config)
+        template_vars = self.manager.hook.get_template_vars(
+            loader_configs=self.loader_configs
+        )
         merged_template_vars = dict(collections.ChainMap(*template_vars))
         return merged_template_vars
 
@@ -89,11 +89,13 @@ class TemplateVarLoaderManager(LoaderManager):
 class DispatchLoaderManager(PersistentLoaderManager):
     """Manager for a dispatch loader."""
 
-    def __init__(self, loader_config):
-        super().__init__(info.DISPATCH_LOADER_PROJ, loader_config)
+    def __init__(self, loader_configs: Config):
+        super().__init__(info.DISPATCH_LOADER_PROJ, loader_configs)
 
     def init_loader(self):
-        self._loader = self.manager.hook.init_dispatch_loader(config=self.loader_config)
+        self._loader = self.manager.hook.init_dispatch_loader(
+            loader_configs=self.loader_configs
+        )
 
     def cleanup_loader(self):
         self.manager.hook.cleanup_dispatch_loader(loader=self._loader)
@@ -122,21 +124,25 @@ class DispatchLoaderManager(PersistentLoaderManager):
 class SimpleBBLoaderManager(LoaderManager):
     """Manager for a simple BBCode formatter loader."""
 
-    def __init__(self, loader_config):
-        super().__init__(info.SIMPLE_BB_LOADER_PROJ, loader_config)
+    def __init__(self, loader_configs: Config):
+        super().__init__(info.SIMPLE_BB_LOADER_PROJ, loader_configs)
 
     def get_simple_bb_config(self):
-        return self.manager.hook.get_simple_bb_config(config=self.loader_config)
+        return self.manager.hook.get_simple_bb_config(
+            loader_configs=self.loader_configs
+        )
 
 
 class CredLoaderManager(PersistentLoaderManager):
     """Manager for a login credential loader."""
 
-    def __init__(self, loader_config):
-        super().__init__(info.CRED_LOADER_PROJ, loader_config)
+    def __init__(self, loader_configs: Config):
+        super().__init__(info.CRED_LOADER_PROJ, loader_configs)
 
     def init_loader(self):
-        self._loader = self.manager.hook.init_cred_loader(config=self.loader_config)
+        self._loader = self.manager.hook.init_cred_loader(
+            loader_configs=self.loader_configs
+        )
 
     def cleanup_loader(self):
         self.manager.hook.cleanup_cred_loader(loader=self._loader)

@@ -8,7 +8,11 @@ import nationstates
 from nsdu import exceptions
 
 
-def convert_to_html_entities(text: str) -> str:
+class OwnerNationNotSet(exceptions.DispatchApiError):
+    pass
+
+
+def convert_to_html_entities(text: str) -> bytes:
     """Convert special characters to HTML entities
 
     Args:
@@ -65,7 +69,7 @@ class AuthApi:
 
         try:
             resp = nation.get_shards("ping", full_response=True)
-            return resp["headers"]["X-Autologin"]
+            return resp["headers"]["X-Autologin"]  # type: ignore
         except nationstates.exceptions.Forbidden as err:
             raise exceptions.NationLoginError from err
 
@@ -127,6 +131,9 @@ class DispatchApi:
             str: New dispatch ID
         """
 
+        if self.owner_nation is None:
+            raise OwnerNationNotSet
+
         try:
             resp = self.owner_nation.create_dispatch(
                 title=title,
@@ -134,10 +141,20 @@ class DispatchApi:
                 category=category,
                 subcategory=subcategory,
             )
-            new_dispatch_id = re.search("id=(\\d+)", resp["success"]).group(1)
-            return new_dispatch_id
         except nationstates.exceptions.APIError as err:
             raise_nsdu_exception(err)
+
+        matches = re.search("id=(\\d+)", resp["success"])  # type: ignore
+        if matches is None:
+            raise exceptions.DispatchApiError(
+                "No dispatch ID found in dispatch API response"
+            )
+        new_dispatch_id = matches.group(1)
+        if not isinstance(new_dispatch_id, str):
+            raise exceptions.DispatchApiError(
+                "No dispatch ID found in dispatch API response"
+            )
+        return new_dispatch_id
 
     def edit_dispatch(
         self, dispatch_id: str, title: str, text: str, category: str, subcategory: str
@@ -151,6 +168,9 @@ class DispatchApi:
             category (str): Dispatch category number
             subcategory (str): Dispatch subcategory number
         """
+
+        if self.owner_nation is None:
+            raise OwnerNationNotSet
 
         try:
             self.owner_nation.edit_dispatch(
@@ -169,6 +189,9 @@ class DispatchApi:
         Args:
             dispatch_id (str): Dispatch ID
         """
+
+        if self.owner_nation is None:
+            raise OwnerNationNotSet
 
         try:
             self.owner_nation.remove_dispatch(dispatch_id=dispatch_id)

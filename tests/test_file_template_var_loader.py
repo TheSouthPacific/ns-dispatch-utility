@@ -1,7 +1,7 @@
 import pytest
 
 from nsdu import exceptions
-from nsdu.loaders import file_templatevarloader
+from nsdu.loaders import file_template_var_loader
 
 
 class TestLoadTemplateVarsFromTomlFiles:
@@ -13,7 +13,7 @@ class TestLoadTemplateVarsFromTomlFiles:
             }
         )
 
-        r = file_templatevarloader.load_template_vars_from_files(
+        r = file_template_var_loader.load_template_vars_from_files(
             [str(paths / "test1.toml"), str(paths / "test2.toml")]
         )
 
@@ -22,14 +22,16 @@ class TestLoadTemplateVarsFromTomlFiles:
 
     def test_with_non_existent_file(self):
         with pytest.raises(exceptions.LoaderConfigError):
-            file_templatevarloader.load_template_vars_from_files(["non_existent.toml"])
+            file_template_var_loader.load_template_vars_from_files(
+                ["non_existent.toml"]
+            )
 
     def test_with_empty_file(self, toml_files):
         paths = toml_files(
             {"test1.toml": {"foo1": {"bar1": "john1"}}, "test2.toml": ""}
         )
 
-        r = file_templatevarloader.load_template_vars_from_files(
+        r = file_template_var_loader.load_template_vars_from_files(
             [str(paths / "test1.toml"), str(paths / "test2.toml")]
         )
         assert r == {"foo1": {"bar1": "john1"}}
@@ -39,7 +41,7 @@ class TestLoadTemplateVarsFromTomlFiles:
         Nothing should happen.
         """
 
-        file_templatevarloader.load_template_vars_from_files([])
+        file_template_var_loader.load_template_vars_from_files([])
 
 
 class TestReplaceNameWithPersonnelInfo:
@@ -57,7 +59,7 @@ class TestReplaceNameWithPersonnelInfo:
             },
         }
 
-        r = file_templatevarloader.replace_name_with_personnel_info(
+        r = file_template_var_loader.replace_name_with_personnel_info(
             "Frodo", personnel_info
         )
 
@@ -82,7 +84,7 @@ class TestReplaceNameWithPersonnelInfo:
         }
 
         with pytest.raises(exceptions.LoaderConfigError):
-            file_templatevarloader.replace_name_with_personnel_info(
+            file_template_var_loader.replace_name_with_personnel_info(
                 "Random", personnel_info
             )
 
@@ -102,7 +104,7 @@ class TestReplaceNameListWithPersonnelInfo:
             },
         }
 
-        r = file_templatevarloader.replace_name_list_with_personnel_info(
+        r = file_template_var_loader.replace_name_list_with_personnel_info(
             ["Frodo", "Gandalf"], personnel_info
         )
 
@@ -130,7 +132,7 @@ class TestReplaceNameListWithPersonnelInfo:
         }
 
         with pytest.raises(exceptions.LoaderConfigError):
-            file_templatevarloader.replace_name_list_with_personnel_info(
+            file_template_var_loader.replace_name_list_with_personnel_info(
                 ["Frodo", "Random"], personnel_info
             )
 
@@ -153,7 +155,7 @@ class TestMergePersonnelInfoGroups:
             },
         }
 
-        r = file_templatevarloader.merge_personnel_info_groups(
+        r = file_template_var_loader.merge_personnel_info_groups(
             template_vars, ["info1", "info2"]
         )
 
@@ -194,7 +196,7 @@ class TestMergePersonnelInfoGroups:
         }
 
         with pytest.raises(exceptions.LoaderConfigError):
-            file_templatevarloader.merge_personnel_info_groups(
+            file_template_var_loader.merge_personnel_info_groups(
                 template_vars, ["info1", "random"]
             )
 
@@ -225,7 +227,7 @@ class TestAddPersonnelInfo:
         vars.update(personnel)
         vars.update(personnel_info)
 
-        file_templatevarloader.add_personnel_info(
+        file_template_var_loader.add_personnel_info(
             vars, ["personnel1", "personnel2"], ["info1", "info2"]
         )
 
@@ -311,7 +313,9 @@ class TestFileVarLoader:
             "personnel_info_groups": ["info1", "info2"],
         }
 
-        r = file_templatevarloader.get_template_vars({"file_templatevarloader": config})
+        r = file_template_var_loader.get_template_vars(
+            {"file_template_var_loader": config}
+        )
 
         expected = {
             "personnel1": {

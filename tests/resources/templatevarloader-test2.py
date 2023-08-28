@@ -2,9 +2,9 @@
 """
 
 
-from nsdu import loader_api
+from nsdu import config, loader_api
 
 
 @loader_api.template_var_loader
-def get_template_vars(config):
-    return {"key2": config["templatevarloader-test2"]}
+def get_template_vars(loader_configs: config.Config):
+    return {"key2": loader_configs["templatevarloader-test2"]}

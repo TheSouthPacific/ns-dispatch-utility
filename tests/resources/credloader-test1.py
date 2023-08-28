@@ -2,12 +2,12 @@
 """
 
 
-from nsdu import loader_api
+from nsdu import config, loader_api
 
 
 class CredLoaderTest1:
-    def __init__(self, config):
-        self.config = config
+    def __init__(self, loader_config):
+        self.config = loader_config
         self.creds = {}
 
     def get_creds(self):
@@ -24,8 +24,8 @@ class CredLoaderTest1:
 
 
 @loader_api.cred_loader
-def init_cred_loader(config):
-    return CredLoaderTest1(config)
+def init_cred_loader(loader_configs: config.Config):
+    return CredLoaderTest1(loader_configs)
 
 
 @loader_api.cred_loader
