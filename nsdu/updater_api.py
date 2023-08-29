@@ -2,13 +2,12 @@
 """
 
 import logging
-from typing import Any, Callable, Mapping, Sequence, Tuple
+from pathlib import Path
+from typing import Sequence, Tuple
 
-from nsdu import ns_api
-from nsdu import renderer
-from nsdu import info
-from nsdu import exceptions
-
+from nsdu import exceptions, info, ns_api, renderer
+from nsdu.bbc_parser import SimpleFormattersConfig
+from nsdu.renderer import TemplateLoadFunc, TemplateVars
 
 logger = logging.getLogger(__name__)
 
@@ -56,10 +55,10 @@ class DispatchUpdater:
         self,
         user_agent: str,
         template_filter_paths: Sequence[str],
-        simple_formatter_config: Mapping[str, Mapping[str, str]],
-        complex_formatter_source_path: str,
-        template_load_func: Callable[[str], str],
-        template_vars: Mapping[str, Any],
+        simple_fmts_config: SimpleFormattersConfig | None,
+        complex_fmts_source_path: Path | None,
+        template_load_func: TemplateLoadFunc,
+        template_vars: TemplateVars,
     ) -> None:
         """Renders dispatches from templates and uploads them to NationStates.
 
@@ -67,20 +66,21 @@ class DispatchUpdater:
             user_agent (str): User agent for NationStates API calls
             template_filter_paths (Sequence[str]): List of paths to template filter
             source files
-            simple_formatter_config (Mapping[str, Mapping[str, str]]): Simple BBCode
+            simple_formatter_config (SimpleFormattersConfig | None): Simple BBCode
             formatter config
-            complex_formatter_source_path (str): Path to complex BBCode formatter
+            complex_formatter_source_path (Path | None): Path to complex BBCode
+            formatter
             source file
-            template_load_func (Callable[[str], str]): A callable that receives a
+            template_load_func (TemplateLoadFunc): A callable that receives a
             dispatch name and returns its template
-            template_vars (Mapping[str, Any]): Template variables
+            template_vars (TemplateVars): Template variables
         """
 
         self.dispatch_api = ns_api.DispatchApi(user_agent=user_agent)
         self.renderer = renderer.DispatchRenderer(
             template_load_func,
-            simple_formatter_config,
-            complex_formatter_source_path,
+            simple_fmts_config,
+            complex_fmts_source_path,
             template_filter_paths,
             template_vars,
         )

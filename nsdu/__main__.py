@@ -2,24 +2,16 @@
 
 import abc
 import argparse
-from datetime import datetime
-from datetime import timezone
 import importlib.metadata as import_metadata
 import logging
 import logging.config
 import signal
 import sys
+from datetime import datetime, timezone
 from typing import Mapping, Sequence
 
-from nsdu import info
+from nsdu import config, exceptions, info, loader, ns_api, updater_api, utils
 from nsdu.config import Config
-from nsdu import config
-from nsdu import exceptions
-from nsdu import ns_api
-from nsdu import loader
-from nsdu import updater_api
-from nsdu import utils
-
 
 logger = logging.getLogger("NSDU")
 
@@ -239,8 +231,8 @@ def setup_dispatch_operations(
     dispatch_updater = updater_api.DispatchUpdater(
         user_agent=nsdu_config["general"]["user_agent"],
         template_filter_paths=rendering_config.get("filter_paths", None),
-        simple_formatter_config=simple_bb_config,
-        complex_formatter_source_path=rendering_config.get(
+        simple_fmts_config=simple_bb_config,
+        complex_fmts_source_path=rendering_config.get(
             "complex_formatter_source_path", None
         ),
         template_load_func=dispatch_loader_manager.get_dispatch_template,
@@ -534,7 +526,7 @@ def main():
     try:
         nsdu_config = config.get_general_config()
         logger.debug("Loaded general configuration.")
-    except exceptions.ConfigError as err:
+    except config.ConfigError as err:
         print(err)
         return
 

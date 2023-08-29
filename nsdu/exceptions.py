@@ -6,10 +6,6 @@ class NSDUError(Exception):
     """NSDU general error."""
 
 
-class ConfigError(NSDUError):
-    """NSDU general config error."""
-
-
 class LoaderNotFound(NSDUError):
     """Loader source file not found."""
 
@@ -65,10 +61,6 @@ class NonexistentCategoryError(DispatchConfigError):
 
 class DispatchRenderingError(NSDUError):
     """Dispatch rendering error."""
-
-
-class BBParsingError(DispatchRenderingError):
-    """BBCode parsing errors."""
 
 
 class TemplateRenderingError(DispatchRenderingError):

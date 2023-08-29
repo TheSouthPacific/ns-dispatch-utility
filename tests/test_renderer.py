@@ -1,9 +1,9 @@
+from pathlib import Path
 from unittest.mock import Mock
 
 import pytest
 
-from nsdu import exceptions
-from nsdu import renderer
+from nsdu import config, exceptions, renderer
 
 
 class TestDispatchTemplateLoader:
@@ -77,7 +77,7 @@ class TestLoadFiltersFromSource:
     def test_with_non_existent_files_raises_exception(self):
         obj = renderer.TemplateRenderer(Mock())
 
-        with pytest.raises(exceptions.ConfigError):
+        with pytest.raises(config.ConfigError):
             renderer.load_filters_from_source(obj, [""])
 
 
@@ -91,7 +91,9 @@ class TestDispatchRenderer:
         )
         template_load_func = Mock(return_value=template)
         simple_formatter_config = {"s": {"format_string": "[sr]%(value)s[/sr]"}}
-        complex_formatter_source_path = "tests/resources/bb_complex_formatters.py"
+        complex_formatter_source_path = Path(
+            "tests/resources/bbc_complex_formatters.py"
+        )
         template_filter_paths = [
             "tests/resources/filters-1.py",
             "tests/resources/filters-2.py",
@@ -105,5 +107,7 @@ class TestDispatchRenderer:
             template_vars,
         )
 
-        expected = "[sr]fA-1[/sr][cr2=bar]fC-1[/cr2][sr]fA-2[/sr][cr2=bar]fC-2[/cr2]"
+        expected = (
+            "[sr]fA-1[/sr][cr2]ctx=bar fC-1[/cr2][sr]fA-2[/sr][cr2]ctx=bar fC-2[/cr2]"
+        )
         assert obj.render("t") == expected

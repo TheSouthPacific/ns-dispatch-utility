@@ -1,28 +1,30 @@
-from typing import Any, Mapping
+from typing import Any
 import os
 import shutil
 from pathlib import Path
 
 import toml
 
-from nsdu import info
-from nsdu import exceptions
+from nsdu import info, exceptions, utils
 
-Config = Mapping[str, Any]
+Config = dict[str, Any]
 
 
-def get_config_from_toml(config_path: str | Path) -> dict:
-    """Get configuration from a TOML file as a dictionary.
+class ConfigError(exceptions.NSDUError):
+    """NSDU general config error."""
+
+
+def get_config_from_toml(config_path: str | Path) -> Config:
+    """Get configuration from a TOML file.
 
     Args:
-        config_path (Union[str, Path]): Path to a TOML file.
-        The user symbol will be expanded.
+        config_path (str | Path): Path to a TOML file.
 
     Returns:
-        dict: Configuration
+        Config: Configuration
     """
 
-    return toml.load(Path(config_path).expanduser())
+    return toml.load(utils.expanded_path(config_path))
 
 
 def get_config_from_env(config_path: Path) -> dict:
@@ -32,18 +34,16 @@ def get_config_from_env(config_path: Path) -> dict:
         config_path (Path): Path to a TOML file
 
     Raises:
-        exceptions.ConfigError: Could not find the TOML file
+        ConfigError: Could not find the TOML file
 
     Returns:
-        dict: Configuration
+        Config: Configuration
     """
 
     try:
         return get_config_from_toml(config_path)
     except FileNotFoundError as err:
-        raise exceptions.ConfigError(
-            "Could not find general config file {}".format(config_path)
-        ) from err
+        raise ConfigError(f"Could not find general config file {config_path}") from err
 
 
 def get_config_from_default(
@@ -58,10 +58,10 @@ def get_config_from_default(
         config_name (Path | str): Name of config file
 
     Raises:
-        exceptions.ConfigError: Could not find config file
+        ConfigError: Could not find config file
 
     Returns:
-        dict: Configuration
+        Config: Configuration
     """
 
     config_path = Path(config_dir) / Path(config_name)
@@ -69,7 +69,7 @@ def get_config_from_default(
         return get_config_from_toml(config_path)
     except FileNotFoundError as err:
         shutil.copyfile(default_config_path, config_path)
-        raise exceptions.ConfigError(
+        raise ConfigError(
             (
                 "Could not find config.toml. First time run? "
                 "Created one in {}. Please edit it."
@@ -77,12 +77,12 @@ def get_config_from_default(
         ) from err
 
 
-def get_general_config() -> dict:
+def get_general_config() -> Config:
     """Get general configuration from default path
     or path defined via environment variable.
 
     Returns:
-        dict: Config
+        Config: Config
     """
 
     env_var = os.getenv(info.CONFIG_ENVVAR)

@@ -1,7 +1,7 @@
 import pathlib
 import pytest
 
-from nsdu import config, exceptions, info
+from nsdu import config, info
 
 
 class TestGetConfigFromEnv:
@@ -13,7 +13,7 @@ class TestGetConfigFromEnv:
         assert r == {"a": "b"}
 
     def test_with_env_and_non_existing_config_file(self):
-        with pytest.raises(exceptions.ConfigError):
+        with pytest.raises(config.ConfigError):
             config.get_config_from_env(pathlib.Path("abcd.toml"))
 
 
@@ -28,7 +28,7 @@ class TestGetConfigFromDefault:
         assert r == {"a": "b"}
 
     def test_with_non_existing_config_file(self, tmp_path):
-        with pytest.raises(exceptions.ConfigError):
+        with pytest.raises(config.ConfigError):
             config.get_config_from_default(
                 tmp_path, info.DEFAULT_CONFIG_PATH, info.CONFIG_NAME
             )

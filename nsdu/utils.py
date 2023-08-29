@@ -3,15 +3,11 @@
 
 import inspect
 import logging
-import importlib.util
-from pathlib import Path
 import sys
+from importlib import util as import_util
+from pathlib import Path
 from types import ModuleType
-from typing import Any, Mapping
-
-
-from nsdu import exceptions
-
+from typing import Mapping
 
 logger = logging.getLogger(__name__)
 
@@ -35,17 +31,30 @@ def get_dispatch_info(dispatch_config: Mapping) -> dict:
     return dispatch_info
 
 
-def get_functions_from_module(path: Path | str) -> list[Any]:
-    """Get all functions from a Python module file.
+def expanded_path(path: Path | str) -> Path:
+    """Get user-expanded path.
+
+    Args:
+        path (Path | str): Path
+
+    Returns:
+        Path: User-expanded path
+    """
+
+    return Path(path).expanduser()
+
+
+def get_functions_from_module(path: Path | str):
+    """Get all functions in a Python module file.
 
     Args:
         path (Path | str): Path to the module file
 
     Returns:
-        list[Any]: Functions
+        Functions
     """
 
-    module = load_module(Path(path))
+    module = load_module(path)
     return inspect.getmembers(module, inspect.isfunction)
 
 
@@ -62,22 +71,23 @@ def load_module(path: Path | str) -> ModuleType:
         ModuleType: Loaded module
     """
 
-    path = Path(path)
+    path = expanded_path(path)
     module_name = path.name
-    spec = importlib.util.spec_from_file_location(module_name, path.expanduser())
-    if spec is not None:
-        if not spec.loader:
-            raise exceptions.NSDUError(f"Failed to load loader {module_name}")
-        module = importlib.util.module_from_spec(spec)
-        sys.modules[module_name] = module
-        spec.loader.exec_module(module)
-        return module
 
-    raise FileNotFoundError
+    spec = import_util.spec_from_file_location(module_name, path.expanduser())
+
+    if spec is None or spec.loader is None:
+        raise ModuleNotFoundError
+
+    module = import_util.module_from_spec(spec)
+    sys.modules[module_name] = module
+    spec.loader.exec_module(module)
+
+    return module
 
 
 def canonical_nation_name(name: str) -> str:
-    """Canonicalize nation name into lower case form with no underscore.
+    """Convert nation name into canonical form (lower case with no underscore).
 
     Args:
         name (str): Name

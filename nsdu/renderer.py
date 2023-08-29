@@ -2,27 +2,25 @@
 """
 
 import logging
+from pathlib import Path
 from typing import Any, Callable, Mapping, Sequence
 
 import jinja2
 
-from nsdu import exceptions
-from nsdu import bbc_parser
-from nsdu import utils
-from nsdu.config import Config
-
+from nsdu import bbc_parser, config, utils
+from nsdu.bbc_parser import SimpleFormattersConfig
+from nsdu.types import RenderContext
 
 logger = logging.getLogger(__name__)
 
 
 TemplateLoadFunc = Callable[[str], str]
 FilterFunc = Callable[..., str]
-RenderContext = Mapping[str, Any]
-TemplateVars = RenderContext
+TemplateVars = Mapping[str, Any]
 
 
 class JinjaTemplateLoader(jinja2.BaseLoader):
-    """Load dispatch templates for Jinja to process from a callback function."""
+    """Load dispatch templates into Jinja from a callback function."""
 
     def __init__(self, template_load_func: TemplateLoadFunc):
         self.template_load_func = template_load_func
@@ -46,7 +44,7 @@ class TemplateRenderer:
 
         template_loader = JinjaTemplateLoader(template_load_func)
         # Make access to undefined context variables generate logs.
-        undef = jinja2.make_logging_undefined(logger=logger)
+        undef = jinja2.make_logging_undefined(logger)
         self.env = jinja2.Environment(
             loader=template_loader, trim_blocks=True, undefined=undef
         )
@@ -55,7 +53,7 @@ class TemplateRenderer:
         """Load template filters into Jinja.
 
         Args:
-            filters (Mapping[str, FilterFunc]): A map of filter functions and their name
+            filters (Mapping[str, FilterFunc]): Filter functions keyed by name
         """
 
         self.env.filters.update(filters)
@@ -64,11 +62,11 @@ class TemplateRenderer:
         """Render a dispatch from its template.
 
         Args:
-            name (str): Dispatch template name
-            context (RenderContext): Rendering context of the template
+            name (str): Dispatch name
+            context (RenderContext): Context values
 
         Returns:
-            str: Rendered dispatch
+            str: Rendered text
         """
 
         return self.env.get_template(name).render(context)
@@ -92,11 +90,12 @@ def load_filters_from_source(
     for path in filter_paths:
         try:
             filters = utils.get_functions_from_module(path)
-        except FileNotFoundError:
-            raise exceptions.ConfigError('Filter file not found at "{}"'.format(path))
+        except ModuleNotFoundError as err:
+            raise config.ConfigError(f'Filter file not found at "{path}"') from err
 
         for jinja_filter in filters:
-            loaded_filters[jinja_filter[0]] = jinja_filter[1]
+            filter_name = jinja_filter[0]
+            loaded_filters[filter_name] = jinja_filter[1]
             logger.debug('Loaded filter "%s"', jinja_filter[0])
 
     template_renderer.load_filters(loaded_filters)
@@ -109,8 +108,8 @@ class DispatchRenderer:
     def __init__(
         self,
         template_load_func: TemplateLoadFunc,
-        simple_formatter_config: Config,
-        complex_formatter_source_path: str,
+        simple_fmts_config: SimpleFormattersConfig | None,
+        complex_fmts_source_path: Path | None,
         template_filter_paths: Sequence[str],
         template_vars: TemplateVars,
     ):
@@ -119,9 +118,10 @@ class DispatchRenderer:
         Args:
             template_load_func (TemplateLoadFunc): A callable that receives
             a dispatch name and returns its template
-            simple_formatter_config (Config): Config for
+            simple_fmts_config (SimpleFormattersConfig | None): Config for
             simple formatters
-            complex_formatter_source_path (str): Path to complex formatter source file
+            complex_fmts_source_path (Path | None): Path to complex formatter
+            source file
             template_filter_paths (Sequence[str]): Paths to filter source files
             template_vars (TemplateVars): Template variables
         """
@@ -131,10 +131,10 @@ class DispatchRenderer:
             load_filters_from_source(self.template_renderer, template_filter_paths)
 
         self.bbc_parser = bbc_parser.BBCParser(
-            simple_formatter_config, complex_formatter_source_path
+            simple_fmts_config, complex_fmts_source_path
         )
 
-        # Rendering context all dispatches will have
+        # Render context all dispatches will have
         self.global_context = dict(template_vars)
 
     def render(self, name: str) -> str:
@@ -148,11 +148,10 @@ class DispatchRenderer:
         """
 
         context = self.global_context
-        context["current_dispatch"] = name
+        context["current_dispatch_name"] = name
 
         rendered = self.template_renderer.render(name, context)
-        rendered = self.bbc_parser.format(rendered, **context)
-
+        rendered = self.bbc_parser.format(rendered, context)
         logger.debug('Rendered dispatch "%s"', name)
 
         return rendered

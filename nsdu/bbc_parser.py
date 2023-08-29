@@ -2,38 +2,48 @@
 """
 
 from abc import ABC, abstractmethod
+from collections import namedtuple
 from dataclasses import dataclass
 import logging
 from pathlib import Path
-from typing import Callable, Mapping, Type
+from typing import Any, Type
 
 import bbcode
 
-from nsdu import exceptions
-from nsdu import utils
+from nsdu import config, utils
 from nsdu.config import Config
+from nsdu.types import RenderContext
 
 logger = logging.getLogger(__name__)
 
-
-SimpleFormatterConfig = Mapping[str, str]
-SimpleFormatterConfigs = Mapping[str, SimpleFormatterConfig]
-
-
-class BBCFormatterLoadingError(exceptions.NSDUError):
-    pass
+SimpleFormattersConfig = dict[str, Config]
 
 
 class ComplexFormatter(ABC):
+    """Base class for a complex BBCode formatter."""
+
     @abstractmethod
     def format(
-        self, tag_name: str, value: str, options: Config, parent, context: Config
+        self, tag_name: str, value: str, options: Config, parent: Any, context: Config
     ) -> str:
-        pass
+        """Format text between the tags and return it.
+
+        Args:
+            tag_name (str): Tag name
+            value (str): Text to format
+            options (Config): Tag options
+            parent (Any): Parent tag object
+            context (Config): Context variables
+
+        Returns:
+            str: Formatted text
+        """
 
 
-@dataclass
-class ComplexFormatterConfig:
+@dataclass(frozen=True)
+class FormatterConfig:
+    """Configuration of a BBCode formatter."""
+
     tag_name: str
     newline_closes: bool
     same_tag_closes: bool
@@ -43,13 +53,13 @@ class ComplexFormatterConfig:
     swallow_trailing_newline: bool
 
 
-InitedComplexFormatterTuple = tuple[ComplexFormatter, ComplexFormatterConfig]
+ComplexFormatterTuple = namedtuple("ComplexFormatter", "cls config")
+InitedComplexFormatterTuple = namedtuple("InitedComplexFormatter", "obj config")
 
 
 class BBCRegistry:
     """A registry for complex BBCode formatters."""
 
-    ComplexFormatterTuple = tuple[Type[ComplexFormatter], ComplexFormatterConfig]
     complex_formatters: list[ComplexFormatterTuple] = []
 
     @classmethod
@@ -62,15 +72,23 @@ class BBCRegistry:
         render_embedded=False,
         strip=False,
         swallow_trailing_newline=False,
-    ) -> Callable:
-        """A decorator to register a complex formatter.
+    ):
+        """Register a complex BBCode formatter class.
 
         Args:
-            tag_name (str): Tag name.
+            tag_name (str): Tag name
+            newline_closes (bool, optional): Close tag on newline. Defaults to False.
+            same_tag_closes (bool, optional): Use same new tag to close current tag.
+            Defaults to False.
+            standalone (bool, optional): No close tag needed. Defaults to False.
+            render_embedded (bool, optional): Format nested tags. Defaults to False.
+            strip (bool, optional): Strip trailing whitespaces. Defaults to False.
+            swallow_trailing_newline (bool, optional): Swallow trailing newline.
+            Defaults to False.
         """
 
-        def decorator(formatter_class: Type[ComplexFormatter]):
-            formatter_config = ComplexFormatterConfig(
+        def decorator(fmt_class: Type[ComplexFormatter]):
+            fmt_config = FormatterConfig(
                 tag_name,
                 newline_closes,
                 same_tag_closes,
@@ -79,38 +97,37 @@ class BBCRegistry:
                 strip,
                 swallow_trailing_newline,
             )
-            cls.complex_formatters.append((formatter_class, formatter_config))
+            cls.complex_formatters.append(ComplexFormatterTuple(fmt_class, fmt_config))
 
         return decorator
 
     @classmethod
     def init_complex_formatters(cls) -> list[InitedComplexFormatterTuple]:
-        """Initialize complex formatters."""
+        """Initialize complex formatters.
+
+        Raises:
+            BBCFormatterLoadingError: Failed to load a formatter
+
+        Returns:
+            list[InitedComplexFormatterTuple]: Initialized formatters
+        """
 
         inited_formatters: list[InitedComplexFormatterTuple] = []
-        for formatter_cls, config in cls.complex_formatters:
-            try:
-                formatter_cls.format
-            except AttributeError as err:
-                cls.complex_formatters = []
-                raise BBCFormatterLoadingError(
-                    f"Could not find format method in "
-                    f'complex formatter class "{formatter_cls.__name__}"'
-                ) from err
 
-            formatter_obj = formatter_cls()
-            inited_formatters.append((formatter_obj, config))
-            logger.debug('Initialized complex formatter "%s"', config.tag_name)
+        for fmt_cls, fmt_config in cls.complex_formatters:
+            fmt_obj = fmt_cls()
+            inited_formatters.append(InitedComplexFormatterTuple(fmt_obj, fmt_config))
+            logger.debug('Initialized complex formatter "%s"', fmt_config.tag_name)
 
         cls.complex_formatters = []
         return inited_formatters
 
 
 class BBCParserAdapter:
-    """An adapter for the bbcode library's API."""
+    """An adapter for the bbcode library."""
 
     def __init__(self) -> None:
-        """An adapter for the bbcode library's API."""
+        """An adapter for the bbcode library."""
 
         self.parser = bbcode.Parser(
             newline="\n",
@@ -120,95 +137,17 @@ class BBCParserAdapter:
             replace_cosmetic=False,
         )
 
-    def add_simple_formatter(self, tag_name: str, format_string: str, **kwargs):
-        """Add a simple formatter.
+    def add_simple_formatter(self, format_string: str, config: FormatterConfig) -> None:
+        """Add a simple BBCode formatter.
 
         Args:
-            tag_name (str): BBCode tag name
-            format_string (str): Template for the formatted string
+            format_string (str): Format template
+            config (FormatterConfig): Formatter config
         """
 
-        self.parser.add_simple_formatter(tag_name, format_string, **kwargs)
-
-    def add_complex_formatter(
-        self, tag_name: str, render_func: Callable[..., str], **kwargs
-    ):
-        """Add a complex formatter.
-
-        Args:
-            tag_name (str): BBCode tag name
-            render_func (Callable): A callable that returns the formatted string
-        """
-
-        self.parser.add_formatter(tag_name, render_func, **kwargs)
-
-    def format(self, text: str, **kwargs):
-        """Format text with the added formatters."""
-
-        return self.parser.format(text, **kwargs)
-
-
-def build_simple_parser_from_config(config: SimpleFormatterConfigs) -> BBCParserAdapter:
-    """Build a BBCode parser with simple formatters loaded from config.
-
-    Args:
-        config (SimpleFormatterConfigs): Simple formatter config
-
-    Returns:
-        BBCParserAdapter: Parser with loaded formatters
-    """
-
-    parser = BBCParserAdapter()
-    for tag_name, format_config in config.items():
-        parser.add_simple_formatter(
-            tag_name=tag_name,
-            format_string=format_config["format_string"],
-            escape_html=False,
-            replace_links=False,
-            replace_cosmetic=False,
-            newline_closes=format_config.get("newline_closes", False),
-            same_tag_closes=format_config.get("same_tag_closes", False),
-            standalone=format_config.get("standalone", False),
-            render_embedded=format_config.get("render_embedded", True),
-            strip=format_config.get("strip", False),
-            swallow_trailing_newline=format_config.get(
-                "swallow_trailing_newline", False
-            ),
-        )
-    return parser
-
-
-def build_complex_parser_from_source(source_path: Path | str) -> BBCParserAdapter:
-    """Build a BBCode parser with complex formatters loaded source file.
-
-    Args:
-        source_path (Path | str): Path to source file
-
-    Raises:
-        exceptions.ConfigError: Source file not found
-
-    Returns:
-        BBParserCore: Parser with loaded formatters
-    """
-
-    try:
-        utils.load_module(source_path)
-        formatters = BBCRegistry.init_complex_formatters()
-        logger.debug('Loaded complex formatter source file at "%s"', source_path)
-    except FileNotFoundError:
-        raise exceptions.ConfigError(
-            'Complex formatter source file not found at "{}"'.format(source_path)
-        )
-
-    parser = BBCParserAdapter()
-
-    for obj, config in formatters:
-        parser.add_complex_formatter(
-            tag_name=config.tag_name,
-            render_func=obj.format,
-            escape_html=False,
-            replace_links=False,
-            replace_cosmetic=False,
+        self.parser.add_simple_formatter(
+            config.tag_name,
+            format_string,
             newline_closes=config.newline_closes,
             same_tag_closes=config.same_tag_closes,
             standalone=config.standalone,
@@ -216,8 +155,96 @@ def build_complex_parser_from_source(source_path: Path | str) -> BBCParserAdapte
             strip=config.strip,
             swallow_trailing_newline=config.swallow_trailing_newline,
         )
-        logger.debug('Loaded complex formatter "%s"', obj, config.tag_name)
 
+    def add_complex_formatter(
+        self, formatter_obj: ComplexFormatter, config: FormatterConfig
+    ) -> None:
+        """Add a complex BBCode formatter.
+
+        Args:
+            render_func (ComplexFormatter): Formatter object
+            config (FormatterConfig): Formatter config
+        """
+
+        self.parser.add_formatter(
+            config.tag_name,
+            formatter_obj.format,
+            newline_closes=config.newline_closes,
+            same_tag_closes=config.same_tag_closes,
+            standalone=config.standalone,
+            render_embedded=config.render_embedded,
+            strip=config.strip,
+            swallow_trailing_newline=config.swallow_trailing_newline,
+        )
+
+    def format(self, text: str, context: RenderContext | None = None) -> str:
+        """Format text with the added formatters.
+
+        Args:
+            text (str): Text to format
+            context (RenderContext | None): Context values. Defaults to None
+
+        Returns:
+            str: Formatted text
+        """
+
+        return self.parser.format(text, **context or {})
+
+
+def build_simple_parser_from_config(
+    formatters_config: SimpleFormattersConfig,
+) -> BBCParserAdapter:
+    """Build a BBCode parser with simple formatters defined in config.
+
+    Args:
+        formatters_config (SimpleFormattersConfig): Simple formatters' config
+
+    Returns:
+        BBCParserAdapter: Parser with loaded formatters
+    """
+
+    parser = BBCParserAdapter()
+    for tag_name, config_dict in formatters_config.items():
+        fmt_config = FormatterConfig(
+            tag_name,
+            config_dict.get("newline_closes", False),
+            config_dict.get("same_tag_closes", False),
+            config_dict.get("standalone", False),
+            config_dict.get("render_embedded", True),
+            config_dict.get("strip", False),
+            config_dict.get("swallow_trailing_newline", False),
+        )
+        parser.add_simple_formatter(config_dict["format_string"], fmt_config)
+        logger.debug('Loaded simple formatter "%s"', tag_name)
+    return parser
+
+
+def build_complex_parser_from_source(source_path: Path) -> BBCParserAdapter:
+    """Build a BBCode parser with complex formatters loaded from source file.
+
+    Args:
+        source_path (Path): Path to source file
+
+    Raises:
+        FormatterLoadingError: Source file not found
+
+    Returns:
+        BBCParserAdapter: Parser with loaded formatters
+    """
+
+    try:
+        utils.load_module(source_path)
+        formatters = BBCRegistry.init_complex_formatters()
+        logger.debug('Loaded complex formatter source file at "%s"', source_path)
+    except ModuleNotFoundError as err:
+        raise config.ConfigError(
+            f'Complex formatter source file not found at "{source_path}"'
+        ) from err
+
+    parser = BBCParserAdapter()
+    for fmt_obj, fmt_config in formatters:
+        parser.add_complex_formatter(fmt_obj, fmt_config)
+        logger.debug('Loaded complex formatter "%s"', fmt_config.tag_name)
     return parser
 
 
@@ -226,36 +253,34 @@ class BBCParser:
 
     def __init__(
         self,
-        simple_formatter_config: SimpleFormatterConfigs | None,
-        complex_formatter_source_path: Path | str | None,
+        simple_fmts_config: SimpleFormattersConfig | None,
+        complex_fmts_source_path: Path | None,
     ) -> None:
         """A parser to convert custom BBCode tags into NSCode tags.
 
         Args:
-            simple_formatter_config (SimpleFormatterConfigs | None): Config for
+            simple_fmts_config (SimpleFormattersConfig | None): Config for
             simple formatters
-            complex_formatter_source_path (Path | str | None): Path to complex formatter
-            source file
+            complex_fmts_source_path (Path | None): Path to source file of
+            complex formatters
         """
 
-        self.simple_formatter_config = simple_formatter_config
-        self.complex_formatter_source_path = complex_formatter_source_path
+        self.simple_parser = None
+        if simple_fmts_config is not None:
+            self.simple_parser = build_simple_parser_from_config(simple_fmts_config)
 
-        if self.simple_formatter_config is not None:
-            self.simple_parser = build_simple_parser_from_config(
-                self.simple_formatter_config
-            )
-
-        if self.complex_formatter_source_path is not None:
+        self.complex_parser = None
+        if complex_fmts_source_path is not None:
             self.complex_parser = build_complex_parser_from_source(
-                Path(self.complex_formatter_source_path)
+                complex_fmts_source_path
             )
 
-    def format(self, text: str, **kwargs) -> str:
-        """Convert custom BBCode tags in provided text into NSCode tags.
+    def format(self, text: str, context: RenderContext | None = None) -> str:
+        """Convert custom BBCode tags in the provided text into NSCode tags.
 
         Args:
-            text (str): Text
+            text (str): Text with BBCode tags
+            context (RenderContext | None): Context values. Defaults to None.
 
         Returns:
             str: Text with NSCode tags
@@ -263,11 +288,11 @@ class BBCParser:
 
         formatted_text = text
 
-        # Complex formatters take precedence over simple formatters
-        if self.complex_formatter_source_path is not None:
-            formatted_text = self.complex_parser.format(text=formatted_text, **kwargs)
+        # Complex tags are evaluated first
+        if self.complex_parser is not None:
+            formatted_text = self.complex_parser.format(formatted_text, context)
 
-        if self.simple_formatter_config is not None:
-            formatted_text = self.simple_parser.format(text=formatted_text, **kwargs)
+        if self.simple_parser is not None:
+            formatted_text = self.simple_parser.format(formatted_text, context)
 
         return formatted_text

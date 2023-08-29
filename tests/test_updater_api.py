@@ -26,8 +26,8 @@ class TestDispatchUpdater:
         updater = updater_api.DispatchUpdater(
             user_agent="foo",
             template_filter_paths=[],
-            simple_formatter_config=None,
-            complex_formatter_source_path=None,
+            simple_fmts_config=None,
+            complex_fmts_source_path=None,
             template_load_func=mock.Mock(),
             template_vars={},
         )
@@ -42,8 +42,8 @@ class TestDispatchUpdater:
         updater = updater_api.DispatchUpdater(
             user_agent="foo",
             template_filter_paths=[],
-            simple_formatter_config=None,
-            complex_formatter_source_path=None,
+            simple_fmts_config=None,
+            complex_fmts_source_path=None,
             template_load_func=mock.Mock(return_value="Test template"),
             template_vars={},
         )
@@ -61,8 +61,8 @@ class TestDispatchUpdater:
         updater = updater_api.DispatchUpdater(
             user_agent="foo",
             template_filter_paths=[],
-            simple_formatter_config=None,
-            complex_formatter_source_path=None,
+            simple_fmts_config=None,
+            complex_fmts_source_path=None,
             template_load_func=mock.Mock(return_value="Test template"),
             template_vars={},
         )
@@ -83,8 +83,8 @@ class TestDispatchUpdater:
         updater = updater_api.DispatchUpdater(
             user_agent="foo",
             template_filter_paths=[],
-            simple_formatter_config=None,
-            complex_formatter_source_path=None,
+            simple_fmts_config=None,
+            complex_fmts_source_path=None,
             template_load_func=mock.Mock(return_value="Test template"),
             template_vars={},
         )
