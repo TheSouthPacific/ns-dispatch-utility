@@ -253,7 +253,7 @@ def build_complex_parser_from_source(source_path: Path) -> BBCParserAdapter:
     return parser
 
 
-class BBCParser:
+class BbcParser:
     """A parser to convert custom BBCode tags into NSCode tags."""
 
     def __init__(

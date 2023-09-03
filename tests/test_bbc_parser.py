@@ -99,7 +99,7 @@ class TestBBCParser:
         complex_formatter_source_path = Path(
             "tests/resources/bbc_complex_formatters.py"
         )
-        obj = bbc_parser.BBCParser(
+        obj = bbc_parser.BbcParser(
             simple_formatter_config, complex_formatter_source_path
         )
 
@@ -114,7 +114,7 @@ class TestBBCParser:
             "s2": {"format_string": "[sr2]%(value)s[/sr2]"},
         }
         complex_formatter_source_path = None
-        obj = bbc_parser.BBCParser(
+        obj = bbc_parser.BbcParser(
             simple_formatter_config, complex_formatter_source_path
         )
 
@@ -128,7 +128,7 @@ class TestBBCParser:
         complex_formatter_source_path = Path(
             "tests/resources/bbc_complex_formatters.py"
         )
-        obj = bbc_parser.BBCParser(
+        obj = bbc_parser.BbcParser(
             simple_formatter_config, complex_formatter_source_path
         )
 
@@ -142,7 +142,7 @@ class TestBBCParser:
         complex_formatter_source_path = Path(
             "tests/resources/bbc_complex_formatters.py"
         )
-        obj = bbc_parser.BBCParser(
+        obj = bbc_parser.BbcParser(
             simple_formatter_config, complex_formatter_source_path
         )
 
@@ -157,7 +157,7 @@ class TestBBCParser:
         complex_formatter_source_path = Path(
             "tests/resources/bbc_complex_formatters.py"
         )
-        obj = bbc_parser.BBCParser(
+        obj = bbc_parser.BbcParser(
             simple_formatter_config, complex_formatter_source_path
         )
 
@@ -168,7 +168,7 @@ class TestBBCParser:
         assert result == "[cr3]opt=bar context[/cr3]"
 
     def test_format_with_non_existent_tag_returns_original(self):
-        obj = bbc_parser.BBCParser(None, None)
+        obj = bbc_parser.BbcParser(None, None)
 
         text = "[s]a[/s]"
         result = obj.format(text, {})
