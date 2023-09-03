@@ -11,7 +11,7 @@ Config = dict[str, Any]
 
 
 class ConfigError(exceptions.NSDUError):
-    """NSDU general config error."""
+    """NSDU config error."""
 
 
 def get_config_from_toml(config_path: str | Path) -> Config:
