@@ -60,7 +60,8 @@ class TestBBCRegistry:
 )
 def test_build_simple_parser_from_config_returns_loaded_parser(config, expected):
     parser = bbc_parser.build_simple_parser_from_config(config)
-    result = parser.format("[t1]a[t2]b[/t2][/t1]")
+
+    result = parser.format("[t1]a[t2]b[/t2][/t1]", {})
 
     assert result == expected
 
@@ -75,16 +76,16 @@ class TestBuildComplexParserFromSource:
             Path("tests/resources/bbc_complex_formatters.py")
         )
 
-        result = obj.format("[c1]a[/c1][c2]b[/c2][c3]c[/c3]")
+        result = obj.format("[c1]a[/c1][c2]b[/c2][c3]c[/c3]", {})
 
         assert result == "[cr1]a[/cr1][cr2]ctx= b[/cr2][cr3]opt= c[/cr3]"
 
-    def test_formatter_config_is_used(self):
+    def test_formatter_config_is_loaded(self):
         obj = bbc_parser.build_complex_parser_from_source(
             Path("tests/resources/bbc_complex_formatters.py")
         )
 
-        result = obj.format("[c2][c1]dont format nested tag[/c1][/c2]")
+        result = obj.format("[c2][c1]dont format nested tag[/c1][/c2]", {})
 
         assert result == "[cr2]ctx= [c1]dont format nested tag[/c1][/cr2]"
 
@@ -103,7 +104,7 @@ class TestBBCParser:
         )
 
         text = "[s1]a[/s1] [s2]b[/s2] [c1]c[/c1] [c2]d[/c2]"
-        result = obj.format(text)
+        result = obj.format(text, {})
 
         assert result == "[sr1]a[/sr1] [sr2]b[/sr2] [cr1]c[/cr1] [cr2]ctx= d[/cr2]"
 
@@ -118,7 +119,7 @@ class TestBBCParser:
         )
 
         text = "[s1]a[/s1] [s2]b[/s2]"
-        result = obj.format(text)
+        result = obj.format(text, {})
 
         assert result == "[sr1]a[/sr1] [sr2]b[/sr2]"
 
@@ -132,7 +133,7 @@ class TestBBCParser:
         )
 
         text = "[c1]c[/c1] [c2]d[/c2]"
-        result = obj.format(text)
+        result = obj.format(text, {})
 
         assert result == "[cr1]c[/cr1] [cr2]ctx= d[/cr2]"
 
@@ -170,6 +171,6 @@ class TestBBCParser:
         obj = bbc_parser.BBCParser(None, None)
 
         text = "[s]a[/s]"
-        result = obj.format(text)
+        result = obj.format(text, {})
 
         assert result == "[s]a[/s]"

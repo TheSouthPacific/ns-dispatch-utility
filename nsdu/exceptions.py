@@ -23,7 +23,7 @@ class CredNotFound(LoaderError):
 
 
 class DispatchTemplateNotFound(LoaderError):
-    """Dispatch template not found."""
+    """Loader could not find the requested dispatch template."""
 
 
 class DispatchApiError(NSDUError):
@@ -57,11 +57,3 @@ class NonexistentCategoryError(DispatchConfigError):
         self.category_type = category_type
         self.category_value = category_value
         super().__init__()
-
-
-class DispatchRenderingError(NSDUError):
-    """Dispatch rendering error."""
-
-
-class TemplateRenderingError(DispatchRenderingError):
-    """Jinja template rendering errors."""

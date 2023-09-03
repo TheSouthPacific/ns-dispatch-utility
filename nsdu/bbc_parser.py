@@ -1,12 +1,11 @@
 """Convert custom BBCode tags into NSCode tags.
 """
 
-from abc import ABC, abstractmethod
-from collections import namedtuple
-from dataclasses import dataclass
 import logging
+from abc import ABC, abstractmethod
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Type
+from typing import Any, NamedTuple, Type
 
 import bbcode
 
@@ -53,12 +52,18 @@ class FormatterConfig:
     swallow_trailing_newline: bool
 
 
-ComplexFormatterTuple = namedtuple("ComplexFormatter", "cls config")
-InitedComplexFormatterTuple = namedtuple("InitedComplexFormatter", "obj config")
+class ComplexFormatterTuple(NamedTuple):
+    cls: Type
+    config: FormatterConfig
+
+
+class InitedComplexFormatterTuple(NamedTuple):
+    obj: ComplexFormatter
+    config: FormatterConfig
 
 
 class BBCRegistry:
-    """A registry for complex BBCode formatters."""
+    """Registry for complex BBCode formatters."""
 
     complex_formatters: list[ComplexFormatterTuple] = []
 
@@ -124,10 +129,10 @@ class BBCRegistry:
 
 
 class BBCParserAdapter:
-    """An adapter for the bbcode library."""
+    """Adapter for the bbcode library."""
 
     def __init__(self) -> None:
-        """An adapter for the bbcode library."""
+        """Adapter for the bbcode library."""
 
         self.parser = bbcode.Parser(
             newline="\n",
@@ -177,24 +182,24 @@ class BBCParserAdapter:
             swallow_trailing_newline=config.swallow_trailing_newline,
         )
 
-    def format(self, text: str, context: RenderContext | None = None) -> str:
+    def format(self, text: str, context: RenderContext) -> str:
         """Format text with the added formatters.
 
         Args:
             text (str): Text to format
-            context (RenderContext | None): Context values. Defaults to None
+            context (RenderContext): Context values
 
         Returns:
             str: Formatted text
         """
 
-        return self.parser.format(text, **context or {})
+        return self.parser.format(text, **context)
 
 
 def build_simple_parser_from_config(
     formatters_config: SimpleFormattersConfig,
 ) -> BBCParserAdapter:
-    """Build a BBCode parser with simple formatters defined in config.
+    """Build a BBCode parser with simple formatters defined via config.
 
     Args:
         formatters_config (SimpleFormattersConfig): Simple formatters' config
@@ -226,7 +231,7 @@ def build_complex_parser_from_source(source_path: Path) -> BBCParserAdapter:
         source_path (Path): Path to source file
 
     Raises:
-        FormatterLoadingError: Source file not found
+        config.ConfigError: Source file not found
 
     Returns:
         BBCParserAdapter: Parser with loaded formatters
@@ -275,12 +280,12 @@ class BBCParser:
                 complex_fmts_source_path
             )
 
-    def format(self, text: str, context: RenderContext | None = None) -> str:
+    def format(self, text: str, context: RenderContext) -> str:
         """Convert custom BBCode tags in the provided text into NSCode tags.
 
         Args:
             text (str): Text with BBCode tags
-            context (RenderContext | None): Context values. Defaults to None.
+            context (RenderContext): Context values
 
         Returns:
             str: Text with NSCode tags
