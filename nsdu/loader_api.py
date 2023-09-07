@@ -8,8 +8,11 @@ from typing import Any
 
 import pluggy
 
-from nsdu.config import Config
 from nsdu import info
+from nsdu.config import Config
+
+TemplateVars = dict[str, Any]
+BbcConfig = Config
 
 
 class DispatchOperation(Enum):
@@ -21,8 +24,8 @@ class DispatchOperation(Enum):
 
 
 @dataclass(frozen=True)
-class Dispatch:
-    """Contains the metadata and template of a dispatch."""
+class DispatchMetadata:
+    """Contains the metadata of a dispatch."""
 
     ns_id: str | None
     operation: DispatchOperation
@@ -30,8 +33,10 @@ class Dispatch:
     title: str
     category: str
     subcategory: str
-    template: str
 
+
+DispatchesMetadata = dict[str, DispatchMetadata]
+LoginCreds = dict[str, str]
 
 dispatch_loader_specs = pluggy.HookspecMarker(info.DISPATCH_LOADER_PROJ)
 dispatch_loader = pluggy.HookimplMarker(info.DISPATCH_LOADER_PROJ)
@@ -39,34 +44,35 @@ dispatch_loader = pluggy.HookimplMarker(info.DISPATCH_LOADER_PROJ)
 template_var_loader_specs = pluggy.HookspecMarker(info.TEMPLATE_VAR_LOADER_PROJ)
 template_var_loader = pluggy.HookimplMarker(info.TEMPLATE_VAR_LOADER_PROJ)
 
-simple_bb_loader_specs = pluggy.HookspecMarker(info.SIMPLE_BB_LOADER_PROJ)
-simple_bb_loader = pluggy.HookimplMarker(info.SIMPLE_BB_LOADER_PROJ)
+simple_bbc_loader_specs = pluggy.HookspecMarker(info.SIMPLE_BB_LOADER_PROJ)
+simple_bbc_loader = pluggy.HookimplMarker(info.SIMPLE_BB_LOADER_PROJ)
 
 cred_loader_specs = pluggy.HookspecMarker(info.CRED_LOADER_PROJ)
 cred_loader = pluggy.HookimplMarker(info.CRED_LOADER_PROJ)
 
 
 @dispatch_loader_specs(firstresult=True)
-def init_dispatch_loader(loader_configs: Config) -> object:
-    """Create and return a loader object to persist.
+def init_dispatch_loader(loaders_config: Config) -> object:
+    """Return a dispatch loader object which holds any state
+    this loader should keep while NSDU is running.
 
     Args:
-        loader_configs (Config): Loader's configuration
+        loaders_config (Config): Loaders' config
 
     Return:
-        Loader object
+        object: Loader object
     """
 
 
 @dispatch_loader_specs(firstresult=True)
-def get_dispatch_config(loader: object) -> dict[str, dict]:
-    """Get configuration of dispatches as a dict.
+def get_dispatch_metadata(loader: object) -> DispatchesMetadata:
+    """Return metadata of dispatches to work on.
 
     Args:
-        loader: Loader object
+        loader (object): Loader object
 
     Return:
-        dict[str, dict]: Dispatch configuration
+        DispatchesMetadata: Metadata keyed by dispatch name
     """
 
     raise NotImplementedError
@@ -74,13 +80,14 @@ def get_dispatch_config(loader: object) -> dict[str, dict]:
 
 @dispatch_loader_specs(firstresult=True)
 def get_dispatch_template(loader: object, name: str) -> str:
-    """Get template text of a dispatch.
+    """Return template text of a dispatch.
 
     Args:
-        loader: Loader object
+        loader (object): Loader object
+        name (str): Dispatch name
 
     Return:
-        str: Dispatch content text
+        str: Dispatch template text
     """
 
     raise NotImplementedError
@@ -88,17 +95,16 @@ def get_dispatch_template(loader: object, name: str) -> str:
 
 @dispatch_loader_specs(firstresult=True)
 def after_update(
-    loader: object, name: str, action: str, result: str, result_time: datetime
+    loader: object, name: str, op: DispatchOperation, result: str, result_time: datetime
 ) -> None:
-    """Run after a dispatch has finished updating to report
-    the result of an operation.
+    """Run after a dispatch operation has finished to get its result.
 
     Args:
-        loader: Loader object
+        loader (object): Loader object
         name (str): Dispatch name
-        action (str): Finished action
+        op (DispatchOperation): Operation type
         result (str): Result message
-        result_time (datetime): Time of the update
+        result_time (datetime): Time the operation finished
     """
 
     raise NotImplementedError
@@ -109,7 +115,7 @@ def add_dispatch_id(loader: object, name: str, dispatch_id: str) -> None:
     """Add or update dispatch ID when a new dispatch is made.
 
     Args:
-        loader: Loader object
+        loader (object): Loader object
         name (str): Dispatch name
         dispatch_id (str): Dispatch ID
     """
@@ -119,67 +125,69 @@ def add_dispatch_id(loader: object, name: str, dispatch_id: str) -> None:
 
 @dispatch_loader_specs(firstresult=True)
 def cleanup_dispatch_loader(loader: object) -> None:
-    """Run cleanup operations such as saving files
-    on the loader when NSDU don't use it anymore.
+    """Run cleanup operations on the loader such as saving files
+    when NSDU doesn't use it anymore.
 
     Args:
-        loader: Loader object
+        loader (object): Loader object
     """
 
     raise NotImplementedError
 
 
 @template_var_loader_specs
-def get_template_vars(loader_configs: Config) -> dict[str, Any]:
-    """Get variables for template placeholders.
+def get_template_vars(loaders_config: Config) -> TemplateVars:
+    """Return template variable values.
 
     Args:
-        loader_configs (Config): Loader's configuration
+        loaders_config (Config): Loaders' configuration
 
     Return:
-        dict[str, Any]: Placeholder variables
+        TemplateVars: Variable values
     """
 
     raise NotImplementedError
 
 
-@simple_bb_loader_specs(firstresult=True)
-def get_simple_bb_config(loader_configs: Config) -> dict[str, Any]:
-    """Get configuration for simple BBCode formatters.
+@simple_bbc_loader_specs(firstresult=True)
+def get_simple_bbc_config(loaders_config: Config) -> BbcConfig:
+    """Return a credential loader object which holds any state
+    this loader should keep while NSDU is running.
 
     Args:
-        loader_configs (Config): Loader's configuration
+        loaders_config (Config): Loaders' configuration
 
     Return:
-        dict[str, dict]: Config for simple BBCode formatters
+        BbcConfig: Configuration
     """
 
     raise NotImplementedError
 
 
 @cred_loader_specs(firstresult=True)
-def init_cred_loader(loader_configs: Config) -> object:
+def init_cred_loader(loaders_config: Config) -> object:
     """Create and return a loader object to persist.
 
     Args:
-        loader_configs (Config): Loader's configuration
+        loaders_config (Config): Loaders' configuration
 
     Return:
-        Loader object
+        object: Loader object
     """
 
     raise NotImplementedError
 
 
 @cred_loader_specs(firstresult=True)
-def get_creds(loader: object) -> dict[str, str]:
-    """Get all login credentials.
+def get_cred(loader: object, name: str) -> str:
+    """Get the autologin code of a nation.
 
     Args:
-        loader: Loader object object
+        loader (object): Loader object
+        name (str): Nation name
 
     Return:
-        dict[str, str]: Login credentials
+        str: Autologin code
     """
 
     raise NotImplementedError
@@ -187,12 +195,12 @@ def get_creds(loader: object) -> dict[str, str]:
 
 @cred_loader_specs(firstresult=True)
 def add_cred(loader: object, name: str, x_autologin: str) -> None:
-    """Add a login credential.
+    """Add a nation login credential.
 
     Args:
-        loader: Loader object
-        name (str): Nation's name
-        x_autologin (str): Nation's X-Autologin value.
+        loader (object): Loader object
+        name (str): Nation name
+        x_autologin (str): Autologin code.
     """
 
     raise NotImplementedError
@@ -200,11 +208,11 @@ def add_cred(loader: object, name: str, x_autologin: str) -> None:
 
 @cred_loader_specs(firstresult=True)
 def remove_cred(loader: object, name: str) -> None:
-    """Delete a login credential.
+    """Delete a nation login credential.
 
     Args:
-        loader: Loader object
-        name (str): Nation's name
+        loader (object): Loader object
+        name (str): Nation name
     """
 
     raise NotImplementedError
@@ -212,11 +220,11 @@ def remove_cred(loader: object, name: str) -> None:
 
 @cred_loader_specs(firstresult=True)
 def cleanup_cred_loader(loader: object) -> None:
-    """Run cleanup operations such as saving files
-    on the loader when NSDU don't use it anymore.
+    """Run cleanup operations on the loader such as saving files
+    when NSDU doesn't use it anymore.
 
     Args:
-        loader: Loader object
+        loader (object): Loader object
     """
 
     raise NotImplementedError

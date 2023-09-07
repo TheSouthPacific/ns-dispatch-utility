@@ -65,7 +65,7 @@ def load_module(path: Path | str) -> ModuleType:
         path (Path | str): Path to the module file
 
     Raises:
-        FileNotFoundError: Could not find the module file
+        ModuleNotFoundError: Could not find the module file
 
     Returns:
         ModuleType: Loaded module
@@ -74,14 +74,17 @@ def load_module(path: Path | str) -> ModuleType:
     path = expanded_path(path)
     module_name = path.name
 
-    spec = import_util.spec_from_file_location(module_name, path.expanduser())
-
+    spec = import_util.spec_from_file_location(module_name, path)
     if spec is None or spec.loader is None:
         raise ModuleNotFoundError
 
     module = import_util.module_from_spec(spec)
     sys.modules[module_name] = module
-    spec.loader.exec_module(module)
+
+    try:
+        spec.loader.exec_module(module)
+    except FileNotFoundError as err:
+        raise ModuleNotFoundError from err
 
     return module
 

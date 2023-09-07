@@ -3,12 +3,13 @@
 
 import logging
 from pathlib import Path
-from typing import Any, Callable, Mapping, Sequence
+from typing import Callable, Mapping, Sequence
 
 import jinja2
 
 from nsdu import bbc_parser, exceptions, config, utils
 from nsdu.bbc_parser import SimpleFormattersConfig
+from nsdu.loader_api import TemplateVars
 from nsdu.types import RenderContext
 
 logger = logging.getLogger(__name__)
@@ -16,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 TemplateLoadFunc = Callable[[str], str]
 FilterFunc = Callable[..., str]
-TemplateVars = Mapping[str, Any]
 
 
 class DispatchRenderError(exceptions.NSDUError):
@@ -148,7 +148,7 @@ class DispatchRenderer:
         if template_filter_paths is not None:
             load_filters_from_source(self.template_renderer, template_filter_paths)
 
-        self.bbc_parser = bbc_parser.BBCParser(
+        self.bbc_parser = bbc_parser.BbcParser(
             simple_fmts_config, complex_fmts_source_path
         )
 
