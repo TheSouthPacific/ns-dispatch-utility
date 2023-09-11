@@ -4,16 +4,19 @@
 import logging
 
 from nsdu import config, exceptions, loader_api
+from nsdu.config import Config
 
 logger = logging.getLogger(__name__)
 
 
-@loader_api.simple_bb_loader
-def get_simple_bb_config(loader_config: config.Config):
+@loader_api.simple_bbc_loader
+def get_simple_bb_config(loaders_config: Config) -> Config:
     try:
-        file_path = loader_config["file_simple_bbc_loader"]["file_path"]
+        file_path = loaders_config["file_simple_bbc_loader"]["file_path"]
     except KeyError:
-        return None
+        raise exceptions.LoaderConfigError(
+            "Simple BBCode formatter config file path is not set"
+        )
 
     try:
         return config.get_config_from_toml(file_path)

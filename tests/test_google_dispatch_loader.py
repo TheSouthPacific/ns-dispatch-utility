@@ -6,11 +6,12 @@ from unittest.mock import Mock
 import freezegun
 import pytest
 
-from nsdu.loader_api import Dispatch, DispatchOperation
+from nsdu.loader_api import DispatchOperation
 from nsdu.loaders import google_dispatch_loader as loader
 from nsdu.loaders.google_dispatch_loader import (
     CategorySetup,
     DispatchRow,
+    Dispatch,
     OwnerNation,
     SheetRange,
     UtilityTemplateRow,

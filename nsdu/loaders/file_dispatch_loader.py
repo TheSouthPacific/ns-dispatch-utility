@@ -10,7 +10,8 @@ from typing import Sequence
 import toml
 
 import nsdu
-from nsdu import config, exceptions, loader_api
+from nsdu import exceptions, loader_api
+from nsdu.config import Config
 
 DEFAULT_ID_STORE_FILENAME = "dispatch_id.json"
 DEFAULT_EXT = ".txt"
@@ -136,7 +137,7 @@ class FileDispatchLoader:
 
         return self.dispatch_config_manager.get_canonical_dispatch_config()
 
-    def get_dispatch_template(self, name: str) -> str | None:
+    def get_dispatch_template(self, name: str) -> str:
         """Get the template text of a dispatch.
 
         Args:
@@ -153,8 +154,7 @@ class FileDispatchLoader:
         try:
             return file_path.read_text()
         except FileNotFoundError:
-            logger.error('Could not find dispatch template file "%s".', file_path)
-            return None
+            raise ValueError("Dispatch template not found")
 
     def add_new_dispatch_id(self, name, dispatch_id) -> None:
         """Add NationStates-provided ID of a new dispatch.
@@ -173,9 +173,9 @@ class FileDispatchLoader:
 
 
 @loader_api.dispatch_loader
-def init_dispatch_loader(loader_configs: config.Config):
+def init_dispatch_loader(loaders_config: Config):
     try:
-        loader_config = loader_configs["file_dispatch_loader"]
+        loader_config = loaders_config["file_dispatch_loader"]
     except KeyError:
         raise exceptions.LoaderConfigError("File dispatch loader does not have config.")
 
@@ -204,20 +204,20 @@ def init_dispatch_loader(loader_configs: config.Config):
 
 
 @loader_api.dispatch_loader
-def get_dispatch_config(loader):
+def get_dispatch_metadata(loader: FileDispatchLoader):
     return loader.get_dispatch_config()
 
 
 @loader_api.dispatch_loader
-def get_dispatch_template(loader, name):
+def get_dispatch_template(loader: FileDispatchLoader, name: str) -> str:
     return loader.get_dispatch_template(name)
 
 
 @loader_api.dispatch_loader
-def add_dispatch_id(loader, name, dispatch_id):
+def add_dispatch_id(loader: FileDispatchLoader, name: str, dispatch_id: str) -> None:
     loader.add_new_dispatch_id(name, dispatch_id)
 
 
 @loader_api.dispatch_loader
-def cleanup_dispatch_loader(loader):
+def cleanup_dispatch_loader(loader: FileDispatchLoader) -> None:
     loader.save_dispatch_config()

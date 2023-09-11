@@ -17,8 +17,9 @@ from google.oauth2 import service_account
 from googleapiclient import discovery
 from googleapiclient.http import HttpError
 
-from nsdu import config, exceptions, loader_api
-from nsdu.loader_api import Dispatch, DispatchOperation
+from nsdu import exceptions, loader_api
+from nsdu.config import Config
+from nsdu.loader_api import DispatchOperation, DispatchesMetadata
 
 GOOGLE_API_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -63,6 +64,11 @@ class SheetRange:
 
 
 MultiRangeCellValues = dict[SheetRange, RangeCellValues]
+
+
+@dataclass(frozen=True)
+class Dispatch(loader_api.DispatchMetadata):
+    template: str
 
 
 class GoogleDispatchLoaderError(exceptions.LoaderError):
@@ -1054,8 +1060,8 @@ def flatten_spreadsheet_config(config: Any) -> Sequence[SheetRange]:
 
 
 @loader_api.dispatch_loader
-def init_dispatch_loader(loader_configs: config.Config):
-    loader_config = loader_configs["google_dispatch_loader"]
+def init_dispatch_loader(loaders_config: Config):
+    loader_config = loaders_config["google_dispatch_loader"]
 
     google_api_creds = service_account.Credentials.from_service_account_file(
         loader_config["google_cred_path"], scopes=GOOGLE_API_SCOPES
@@ -1122,18 +1128,24 @@ def init_dispatch_loader(loader_configs: config.Config):
 
 
 @loader_api.dispatch_loader
-def get_dispatch_config(loader: GoogleDispatchLoader):
+def get_dispatch_metadata(loader: GoogleDispatchLoader) -> DispatchesMetadata:
     return loader.get_dispatch_config()
 
 
 @loader_api.dispatch_loader
-def get_dispatch_template(loader: GoogleDispatchLoader, name: str):
+def get_dispatch_template(loader: GoogleDispatchLoader, name: str) -> str:
     return loader.get_dispatch_template(name)
 
 
 @loader_api.dispatch_loader
-def after_update(loader: GoogleDispatchLoader, name, action, result, result_time):
-    match action:
+def after_update(
+    loader: GoogleDispatchLoader,
+    name: str,
+    op: DispatchOperation,
+    result: str,
+    result_time: datetime,
+) -> None:
+    match op:
         case "create":
             operation = DispatchOperation.CREATE
         case "edit":
@@ -1147,10 +1159,10 @@ def after_update(loader: GoogleDispatchLoader, name, action, result, result_time
 
 
 @loader_api.dispatch_loader
-def add_dispatch_id(loader: GoogleDispatchLoader, name: str, dispatch_id: str):
+def add_dispatch_id(loader: GoogleDispatchLoader, name: str, dispatch_id: str) -> None:
     loader.add_dispatch_id(name, dispatch_id)
 
 
 @loader_api.dispatch_loader
-def cleanup_dispatch_loader(loader: GoogleDispatchLoader):
+def cleanup_dispatch_loader(loader: GoogleDispatchLoader) -> None:
     loader.update_spreadsheets()

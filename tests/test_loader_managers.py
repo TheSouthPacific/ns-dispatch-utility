@@ -96,7 +96,7 @@ def test_load_modules_from_dir_returns_modules(names, expected):
     assert list(result.keys()) == expected
 
 
-class TestLoadCustomLoadersIntoManager:
+class TestLoadLoaderModules:
     @pytest.mark.parametrize(
         "names,entry_points,custom_dir,expected",
         [
@@ -127,16 +127,16 @@ class TestLoadCustomLoadersIntoManager:
             [[], [], [], []],
         ],
     )
-    def test_with_existing_names_returns_loaded_manager(
+    def test_with_existing_names_returns_modules(
         self, names, entry_points, custom_dir, expected
     ):
-        result = loader_managers.load_user_loaders(names, entry_points, custom_dir)
+        result = loader_managers.load_loader_modules(names, entry_points, custom_dir)
 
         assert list(map(lambda i: i.__name__, result)) == expected
 
     def test_with_non_existent_names_raises_exception(self):
         with pytest.raises(loader_managers.LoaderLoadError):
-            loader_managers.load_user_loaders(["a"], [], None)
+            loader_managers.load_loader_modules(["a"], [], None)
 
 
 class TestDispatchLoaderManager:
@@ -238,7 +238,8 @@ class TestTemplateVarLoaderManager:
         self, loader_modules, loaders_config, expected
     ):
         manager = loader_managers.TemplateVarLoaderManager(loaders_config)
-        manager.load_loaders(loader_modules)
+        manager.load_loader(loader_modules[0])
+        manager.load_loader(loader_modules[1])
 
         result = manager.get_all_template_vars()
 

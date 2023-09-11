@@ -1,15 +1,18 @@
 """Load template variables from JSON files."""
 
 import pathlib
-from typing import Any
 import json
 
-from nsdu import config, exceptions, loader_api
+from nsdu import exceptions, loader_api
+from nsdu.loader_api import TemplateVars
+from nsdu.config import Config
 
 
 @loader_api.template_var_loader
-def get_template_vars(config: config.Config) -> dict[dict, Any]:
-    var_json_paths: list = config["json_template_var_loader"]["template_var_paths"]
+def get_template_vars(loaders_config: Config) -> TemplateVars:
+    var_json_paths: list = loaders_config["json_template_var_loader"][
+        "template_var_paths"
+    ]
 
     template_vars = {}
     for path in var_json_paths:

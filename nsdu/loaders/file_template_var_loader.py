@@ -6,6 +6,8 @@ import logging
 import pathlib
 
 from nsdu import config, exceptions, loader_api
+from nsdu.config import Config
+from nsdu.loader_api import TemplateVars
 
 logger = logging.getLogger(__name__)
 
@@ -93,8 +95,8 @@ def add_personnel_info(template_vars, personnel_groups, personnel_info_groups):
 
 
 @loader_api.template_var_loader
-def get_template_vars(loader_configs: config.Config):
-    loader_config = loader_configs["file_template_var_loader"]
+def get_template_vars(loaders_config: Config) -> TemplateVars:
+    loader_config = loaders_config["file_template_var_loader"]
 
     template_vars = load_template_vars_from_files(loader_config["template_var_paths"])
     add_personnel_info(

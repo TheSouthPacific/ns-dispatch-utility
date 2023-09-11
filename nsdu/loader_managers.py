@@ -1,6 +1,6 @@
 """Load loader plugins and expose interfaces to use them.
 """
-
+from __future__ import annotations
 import collections
 from abc import ABC, abstractmethod
 from importlib.metadata import EntryPoint
@@ -85,10 +85,6 @@ class TemplateVarLoaderManager(LoaderManager):
 
     def __init__(self, loaders_config: Config) -> None:
         super().__init__(info.TEMPLATE_VAR_LOADER_PROJ, loaders_config)
-
-    def load_loaders(self, modules: Sequence[ModuleType]) -> None:
-        for module in modules:
-            self.load_loader(module)
 
     def get_all_template_vars(self):
         template_vars = self.manager.hook.get_template_vars(
@@ -221,12 +217,13 @@ def load_modules_from_dir(
     return modules
 
 
-def load_user_loaders(
+def load_loader_modules(
     names: Sequence[str],
     entry_points: Sequence[EntryPoint],
     custom_dir_path: Path | None,
 ) -> list[ModuleType]:
-    """Load user-provided loaders into a loader manager.
+    """Load loaders from default directory, package entry points,
+    and custom directory.
 
     Args:
         names (Sequence[str]): Loader names
@@ -237,10 +234,11 @@ def load_user_loaders(
         LoaderLoadError: Failed to load a loader
 
     Returns:
-        dict[str, ModuleType]: Modules
+        list[ModuleType]: Modules
     """
 
-    modules = load_modules_from_entry_points(entry_points, names)
+    modules = load_modules_from_dir(info.LOADER_DIR_PATH, names)
+    modules.update(load_modules_from_entry_points(entry_points, names))
     if custom_dir_path is not None:
         modules.update(load_modules_from_dir(custom_dir_path, names))
 
@@ -249,3 +247,26 @@ def load_user_loaders(
         raise LoaderLoadError(f"Loaders {list(failed_to_load)} not found")
 
     return list(modules.values())
+
+
+class LoaderManagerBuilder(ABC):
+    def __init__(
+        self,
+        entry_points: Sequence[EntryPoint],
+        custom_dir_path: Path | None,
+    ) -> None:
+        self.entry_points = entry_points
+        self.custom_dir_path = custom_dir_path
+
+    def build(self, manager: LoaderManager, names: str | Sequence[str]):
+        if isinstance(names, str):
+            loader_modules = load_loader_modules(
+                [names], self.entry_points, self.custom_dir_path
+            )
+            manager.load_loader(loader_modules[0])
+        else:
+            loader_modules = load_loader_modules(
+                names, self.entry_points, self.custom_dir_path
+            )
+            for module in loader_modules:
+                manager.load_loader(module)

@@ -8,9 +8,16 @@ import logging.config
 import signal
 import sys
 from datetime import datetime, timezone
-from typing import Mapping, Sequence
+from typing import Sequence
 
-from nsdu import config, exceptions, info, loader, ns_api, updater_api, utils
+from nsdu import config, exceptions, info, loader_managers, ns_api, updater_api, utils
+from nsdu.loader_managers import (
+    DispatchLoaderManager,
+    LoaderManagerBuilder,
+    TemplateVarLoaderManager,
+    CredLoaderManager,
+    SimpleBbcLoaderManager,
+)
 from nsdu.config import Config
 
 logger = logging.getLogger("NSDU")
@@ -30,10 +37,10 @@ class DispatchOperations(OperationWrapper):
     def __init__(
         self,
         dispatch_updater: updater_api.DispatchUpdater,
-        dispatch_loader_manager: loader.DispatchLoaderManager,
+        dispatch_loader_manager: DispatchLoaderManager,
+        cred_loader_manager: CredLoaderManager,
         dispatch_config: dict,
         dispatch_info: dict,
-        creds: Mapping[str, str],
     ) -> None:
         """A wrapper for dispatch operations such as update.
 
@@ -50,7 +57,7 @@ class DispatchOperations(OperationWrapper):
         self.dispatch_loader_manager = dispatch_loader_manager
         self.dispatch_config = dispatch_config
         self.dispatch_info = dispatch_info
-        self.creds = creds
+        self.cred_loader_manager = cred_loader_manager
 
     def update_a_dispatch(self, name: str) -> None:
         """Update a dispatch.
@@ -142,7 +149,7 @@ class DispatchOperations(OperationWrapper):
             try:
                 owner_nation = utils.canonical_nation_name(owner_nation)
                 self.dispatch_updater.set_owner_nation(
-                    owner_nation, self.creds[owner_nation]
+                    owner_nation, self.cred_loader_manager.get_cred(owner_nation)
                 )
                 logger.info('Begin to update dispatches of nation "%s".', owner_nation)
             except exceptions.NationLoginError:
@@ -180,48 +187,45 @@ def get_metadata_entry_points() -> Sequence[import_metadata.EntryPoint]:
 
 
 def setup_dispatch_operations(
-    nsdu_config: Config,
-    single_loader_builder: loader.SingleLoaderManagerBuilder,
-    multi_loaders_builder: loader.MultiLoadersManagerBuilder,
+    nsdu_config: Config, loader_manager_builder: LoaderManagerBuilder
 ) -> DispatchOperations:
     """Setup and return dispatch operation wrapper.
 
     Args:
         nsdu_config (Config): User configuration
-        single_loader_builder (loader.SingleLoaderManagerBuilder): Single-loader
-        manager builder
-        multi_loaders_builder (loader.MultiLoadersManagerBuilder): Multi-loaders
-        manager builder
+        loader_manager_builder (loader_managers.LoaderManagerBuilder): Loader manager
+        builder object
 
     Returns:
         DispatchOperations: Dispatch operation wrapper
     """
 
-    loader_config = nsdu_config["loader_config"]
-    plugin_opt = nsdu_config["plugins"]
+    loader_opts = nsdu_config["loaders"]
+    loaders_config = nsdu_config["loaders_config"]
 
-    dispatch_loader_manager = loader.DispatchLoaderManager(loader_config)
-    template_var_loader_manager = loader.TemplateVarLoaderManager(loader_config)
-    simple_bb_loader_manager = loader.SimpleBBLoaderManager(loader_config)
-    cred_loader_manager = loader.CredLoaderManager(loader_config)
+    dispatch_loader_manager = DispatchLoaderManager(loaders_config)
+    template_var_loader_manager = TemplateVarLoaderManager(loaders_config)
+    simple_bbc_loader_manager = SimpleBbcLoaderManager(loaders_config)
+    cred_loader_manager = CredLoaderManager(loaders_config)
 
-    single_loader_builder.set_loader_manager(cred_loader_manager)
-    single_loader_builder.load_loader(plugin_opt["cred_loader"])
-    single_loader_builder.set_loader_manager(dispatch_loader_manager)
-    single_loader_builder.load_loader(plugin_opt["dispatch_loader"])
-    single_loader_builder.set_loader_manager(simple_bb_loader_manager)
-    single_loader_builder.load_loader(plugin_opt["simple_bb_loader"])
-    multi_loaders_builder.set_loader_manager(template_var_loader_manager)
-    multi_loaders_builder.load_loaders(plugin_opt["template_var_loader"])
+    loader_manager_builder.build(
+        dispatch_loader_manager, loader_opts["dispatch_loader"]
+    )
+    loader_manager_builder.build(
+        template_var_loader_manager, loader_opts["template_var_loader"]
+    )
+    loader_manager_builder.build(cred_loader_manager, loader_opts["cred_loader"])
+    loader_manager_builder.build(
+        simple_bbc_loader_manager, loader_opts["simple_bb_loader"]
+    )
 
     cred_loader_manager.init_loader()
-    creds = cred_loader_manager.get_creds()
 
     dispatch_loader_manager.init_loader()
-    dispatch_config = dispatch_loader_manager.get_dispatch_config()
+    dispatch_config = dispatch_loader_manager.get_dispatch_metadata()
     logger.debug("Loaded dispatch config: %r", dispatch_config)
 
-    simple_bb_config = simple_bb_loader_manager.get_simple_bb_config()
+    simple_bb_config = simple_bbc_loader_manager.get_simple_bbc_config()
 
     template_vars = template_var_loader_manager.get_all_template_vars()
     dispatch_info = utils.get_dispatch_info(dispatch_config)
@@ -240,7 +244,11 @@ def setup_dispatch_operations(
     )
 
     return DispatchOperations(
-        dispatch_updater, dispatch_loader_manager, dispatch_config, dispatch_info, creds
+        dispatch_updater,
+        dispatch_loader_manager,
+        cred_loader_manager,
+        dispatch_config,
+        dispatch_info,
     )
 
 
@@ -249,7 +257,7 @@ class CredOperations(OperationWrapper):
 
     def __init__(
         self,
-        cred_loader_manager: loader.CredLoaderManager,
+        cred_loader_manager: CredLoaderManager,
         login_api: ns_api.AuthApi,
     ) -> None:
         """A wrapper for credential operations such as adding credential.
@@ -311,7 +319,7 @@ class CredOperations(OperationWrapper):
 
 
 def setup_cred_operations(
-    nsdu_config: Config, single_loader_builder: loader.SingleLoaderManagerBuilder
+    nsdu_config: Config, loader_manager_builder: LoaderManagerBuilder
 ) -> CredOperations:
     """Setup and return credential operation wrapper.
 
@@ -324,43 +332,16 @@ def setup_cred_operations(
         CredOperations: Cred operation wrapper
     """
 
-    cred_loader_manager = loader.CredLoaderManager(nsdu_config["loader_config"])
-    single_loader_builder.set_loader_manager(cred_loader_manager)
-    single_loader_builder.load_loader(nsdu_config["plugins"]["cred_loader"])
+    cred_loader_manager = loader_managers.CredLoaderManager(
+        nsdu_config["loaders_config"]
+    )
+    loader_name = nsdu_config["loaders"]["cred_loader"]
+    loader_manager_builder.build(cred_loader_manager, loader_name)
     cred_loader_manager.init_loader()
 
     login_api = ns_api.AuthApi(nsdu_config["general"]["user_agent"])
 
     return CredOperations(cred_loader_manager, login_api)
-
-
-def setup_operations(
-    nsdu_config: Config, cli_args: argparse.Namespace
-) -> OperationWrapper:
-    """Setup and return operation wrapper.
-
-    Args:
-        nsdu_config (Config): User configuration
-        cli_args (argparse.Namespace): CLI argument values
-
-    Returns:
-        OperationWrapper: Operation wrapper
-    """
-
-    custom_loader_dir_path = nsdu_config["general"].get("custom_loader_dir_path", None)
-    entry_points = get_metadata_entry_points()
-    single_loader_builder = loader.SingleLoaderManagerBuilder(
-        info.LOADER_DIR_PATH, custom_loader_dir_path, entry_points
-    )
-    multi_loaders_builder = loader.MultiLoadersManagerBuilder(
-        info.LOADER_DIR_PATH, custom_loader_dir_path, entry_points
-    )
-
-    if cli_args.subparser_name == "update":
-        return setup_dispatch_operations(
-            nsdu_config, single_loader_builder, multi_loaders_builder
-        )
-    return setup_cred_operations(nsdu_config, single_loader_builder)
 
 
 def run_add_password_creds(
@@ -440,11 +421,8 @@ def run(nsdu_config: Config, cli_args: argparse.Namespace) -> None:
 
     custom_loader_dir_path = nsdu_config["general"].get("custom_loader_dir_path", None)
     entry_points = get_metadata_entry_points()
-    single_loader_builder = loader.SingleLoaderManagerBuilder(
-        info.LOADER_DIR_PATH, custom_loader_dir_path, entry_points
-    )
-    multi_loaders_builder = loader.MultiLoadersManagerBuilder(
-        info.LOADER_DIR_PATH, custom_loader_dir_path, entry_points
+    loader_manager_builder = loader_managers.LoaderManagerBuilder(
+        entry_points, custom_loader_dir_path
     )
 
     operations: OperationWrapper | None = None
@@ -459,7 +437,7 @@ def run(nsdu_config: Config, cli_args: argparse.Namespace) -> None:
     signal.signal(signal.SIGINT, interrupt_handler)
 
     if cli_args.subparser_name == "cred":
-        operations = setup_cred_operations(nsdu_config, single_loader_builder)
+        operations = setup_cred_operations(nsdu_config, loader_manager_builder)
         if hasattr(cli_args, "add") and cli_args.add is not None:
             run_add_autologin_creds(operations, cli_args)
         elif hasattr(cli_args, "add_password") and cli_args.add_password is not None:
@@ -467,9 +445,7 @@ def run(nsdu_config: Config, cli_args: argparse.Namespace) -> None:
         elif hasattr(cli_args, "remove") and cli_args.remove is not None:
             run_remove_cred(operations, cli_args)
     elif cli_args.subparser_name == "update":
-        operations = setup_dispatch_operations(
-            nsdu_config, single_loader_builder, multi_loaders_builder
-        )
+        operations = setup_dispatch_operations(nsdu_config, loader_manager_builder)
         operations.update_dispatches(cli_args.dispatches)
 
     if operations:

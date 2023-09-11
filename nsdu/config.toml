@@ -8,7 +8,7 @@ user_agent = 'NationStates Dispatch Utility run by <your main nation name>'
 complex_formatter_source_path = '~/ns_dispatches/design/complex_tags.toml'
 filter_paths = ['~/ns_dispatches/design/filters.toml']
 
-[plugins]
+[loaders]
 # Choose loader to load dispatch config and content.
 dispatch_loader = 'file_dispatch_loader'
 # Choose loader to load simple BBCode fornatters
