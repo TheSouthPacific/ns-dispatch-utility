@@ -19,14 +19,14 @@ class LoaderLoadError(exceptions.NSDUError):
 
 
 class LoaderManager(ABC):
-    """Manages loader plugin(s)."""
+    """Expose interface to manage and interact with loader plugin(s)."""
 
     def __init__(self, proj_name: str, loaders_config: Config) -> None:
-        """Manages loader plugin(s).
+        """Expose interface to manage and interact with loader plugin(s).
 
         Args:
             proj_name (str): Pluggy project name for this loader plugin type
-            loaders_config (Config): Loaders' configuration
+            loaders_config (Config): Config of loaders
         """
 
         self.manager = pluggy.PluginManager(proj_name)
@@ -53,14 +53,15 @@ class LoaderManager(ABC):
 
 
 class PersistentLoaderManager(LoaderManager):
-    """Manages loader(s) that hold states through many hook calls."""
+    """Expose interface to manage and interact with loader plugin(s)
+    that hold states through many hook calls."""
 
     def __init__(self, proj_name: str, loaders_config: Config) -> None:
         """Manages loader(s) that hold states through many hook calls.
 
         Args:
             proj_name (str): Pluggy project name for this loader plugin type
-            loaders_config (Config): Loaders' configuration
+            loaders_config (Config): Config of loaders
         """
 
         super().__init__(proj_name, loaders_config)
@@ -81,9 +82,17 @@ class PersistentLoaderManager(LoaderManager):
 
 # pylint: disable=maybe-no-member
 class TemplateVarLoaderManager(LoaderManager):
-    """Manage template variable loaders."""
+    """Expose interface to manage and interact with template variable
+    loader plugin(s)."""
 
     def __init__(self, loaders_config: Config) -> None:
+        """Expose interface to manage and interact with template variable
+        loader plugin(s).
+
+        Args:
+            loaders_config (Config): Config of loaders
+        """
+
         super().__init__(info.TEMPLATE_VAR_LOADER_PROJ, loaders_config)
 
     def get_all_template_vars(self):
@@ -95,9 +104,15 @@ class TemplateVarLoaderManager(LoaderManager):
 
 
 class DispatchLoaderManager(PersistentLoaderManager):
-    """Manages a dispatch loader."""
+    """Expose interface to manage and interact with a dispatch loader plugin."""
 
     def __init__(self, loaders_config: Config) -> None:
+        """Expose interface to manage and interact with a dispatch loader plugin.
+
+        Args:
+            loaders_config (Config): Config of loaders
+        """
+
         super().__init__(info.DISPATCH_LOADER_PROJ, loaders_config)
 
     def init_loader(self):
@@ -132,9 +147,17 @@ class DispatchLoaderManager(PersistentLoaderManager):
 
 
 class SimpleBbcLoaderManager(LoaderManager):
-    """Manages a loader that loads simple BBCode formatters."""
+    """Expose interface to manage and interact with a loader plugin
+    which loads simple BBCode formatters."""
 
     def __init__(self, loaders_config: Config) -> None:
+        """Expose interface to manage and interact with a loader plugin
+        which loads simple BBCode formatters.
+
+            Args:
+                loaders_config (Config): Config of loaders
+        """
+
         super().__init__(info.SIMPLE_BB_LOADER_PROJ, loaders_config)
 
     def get_simple_bbc_config(self) -> loader_api.BbcConfig:
@@ -144,9 +167,17 @@ class SimpleBbcLoaderManager(LoaderManager):
 
 
 class CredLoaderManager(PersistentLoaderManager):
-    """Manages a nation login credential loader."""
+    """Expose interface to manage and interact with a nation login
+    credential loader."""
 
     def __init__(self, loaders_config: Config) -> None:
+        """Expose interface to manage and interact with a nation login
+        credential loader.
+
+        Args:
+            loaders_config (Config): Config of loaders
+        """
+
         super().__init__(info.CRED_LOADER_PROJ, loaders_config)
 
     def init_loader(self):
@@ -222,8 +253,8 @@ def load_loader_modules(
     entry_points: Sequence[EntryPoint],
     custom_dir_path: Path | None,
 ) -> list[ModuleType]:
-    """Load loaders from default directory, package entry points,
-    and custom directory.
+    """Load loader plugin modules from default directory,
+    package entry points, and custom directory.
 
     Args:
         names (Sequence[str]): Loader names
@@ -234,7 +265,7 @@ def load_loader_modules(
         LoaderLoadError: Failed to load a loader
 
     Returns:
-        list[ModuleType]: Modules
+        list[ModuleType]: Modules of loaders
     """
 
     modules = load_modules_from_dir(info.LOADER_DIR_PATH, names)
@@ -255,10 +286,25 @@ class LoaderManagerBuilder(ABC):
         entry_points: Sequence[EntryPoint],
         custom_dir_path: Path | None,
     ) -> None:
+        """Build a loader manager with loader modules from, default directory,
+        package entry points, and custom directory
+
+        Args:
+            entry_points (Sequence[EntryPoint]): Package entry points
+            custom_dir_path (Path | None): Custom loader directory
+        """
+
         self.entry_points = entry_points
         self.custom_dir_path = custom_dir_path
 
     def build(self, manager: LoaderManager, names: str | Sequence[str]):
+        """Build a loader manager using loaders with provided names.
+
+        Args:
+            manager (LoaderManager): Loader manager object
+            names (str | Sequence[str]): Loader name(s)
+        """
+
         if isinstance(names, str):
             loader_modules = load_loader_modules(
                 [names], self.entry_points, self.custom_dir_path

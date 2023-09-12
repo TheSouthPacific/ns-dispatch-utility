@@ -1,6 +1,7 @@
 import sys
 from pathlib import Path
 from types import ModuleType
+from unittest import mock
 from unittest.mock import Mock
 from importlib.metadata import EntryPoint
 from importlib import util as import_util
@@ -98,13 +99,13 @@ def test_load_modules_from_dir_returns_modules(names, expected):
 
 class TestLoadLoaderModules:
     @pytest.mark.parametrize(
-        "names,entry_points,custom_dir,expected",
+        "names,entry_points,custom_dir_path,expected",
         [
             [
-                ["cred_loader", "m1"],
+                ["cred_loader", "m1", "file_dispatch_loader"],
                 [create_mock_entry_point("m1")[0], create_mock_entry_point("m2")[0]],
                 Path("tests/resources"),
-                ["m1.py", "cred_loader.py"],
+                ["file_dispatch_loader.py", "m1.py", "cred_loader.py"],
             ],
             [
                 ["cred_loader"],
@@ -124,19 +125,46 @@ class TestLoadLoaderModules:
                 Path("tests/resources"),
                 ["cred_loader.py"],
             ],
-            [[], [], [], []],
+            [
+                ["file_dispatch_loader"],
+                [],
+                None,
+                ["file_dispatch_loader.py"],
+            ],
+            [[], [], None, []],
         ],
     )
     def test_with_existing_names_returns_modules(
-        self, names, entry_points, custom_dir, expected
+        self, names, entry_points, custom_dir_path, expected
     ):
-        result = loader_managers.load_loader_modules(names, entry_points, custom_dir)
+        result = loader_managers.load_loader_modules(
+            names, entry_points, custom_dir_path
+        )
 
         assert list(map(lambda i: i.__name__, result)) == expected
 
     def test_with_non_existent_names_raises_exception(self):
         with pytest.raises(loader_managers.LoaderLoadError):
             loader_managers.load_loader_modules(["a"], [], None)
+
+
+@pytest.mark.parametrize(
+    "names,expected",
+    [
+        [["m1", "cred_loader"], 2],
+        ["m1", 1],
+    ],
+)
+def test_loader_manager_builder_loads_loaders_into_manager(names, expected):
+    entry_points = [create_mock_entry_point("m1")[0]]
+    custom_dir_path = Path("tests/resources")
+    builder = loader_managers.LoaderManagerBuilder(entry_points, custom_dir_path)
+    manager = mock.create_autospec(loader_managers.LoaderManager)
+    manager.load_loader = Mock(return_value=None)
+
+    builder.build(manager, names)
+
+    assert manager.load_loader.call_count == expected
 
 
 class TestDispatchLoaderManager:
