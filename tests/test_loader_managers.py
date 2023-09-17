@@ -9,7 +9,7 @@ from importlib import util as import_util
 import pytest
 
 from nsdu import loader_managers
-from nsdu.loader_api import DispatchMetadata, DispatchOperation
+from nsdu.loader_api import DispatchMetadata, DispatchOp, DispatchOpResult
 
 
 TEST_LOADER_DIR_PATH = Path("tests/resources")
@@ -184,7 +184,7 @@ class TestDispatchLoaderManager:
 
         assert result == {"c": "v"}
 
-    def test_get_dispatch_metadata(self, loader_module):
+    def test_get_dispatch_metadata_returns_metadata(self, loader_module):
         manager = loader_managers.DispatchLoaderManager(self.loader_config)
         manager.load_loader(loader_module)
 
@@ -193,12 +193,10 @@ class TestDispatchLoaderManager:
         manager.cleanup_loader()
 
         assert result == {
-            "n": DispatchMetadata(
-                None, DispatchOperation.CREATE, "nat", "t", "cat", "sub"
-            )
+            "n": DispatchMetadata(None, DispatchOp.CREATE, "nat", "t", "cat", "sub")
         }
 
-    def test_get_dispatch_template(self, loader_module):
+    def test_get_dispatch_template_returns_template(self, loader_module):
         manager = loader_managers.DispatchLoaderManager(self.loader_config)
         manager.load_loader(loader_module)
 
@@ -208,23 +206,26 @@ class TestDispatchLoaderManager:
 
         assert result == "n"
 
-    def test_after_update(self, loader_module):
+    def test_after_update_adds_result_on_loader(self, loader_module):
         manager = loader_managers.DispatchLoaderManager(self.loader_config)
         result_time = Mock()
         manager.load_loader(loader_module)
 
         manager.init_loader()
-        manager.after_update("n", DispatchOperation.EDIT, "r", result_time)
+        manager.after_update(
+            "n", DispatchOp.EDIT, DispatchOpResult.FAILURE, result_time, "d"
+        )
         manager.cleanup_loader()
 
         assert manager.loader.result == {
             "name": "n",
-            "op": DispatchOperation.EDIT,
-            "result": "r",
+            "op": DispatchOp.EDIT,
+            "result": DispatchOpResult.FAILURE,
+            "result_details": "d",
             "result_time": result_time,
         }
 
-    def test_add_dispatch_id(self, loader_module):
+    def test_add_dispatch_id_adds_id_on_loader(self, loader_module):
         manager = loader_managers.DispatchLoaderManager(self.loader_config)
         manager.load_loader(loader_module)
 

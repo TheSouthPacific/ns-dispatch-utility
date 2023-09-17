@@ -19,7 +19,7 @@ from googleapiclient.http import HttpError
 
 from nsdu import exceptions, loader_api
 from nsdu.config import Config
-from nsdu.loader_api import DispatchOperation, DispatchesMetadata
+from nsdu.loader_api import DispatchOp, DispatchesMetadata
 
 GOOGLE_API_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -33,17 +33,17 @@ HYPERLINK_FORMAT = (
 
 SUCCESS_RESULT_MESSAGE_FORMAT = "{message}\nTime: {result_time}"
 SUCCESS_RESULT_MESSAGES = {
-    DispatchOperation.CREATE: "Created successfully.",
-    DispatchOperation.EDIT: "Edited successfully.",
-    DispatchOperation.DELETE: "Deleted successfully.",
+    DispatchOp.CREATE: "Created successfully.",
+    DispatchOp.EDIT: "Edited successfully.",
+    DispatchOp.DELETE: "Deleted successfully.",
 }
 FAILURE_RESULT_MESSAGE_FORMAT = (
     "{message}\nDetails: {failure_details}\nTime: {result_time}"
 )
 FAILURE_RESULT_MESSAGES = {
-    DispatchOperation.CREATE: "Failed to create.",
-    DispatchOperation.EDIT: "Failed to edit.",
-    DispatchOperation.DELETE: "Failed to remove.",
+    DispatchOp.CREATE: "Failed to create.",
+    DispatchOp.EDIT: "Failed to edit.",
+    DispatchOp.DELETE: "Failed to remove.",
 }
 INVALID_OPERATION_MESSAGE = "Invalid operation {operation}"
 RESULT_TIME_FORMAT = "%Y/%m/%d %H:%M:%S %Z"
@@ -218,7 +218,7 @@ class OpResult(ABC):
     """Describes the result of a dispatch operation."""
 
     dispatch_name: str
-    operation: DispatchOperation
+    operation: DispatchOp
     result_time: datetime
 
     @property
@@ -248,14 +248,14 @@ class SuccessOpResult(OpResult):
 class FailureOpResult(OpResult):
     """Describes the result of a failed dispatch operation."""
 
-    operation: DispatchOperation | str
+    operation: DispatchOp | str
     details: str | None
 
     @property
     def result_message(self) -> str:
         result_message = (
             FAILURE_RESULT_MESSAGES[self.operation]
-            if isinstance(self.operation, DispatchOperation)
+            if isinstance(self.operation, DispatchOp)
             else INVALID_OPERATION_MESSAGE.format(operation=self.operation)
         )
         result_time_str = self.result_time.strftime(RESULT_TIME_FORMAT)
@@ -272,7 +272,7 @@ class OpResultStore(UserDict[str, OpResult]):
     def report_success(
         self,
         dispatch_name: str,
-        operation: DispatchOperation,
+        operation: DispatchOp,
         result_time: datetime | None = None,
     ) -> None:
         """Report a successful dispatch operation.
@@ -293,7 +293,7 @@ class OpResultStore(UserDict[str, OpResult]):
     def report_failure(
         self,
         dispatch_name: str,
-        operation: DispatchOperation | str,
+        operation: DispatchOp | str,
         details: str | Exception | None = None,
         result_time: datetime | None = None,
     ) -> None:
@@ -543,7 +543,7 @@ def create_hyperlink(name: str, dispatch_id: str) -> str:
 class InvalidDispatchRowError(GoogleDispatchLoaderError):
     """Exception for invalid values on dispatch sheet rows."""
 
-    def __init__(self, operation: DispatchOperation | str, *args: object) -> None:
+    def __init__(self, operation: DispatchOp | str, *args: object) -> None:
         super().__init__(*args)
         self.operation = operation
 
@@ -671,7 +671,7 @@ def parse_dispatch_cell_values_of_row(
 
     operation_cell_value = row.operation.lower()
     try:
-        operation = DispatchOperation[operation_cell_value.upper()]
+        operation = DispatchOp[operation_cell_value.upper()]
     except KeyError as err:
         raise InvalidDispatchRowError(
             operation_cell_value, "Invalid operation."
@@ -716,9 +716,7 @@ def parse_dispatch_cell_values_of_row(
     )
 
 
-ReportFailureCb = Callable[
-    [str, DispatchOperation | str, InvalidDispatchRowError], None
-]
+ReportFailureCb = Callable[[str, DispatchOp | str, InvalidDispatchRowError], None]
 
 
 def parse_dispatch_cell_values_of_rows(
@@ -837,13 +835,10 @@ def generate_new_dispatch_cell_values_of_range(
 
         new_dispatch_name = row.hyperlink
         new_operation = row.operation
-        if (
-            dispatch.operation == DispatchOperation.CREATE
-            and dispatch.ns_id is not None
-        ):
+        if dispatch.operation == DispatchOp.CREATE and dispatch.ns_id is not None:
             new_dispatch_name = create_hyperlink(dispatch_name, dispatch.ns_id)
             new_operation = "edit"
-        elif dispatch.operation == DispatchOperation.DELETE:
+        elif dispatch.operation == DispatchOp.DELETE:
             new_operation = ""
 
         new_dispatch_row = DispatchRow(
@@ -900,11 +895,11 @@ class DispatchConfigStore(UserDict[str, Dispatch]):
         result = {}
         for name, dispatch in self.data.items():
             match dispatch.operation:
-                case DispatchOperation.CREATE:
+                case DispatchOp.CREATE:
                     canonical_operation = "create"
-                case DispatchOperation.EDIT:
+                case DispatchOp.EDIT:
                     canonical_operation = "edit"
-                case DispatchOperation.DELETE:
+                case DispatchOp.DELETE:
                     canonical_operation = "remove"
 
             canonical_config = {
@@ -1012,7 +1007,7 @@ class GoogleDispatchLoader:
     def report_result(
         self,
         name: str,
-        operation: DispatchOperation,
+        operation: DispatchOp,
         result: str,
         result_time: datetime,
     ) -> None:
@@ -1141,17 +1136,17 @@ def get_dispatch_template(loader: GoogleDispatchLoader, name: str) -> str:
 def after_update(
     loader: GoogleDispatchLoader,
     name: str,
-    op: DispatchOperation,
+    op: DispatchOp,
     result: str,
     result_time: datetime,
 ) -> None:
     match op:
         case "create":
-            operation = DispatchOperation.CREATE
+            operation = DispatchOp.CREATE
         case "edit":
-            operation = DispatchOperation.EDIT
+            operation = DispatchOp.EDIT
         case "remove":
-            operation = DispatchOperation.DELETE
+            operation = DispatchOp.DELETE
         case _:
             raise ValueError("Invalid dispatch action")
 

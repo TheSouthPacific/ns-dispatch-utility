@@ -15,7 +15,14 @@ TemplateVars = dict[str, Any]
 BbcConfig = Config
 
 
-class DispatchOperation(Enum):
+class DispatchOpResult(Enum):
+    """Operation result type."""
+
+    SUCCESS = 1
+    FAILURE = 2
+
+
+class DispatchOp(Enum):
     """Dispatch operation type."""
 
     CREATE = 1
@@ -28,7 +35,7 @@ class DispatchMetadata:
     """Contains the metadata of a dispatch."""
 
     ns_id: str | None
-    operation: DispatchOperation
+    operation: DispatchOp
     owner_nation: str
     title: str
     category: str
@@ -95,7 +102,12 @@ def get_dispatch_template(loader: object, name: str) -> str:
 
 @dispatch_loader_specs(firstresult=True)
 def after_update(
-    loader: object, name: str, op: DispatchOperation, result: str, result_time: datetime
+    loader: object,
+    name: str,
+    op: DispatchOp,
+    result: DispatchOpResult,
+    result_time: datetime,
+    result_details: str,
 ) -> None:
     """Run after a dispatch operation has finished to get its result.
 
@@ -103,8 +115,9 @@ def after_update(
         loader (object): Loader object
         name (str): Dispatch name
         op (DispatchOperation): Operation type
-        result (str): Result message
+        result (DispatchOpResult): Result type
         result_time (datetime): Time the operation finished
+        result_details (str): Result details
     """
 
     raise NotImplementedError

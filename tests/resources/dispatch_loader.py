@@ -6,7 +6,12 @@ from datetime import datetime
 
 from nsdu import loader_api
 from nsdu.config import Config
-from nsdu.loader_api import DispatchesMetadata, DispatchOperation, DispatchMetadata
+from nsdu.loader_api import (
+    DispatchOpResult,
+    DispatchesMetadata,
+    DispatchOp,
+    DispatchMetadata,
+)
 
 
 class DispatchLoader:
@@ -17,9 +22,7 @@ class DispatchLoader:
 
     def get_dispatch_metadata(self) -> DispatchesMetadata:
         return {
-            "n": DispatchMetadata(
-                None, DispatchOperation.CREATE, "nat", "t", "cat", "sub"
-            )
+            "n": DispatchMetadata(None, DispatchOp.CREATE, "nat", "t", "cat", "sub")
         }
 
     def get_dispatch_template(self, name: str) -> str:
@@ -29,12 +32,18 @@ class DispatchLoader:
         self.dispatch_ids[name] = dispatch_id
 
     def after_update(
-        self, name: str, action: DispatchOperation, result: str, result_time: datetime
+        self,
+        name: str,
+        action: DispatchOp,
+        result: DispatchOpResult,
+        result_time: datetime,
+        result_details: str,
     ) -> None:
         self.result = {
             "name": name,
             "op": action,
             "result": result,
+            "result_details": result_details,
             "result_time": result_time,
         }
 
@@ -61,11 +70,12 @@ def get_dispatch_template(loader: DispatchLoader, name: str) -> str:
 def after_update(
     loader: DispatchLoader,
     name: str,
-    op: DispatchOperation,
-    result: str,
+    op: DispatchOp,
+    result: DispatchOpResult,
+    result_details: str,
     result_time: datetime,
 ) -> None:
-    loader.after_update(name, op, result, result_time)
+    loader.after_update(name, op, result, result_time, result_details)
 
 
 @loader_api.dispatch_loader

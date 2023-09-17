@@ -3,6 +3,7 @@
 from __future__ import annotations
 import collections
 from abc import ABC, abstractmethod
+from datetime import datetime
 from importlib.metadata import EntryPoint
 from pathlib import Path
 from types import ModuleType
@@ -130,7 +131,12 @@ class DispatchLoaderManager(PersistentLoaderManager):
         return self.manager.hook.get_dispatch_template(loader=self.loader, name=name)
 
     def after_update(
-        self, name: str, op: loader_api.DispatchOperation, result, result_time
+        self,
+        name: str,
+        op: loader_api.DispatchOp,
+        result: loader_api.DispatchOpResult,
+        result_time: datetime,
+        result_details: str | None,
     ) -> None:
         self.manager.hook.after_update(
             loader=self.loader,
@@ -138,6 +144,7 @@ class DispatchLoaderManager(PersistentLoaderManager):
             op=op,
             result=result,
             result_time=result_time,
+            result_details=result_details,
         )
 
     def add_dispatch_id(self, name: str, dispatch_id: str) -> None:

@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import freezegun
 import pytest
 
-from nsdu.loader_api import DispatchOperation
+from nsdu.loader_api import DispatchOp
 from nsdu.loaders import google_dispatch_loader as loader
 from nsdu.loaders.google_dispatch_loader import (
     CategorySetup,
@@ -97,7 +97,7 @@ class TestGoogleSheetsApiAdapter:
 
 class TestOpResult:
     def test_get_success_result_message_returns_formatted_message(self):
-        result = SuccessOpResult("name", DispatchOperation.CREATE, datetime(2023, 1, 1))
+        result = SuccessOpResult("name", DispatchOp.CREATE, datetime(2023, 1, 1))
 
         assert (
             result.result_message == "Created successfully.\nTime: 2023/01/01 00:00:00 "
@@ -106,7 +106,7 @@ class TestOpResult:
     def test_get_failure_result_message_returns_formatted_message(self):
         result = FailureOpResult(
             "name",
-            DispatchOperation.CREATE,
+            DispatchOp.CREATE,
             datetime(2023, 1, 1),
             "Some details.",
         )
@@ -129,10 +129,10 @@ class TestOpResultStore:
     def test_report_success_adds_success_result(self, result_time, expected):
         obj = loader.OpResultStore()
 
-        obj.report_success("n", DispatchOperation.CREATE, result_time)
+        obj.report_success("n", DispatchOp.CREATE, result_time)
         result = obj["n"]
 
-        assert result == SuccessOpResult("n", DispatchOperation.CREATE, expected)
+        assert result == SuccessOpResult("n", DispatchOp.CREATE, expected)
 
     @pytest.mark.parametrize(
         "err_details,result_time,expected_err_details,expected_result_time",
@@ -154,11 +154,11 @@ class TestOpResultStore:
     ):
         obj = loader.OpResultStore()
 
-        obj.report_failure("n", DispatchOperation.CREATE, err_details, result_time)
+        obj.report_failure("n", DispatchOp.CREATE, err_details, result_time)
         result = obj["n"]
 
         assert result == FailureOpResult(
-            "n", DispatchOperation.CREATE, expected_result_time, expected_err_details
+            "n", DispatchOp.CREATE, expected_result_time, expected_err_details
         )
 
 
@@ -443,7 +443,7 @@ class TestParseDispatchCellValuesOfRow:
                 ),
                 Dispatch(
                     "1",
-                    DispatchOperation.EDIT,
+                    DispatchOp.EDIT,
                     "nat",
                     "t",
                     "meta",
@@ -453,15 +453,11 @@ class TestParseDispatchCellValuesOfRow:
             ],
             [
                 DispatchRow("n", "create", "1", "1", "t", "tp", ""),
-                Dispatch(
-                    None, DispatchOperation.CREATE, "nat", "t", "meta", "gameplay", "tp"
-                ),
+                Dispatch(None, DispatchOp.CREATE, "nat", "t", "meta", "gameplay", "tp"),
             ],
             [
                 DispatchRow("n", "create", "1", "1", "t", "", ""),
-                Dispatch(
-                    None, DispatchOperation.CREATE, "nat", "t", "meta", "gameplay", ""
-                ),
+                Dispatch(None, DispatchOp.CREATE, "nat", "t", "meta", "gameplay", ""),
             ],
         ],
     )
@@ -529,7 +525,7 @@ class TestParseDispatchCellValuesOfRows:
                 {
                     "n1": Dispatch(
                         None,
-                        DispatchOperation.CREATE,
+                        DispatchOp.CREATE,
                         "nat",
                         "t1",
                         "meta",
@@ -538,7 +534,7 @@ class TestParseDispatchCellValuesOfRows:
                     ),
                     "n2": Dispatch(
                         None,
-                        DispatchOperation.CREATE,
+                        DispatchOp.CREATE,
                         "nat",
                         "t2",
                         "meta",
@@ -555,7 +551,7 @@ class TestParseDispatchCellValuesOfRows:
                 {
                     "n1": Dispatch(
                         None,
-                        DispatchOperation.CREATE,
+                        DispatchOp.CREATE,
                         "nat",
                         "t1",
                         "meta",
@@ -572,7 +568,7 @@ class TestParseDispatchCellValuesOfRows:
                 {
                     "n1": Dispatch(
                         None,
-                        DispatchOperation.CREATE,
+                        DispatchOp.CREATE,
                         "nat",
                         "t1",
                         "meta",
@@ -643,7 +639,7 @@ class TestParseDispatchCellValuesOfRanges:
                 {
                     "n1": Dispatch(
                         None,
-                        DispatchOperation.CREATE,
+                        DispatchOp.CREATE,
                         "nat",
                         "t1",
                         "meta",
@@ -652,7 +648,7 @@ class TestParseDispatchCellValuesOfRanges:
                     ),
                     "n2": Dispatch(
                         None,
-                        DispatchOperation.CREATE,
+                        DispatchOp.CREATE,
                         "nat",
                         "t2",
                         "meta",
@@ -661,7 +657,7 @@ class TestParseDispatchCellValuesOfRanges:
                     ),
                     "n3": Dispatch(
                         None,
-                        DispatchOperation.CREATE,
+                        DispatchOp.CREATE,
                         "nat",
                         "t3",
                         "meta",
@@ -682,7 +678,7 @@ class TestParseDispatchCellValuesOfRanges:
                 {
                     "n1": Dispatch(
                         None,
-                        DispatchOperation.CREATE,
+                        DispatchOp.CREATE,
                         "nat",
                         "t1",
                         "meta",
@@ -731,7 +727,7 @@ class TestGenerateNewDispatchRangeCellValues:
             [
                 "n",
                 "create",
-                DispatchOperation.CREATE,
+                DispatchOp.CREATE,
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
                 "edit",
                 "Created successfully.\nTime: 2023/01/01 00:00:00 ",
@@ -739,7 +735,7 @@ class TestGenerateNewDispatchRangeCellValues:
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
                 "edit",
-                DispatchOperation.EDIT,
+                DispatchOp.EDIT,
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
                 "edit",
                 "Edited successfully.\nTime: 2023/01/01 00:00:00 ",
@@ -747,7 +743,7 @@ class TestGenerateNewDispatchRangeCellValues:
             [
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
                 "delete",
-                DispatchOperation.DELETE,
+                DispatchOp.DELETE,
                 '=hyperlink("https://www.nationstates.net/page=dispatch/id=1","n")',
                 "",
                 "Deleted successfully.\nTime: 2023/01/01 00:00:00 ",
@@ -778,18 +774,14 @@ class TestGenerateNewDispatchRangeCellValues:
             [
                 "n",
                 {},
-                {
-                    "n": SuccessOpResult(
-                        "n", DispatchOperation.CREATE, datetime(2023, 1, 1)
-                    )
-                },
+                {"n": SuccessOpResult("n", DispatchOp.CREATE, datetime(2023, 1, 1))},
             ],
             [
                 "n",
                 {
                     "n": Dispatch(
                         "1",
-                        DispatchOperation.CREATE,
+                        DispatchOp.CREATE,
                         "nat",
                         "t",
                         "meta",
@@ -825,14 +817,10 @@ class TestGenerateNewDispatchRangeCellValues:
     def test_with_failed_op_returns_identical_row_cell_values_with_failed_status(self):
         old_rows = [DispatchRow("n", "create", "1", "1", "t", "tp", "")]
         dispatch_config = {
-            "n": Dispatch(
-                "1", DispatchOperation.CREATE, "nat", "t", "meta", "gameplay", "tp"
-            )
+            "n": Dispatch("1", DispatchOp.CREATE, "nat", "t", "meta", "gameplay", "tp")
         }
         op_results = {
-            "n": FailureOpResult(
-                "n", DispatchOperation.CREATE, datetime(2023, 1, 1), "d"
-            )
+            "n": FailureOpResult("n", DispatchOp.CREATE, datetime(2023, 1, 1), "d")
         }
 
         result = loader.generate_new_dispatch_cell_values_of_range(
@@ -897,16 +885,12 @@ def test_generate_new_dispatch_cell_values_for_ranges_returns_updated_cell_value
     old_rows, expected_result
 ):
     dispatch_config = {
-        "n1": Dispatch(
-            "1", DispatchOperation.CREATE, "nat", "t1", "meta", "gameplay", "tp1"
-        ),
-        "n2": Dispatch(
-            "2", DispatchOperation.CREATE, "nat", "t2", "meta", "gameplay", "tp2"
-        ),
+        "n1": Dispatch("1", DispatchOp.CREATE, "nat", "t1", "meta", "gameplay", "tp1"),
+        "n2": Dispatch("2", DispatchOp.CREATE, "nat", "t2", "meta", "gameplay", "tp2"),
     }
     op_results = {
-        "n1": SuccessOpResult("n1", DispatchOperation.CREATE, datetime(2023, 1, 1)),
-        "n2": SuccessOpResult("n2", DispatchOperation.CREATE, datetime(2023, 1, 1)),
+        "n1": SuccessOpResult("n1", DispatchOp.CREATE, datetime(2023, 1, 1)),
+        "n2": SuccessOpResult("n2", DispatchOp.CREATE, datetime(2023, 1, 1)),
     }
 
     result = loader.generate_new_dispatch_cell_values_for_ranges(
@@ -925,7 +909,7 @@ class TestDispatchConfigStore:
                     "n": Dispatch(
                         ns_id="1",
                         owner_nation="nat",
-                        operation=DispatchOperation.EDIT,
+                        operation=DispatchOp.EDIT,
                         title="t",
                         template="tp",
                         category="meta",
@@ -949,7 +933,7 @@ class TestDispatchConfigStore:
                     "n": Dispatch(
                         ns_id=None,
                         owner_nation="nat",
-                        operation=DispatchOperation.EDIT,
+                        operation=DispatchOp.EDIT,
                         title="t",
                         template="tp",
                         category="meta",
@@ -984,7 +968,7 @@ class TestDispatchConfigStore:
             "n": Dispatch(
                 ns_id="1",
                 owner_nation="nat",
-                operation=DispatchOperation.EDIT,
+                operation=DispatchOp.EDIT,
                 title="t",
                 template="tp",
                 category="meta",
@@ -1007,7 +991,7 @@ class TestDispatchConfigStore:
             "n": Dispatch(
                 ns_id=old_dispatch_id,
                 owner_nation="nat",
-                operation=DispatchOperation.CREATE,
+                operation=DispatchOp.CREATE,
                 title="t",
                 template="tp",
                 category="meta",
@@ -1180,7 +1164,7 @@ class TestGoogleDispatchLoader:
         obj.add_dispatch_id("n", "1")
         obj.report_result(
             "n",
-            DispatchOperation.CREATE,
+            DispatchOp.CREATE,
             "success",
             datetime(2023, 1, 1),
         )
