@@ -1,97 +1,125 @@
 """Load variables from TOML files.
 """
 
+from __future__ import annotations
+
 import copy
 import logging
-import pathlib
+from collections import UserDict
+from typing import Mapping, Sequence
 
-from nsdu import config, exceptions, loader_api
+from nsdu import config, loader_api
 from nsdu.config import Config
-from nsdu.loader_api import TemplateVars
+from nsdu.loader_api import LoaderError, TemplateVars
 
 logger = logging.getLogger(__name__)
 
+PersonInfo = dict[str, str]
 
-def load_template_vars_from_files(paths):
-    """Get all template variables from TOML file(s).
+
+def load_template_vars_from_files(paths: Sequence[str]) -> TemplateVars:
+    """Get all template variables from TOML files.
 
     Args:
-        paths (list): File paths
+        paths (Sequence[str]): File paths
 
     Returns:
-        dict: Variables
+        TemplateVars: Template variables
     """
 
     loaded_vars = {}
 
     for path in paths:
         try:
-            file_vars = config.get_config_from_toml(pathlib.Path(path))
-            logger.debug('Loaded var file "%s"', path)
+            file_vars = config.get_config_from_toml(path)
+            logger.debug('Loaded variable file "%s"', path)
         except FileNotFoundError:
-            raise exceptions.LoaderConfigError('Var file "{}" not found'.format(path))
+            raise LoaderError(f'Variable file "{path}" not found')
 
         if file_vars is not None:
             loaded_vars.update(file_vars)
         else:
-            logger.warning('Var file "%s" is empty', path)
+            logger.warning('Variable file "%s" is empty', path)
 
     return loaded_vars
 
 
-def replace_name_with_personnel_info(name, personnel_info):
-    try:
-        name = personnel_info[name]
-    except KeyError:
-        raise exceptions.LoaderConfigError(
-            'Info for personnel "{}" not found'.format(name)
-        )
+class PeopleInfoStore(UserDict[str, PersonInfo]):
+    """Contains info such as name, nation name, Discord ID,... of people."""
 
-    return name
+    def __init__(self, people_info: Mapping[str, PersonInfo]):
+        """Contains info such as name, nation name, Discord ID,... of people.
 
+        Args:
+            info_dict (Mapping[str, PersonInfo]): People info as dict
+        """
 
-def replace_name_list_with_personnel_info(name_list, personnel_info):
-    for i, name in enumerate(name_list):
-        name_list[i] = replace_name_with_personnel_info(name, personnel_info)
+        people_info = copy.deepcopy(people_info)
+        for name, person_info in people_info.items():
+            person_info["name"] = name
+        super().__init__(people_info)
 
-    return name_list
+    @classmethod
+    def from_people_info_var_groups(
+        cls, template_vars: TemplateVars, group_names: Sequence[str]
+    ) -> PeopleInfoStore:
+        """Instantiate from people info variable groups.
 
+        Args:
+            template_vars (TemplateVars): Template variables
+            group_names (Sequence[str]): Group names
 
-def merge_personnel_info_groups(template_vars, personnel_info_groups):
-    personnel_info = {}
-    for group in personnel_info_groups:
+        Raises:
+            LoaderError: Group not found
+
+        Returns:
+            PeopleInfoStore
+        """
+
+        people_info: dict[str, PersonInfo] = {}
+        for group in group_names:
+            try:
+                people_info.update(template_vars[group])
+            except KeyError:
+                raise LoaderError(f'People info variable group "{group}" not found')
+
+        return cls(people_info)
+
+    def __getitem__(self, name: str) -> PersonInfo:
         try:
-            personnel_info.update(copy.deepcopy(template_vars[group]))
+            return super().__getitem__(name)
         except KeyError:
-            raise exceptions.LoaderConfigError(
-                'Personnel info var group "{}" not found'.format(group)
-            )
-
-    for name, info in personnel_info.items():
-        info["name"] = name
-
-    return personnel_info
+            raise LoaderError(f'Info for person "{name}" not found')
 
 
-def add_personnel_info(template_vars, personnel_groups, personnel_info_groups):
-    personnel_info = merge_personnel_info_groups(template_vars, personnel_info_groups)
+def replace_personnel_names_with_info(
+    template_vars: TemplateVars,
+    personnel_group_names: Sequence[str],
+    people_info: PeopleInfoStore,
+) -> None:
+    """Replace values of variables in personnel variable groups with info dicts.
 
-    for group in personnel_groups:
+    Args:
+        template_vars (TemplateVars): Template variables
+        personnel_group_names (Sequence[str]): Personnel variable group names
+        people_info (PeopleInfoStore): People info store
+
+    Raises:
+        LoaderError: Personnel variable group not found
+    """
+
+    for group in personnel_group_names:
         try:
             personnel = template_vars[group]
-            for position, names in personnel.items():
-                if isinstance(names, list):
-                    personnel[position] = replace_name_list_with_personnel_info(
-                        names, personnel_info
-                    )
-                else:
-                    personnel[position] = replace_name_with_personnel_info(
-                        names, personnel_info
-                    )
         except KeyError:
-            raise exceptions.LoaderConfigError(
-                'Personnel var group "{}" not found'.format(group)
-            )
+            raise LoaderError(f'Personnel variable group "{group}" not found')
+
+        for position, names in personnel.items():
+            if isinstance(names, list):
+                person_info_list = list(map(lambda name: people_info[name], names))
+                personnel[position] = person_info_list
+            else:
+                personnel[position] = people_info[names]
 
 
 @loader_api.template_var_loader
@@ -99,10 +127,13 @@ def get_template_vars(loaders_config: Config) -> TemplateVars:
     loader_config = loaders_config["file_template_var_loader"]
 
     template_vars = load_template_vars_from_files(loader_config["template_var_paths"])
-    add_personnel_info(
-        template_vars,
-        loader_config["personnel_groups"],
-        loader_config["personnel_info_groups"],
+
+    people_info = PeopleInfoStore.from_people_info_var_groups(
+        template_vars, loader_config["people_info_groups"]
+    )
+
+    replace_personnel_names_with_info(
+        template_vars, loader_config["personnel_groups"], people_info
     )
 
     return template_vars

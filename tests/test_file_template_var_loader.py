@@ -1,364 +1,198 @@
 import pytest
 
-from nsdu import exceptions
-from nsdu.loaders import file_template_var_loader
+from nsdu.loader_api import LoaderError
+from nsdu.loaders import file_template_var_loader as loader
 
 
 class TestLoadTemplateVarsFromTomlFiles:
-    def test_with_existing_files(self, toml_files):
-        paths = toml_files(
+    @pytest.mark.parametrize(
+        "template_vars,expected",
+        [
+            [
+                {
+                    "vars1.toml": {"foo1": {"bar1": "john1"}},
+                    "vars2.toml": {"foo2": {"bar2": "john2"}},
+                },
+                {"foo1": {"bar1": "john1"}, "foo2": {"bar2": "john2"}},
+            ],
+            [{"vars.toml": {}}, {}],
+            [{}, {}],
+        ],
+    )
+    def test_with_existing_files_returns_variables(
+        self, toml_files, template_vars, expected
+    ):
+        var_paths = toml_files(template_vars).file_paths
+        result = loader.load_template_vars_from_files(var_paths)
+
+        assert result == expected
+
+    def test_with_non_existent_file_raises_exception(self):
+        with pytest.raises(LoaderError):
+            loader.load_template_vars_from_files(["a"])
+
+
+class TestPeopleInfoStore:
+    def test_get_non_existent_person_raises_exception(self):
+        obj = loader.PeopleInfoStore({})
+
+        with pytest.raises(LoaderError):
+            obj[""]
+
+    @pytest.mark.parametrize(
+        "template_vars,group_names,expected",
+        [
+            [
+                {
+                    "i1": {
+                        "n1": {
+                            "nation": "nat1",
+                            "discord_handle": "n1#1",
+                        },
+                        "n2": {
+                            "nation": "nat2",
+                            "discord_handle": "n2#2",
+                        },
+                    },
+                    "i2": {
+                        "n3": {
+                            "nation": "nat3",
+                            "discord_handle": "n3#3",
+                        }
+                    },
+                },
+                ["i1", "i2"],
+                {
+                    "n1": {
+                        "name": "n1",
+                        "nation": "nat1",
+                        "discord_handle": "n1#1",
+                    },
+                    "n2": {
+                        "name": "n2",
+                        "nation": "nat2",
+                        "discord_handle": "n2#2",
+                    },
+                    "n3": {
+                        "name": "n3",
+                        "nation": "nat3",
+                        "discord_handle": "n3#3",
+                    },
+                },
+            ],
+            [{}, [], {}],
+        ],
+    )
+    def test_load_from_people_info_var_groups_returns_dict(
+        self, template_vars, group_names, expected
+    ):
+        result = loader.PeopleInfoStore.from_people_info_var_groups(
+            template_vars, group_names
+        )
+
+        assert result == expected
+
+    def test_load_non_existent_info_var_group_raises_exception(self):
+        with pytest.raises(LoaderError):
+            loader.PeopleInfoStore.from_people_info_var_groups({}, ["i"])
+
+
+class TestReplacePersonnelNamesWithInfo:
+    def test_with_existing_groups_returns_replaced_vars(self):
+        people_info = loader.PeopleInfoStore(
             {
-                "test1.toml": {"foo1": {"bar1": "john1"}},
-                "test2.toml": {"foo2": {"bar2": "john2"}},
+                "n1": {"nation": "nat1", "discord_handle": "n1#1"},
+                "n2": {"nation": "nat2", "discord_handle": "n2#2"},
+                "n3": {"nation": "nat3", "discord_handle": "n3#3"},
             }
         )
-
-        r = file_template_var_loader.load_template_vars_from_files(
-            [str(paths / "test1.toml"), str(paths / "test2.toml")]
-        )
-
-        expected = {"foo1": {"bar1": "john1"}, "foo2": {"bar2": "john2"}}
-        assert r == expected
-
-    def test_with_non_existent_file(self):
-        with pytest.raises(exceptions.LoaderConfigError):
-            file_template_var_loader.load_template_vars_from_files(
-                ["non_existent.toml"]
-            )
-
-    def test_with_empty_file(self, toml_files):
-        paths = toml_files(
-            {"test1.toml": {"foo1": {"bar1": "john1"}}, "test2.toml": ""}
-        )
-
-        r = file_template_var_loader.load_template_vars_from_files(
-            [str(paths / "test1.toml"), str(paths / "test2.toml")]
-        )
-        assert r == {"foo1": {"bar1": "john1"}}
-
-    def test_with_empty_file_list(self):
-        """Load vars if no file is provided in the list.
-        Nothing should happen.
-        """
-
-        file_template_var_loader.load_template_vars_from_files([])
-
-
-class TestReplaceNameWithPersonnelInfo:
-    def test_with_existing_info(self):
-        personnel_info = {
-            "Frodo": {
-                "name": "Frodo",
-                "nation": "Frodonia",
-                "discord_handle": "Frodo#1234",
-            },
-            "Gandalf": {
-                "name": "Frodo",
-                "nation": "Gandalf Republic",
-                "discord_handle": "Gandalf#4321",
-            },
-        }
-
-        r = file_template_var_loader.replace_name_with_personnel_info(
-            "Frodo", personnel_info
-        )
-
-        assert r == {
-            "name": "Frodo",
-            "nation": "Frodonia",
-            "discord_handle": "Frodo#1234",
-        }
-
-    def test_with_non_existing_info(self):
-        personnel_info = {
-            "Frodo": {
-                "name": "Frodo",
-                "nation": "Frodonia",
-                "discord_handle": "Frodo#1234",
-            },
-            "Gandalf": {
-                "name": "Frodo",
-                "nation": "Gandalf Republic",
-                "discord_handle": "Gandalf#4321",
-            },
-        }
-
-        with pytest.raises(exceptions.LoaderConfigError):
-            file_template_var_loader.replace_name_with_personnel_info(
-                "Random", personnel_info
-            )
-
-
-class TestReplaceNameListWithPersonnelInfo:
-    def test_with_existing_info(self):
-        personnel_info = {
-            "Frodo": {
-                "name": "Frodo",
-                "nation": "Frodonia",
-                "discord_handle": "Frodo#1234",
-            },
-            "Gandalf": {
-                "name": "Gandalf",
-                "nation": "Gandalf Republic",
-                "discord_handle": "Gandalf#4321",
-            },
-        }
-
-        r = file_template_var_loader.replace_name_list_with_personnel_info(
-            ["Frodo", "Gandalf"], personnel_info
-        )
-
-        assert r == [
-            {"name": "Frodo", "nation": "Frodonia", "discord_handle": "Frodo#1234"},
-            {
-                "name": "Gandalf",
-                "nation": "Gandalf Republic",
-                "discord_handle": "Gandalf#4321",
-            },
-        ]
-
-    def test_with_non_existing_info(self):
-        personnel_info = {
-            "Frodo": {
-                "name": "Frodo",
-                "nation": "Frodonia",
-                "discord_handle": "Frodo#1234",
-            },
-            "Gandalf": {
-                "name": "Gandalf",
-                "nation": "Gandalf Republic",
-                "discord_handle": "Gandalf#4321",
-            },
-        }
-
-        with pytest.raises(exceptions.LoaderConfigError):
-            file_template_var_loader.replace_name_list_with_personnel_info(
-                ["Frodo", "Random"], personnel_info
-            )
-
-
-class TestMergePersonnelInfoGroups:
-    def test_with_existent_groups(self):
         template_vars = {
-            "info1": {
-                "Frodo": {"nation": "Frodonia", "discord_handle": "Frodo#1234"},
-                "Gandalf": {
-                    "nation": "Gandalf Republic",
-                    "discord_handle": "Gandalf#4321",
-                },
-            },
-            "info2": {
-                "Theoden": {
-                    "nation": "Theoden Federation",
-                    "discord_handle": "Theoden#0974",
-                }
-            },
+            "foo1": "bar1",
+            "p1": {"pos1": "n1", "pos2": ["n1", "n2"]},
+            "p2": {"pos3": "n3"},
         }
 
-        r = file_template_var_loader.merge_personnel_info_groups(
-            template_vars, ["info1", "info2"]
+        loader.replace_personnel_names_with_info(
+            template_vars, ["p1", "p2"], people_info
         )
 
         expected = {
-            "Frodo": {
-                "name": "Frodo",
-                "nation": "Frodonia",
-                "discord_handle": "Frodo#1234",
-            },
-            "Gandalf": {
-                "name": "Gandalf",
-                "nation": "Gandalf Republic",
-                "discord_handle": "Gandalf#4321",
-            },
-            "Theoden": {
-                "name": "Theoden",
-                "nation": "Theoden Federation",
-                "discord_handle": "Theoden#0974",
-            },
-        }
-        assert r == expected
-
-    def test_with_non_existent_groups(self):
-        template_vars = {
-            "info1": {
-                "Frodo": {"nation": "Frodonia", "discord_handle": "Frodo#1234"},
-                "Gandalf": {
-                    "nation": "Gandalf Republic",
-                    "discord_handle": "Gandalf#4321",
+            "foo1": "bar1",
+            "p1": {
+                "pos1": {
+                    "name": "n1",
+                    "nation": "nat1",
+                    "discord_handle": "n1#1",
                 },
-            },
-            "info2": {
-                "Theoden": {
-                    "nation": "Theoden Federation",
-                    "discord_handle": "Theoden#0974",
-                }
-            },
-        }
-
-        with pytest.raises(exceptions.LoaderConfigError):
-            file_template_var_loader.merge_personnel_info_groups(
-                template_vars, ["info1", "random"]
-            )
-
-
-class TestAddPersonnelInfo:
-    def test_with_existing_groups(self):
-        personnel = {
-            "personnel1": {"position1": "Frodo", "position2": ["Gandalf", "Sauron"]},
-            "personnel2": {"position1": "Theoden"},
-        }
-        personnel_info = {
-            "info1": {
-                "Frodo": {"nation": "Frodonia", "discord_handle": "Frodo#1234"},
-                "Gandalf": {
-                    "nation": "Gandalf Republic",
-                    "discord_handle": "Gandalf#4321",
-                },
-                "Sauron": {"nation": "Sauron", "discord_handle": "Sauron#5050"},
-            },
-            "info2": {
-                "Theoden": {
-                    "nation": "Theoden Federation",
-                    "discord_handle": "Theoden#0974",
-                }
-            },
-        }
-        vars = {"foo1": "bar1"}
-        vars.update(personnel)
-        vars.update(personnel_info)
-
-        file_template_var_loader.add_personnel_info(
-            vars, ["personnel1", "personnel2"], ["info1", "info2"]
-        )
-
-        expected = {
-            "personnel1": {
-                "position1": {
-                    "name": "Frodo",
-                    "nation": "Frodonia",
-                    "discord_handle": "Frodo#1234",
-                },
-                "position2": [
+                "pos2": [
                     {
-                        "name": "Gandalf",
-                        "nation": "Gandalf Republic",
-                        "discord_handle": "Gandalf#4321",
+                        "name": "n1",
+                        "nation": "nat1",
+                        "discord_handle": "n1#1",
                     },
                     {
-                        "name": "Sauron",
-                        "nation": "Sauron",
-                        "discord_handle": "Sauron#5050",
+                        "name": "n2",
+                        "nation": "nat2",
+                        "discord_handle": "n2#2",
                     },
                 ],
             },
-            "personnel2": {
-                "position1": {
-                    "name": "Theoden",
-                    "nation": "Theoden Federation",
-                    "discord_handle": "Theoden#0974",
-                }
-            },
-            "foo1": "bar1",
-            "info1": {
-                "Frodo": {"nation": "Frodonia", "discord_handle": "Frodo#1234"},
-                "Gandalf": {
-                    "nation": "Gandalf Republic",
-                    "discord_handle": "Gandalf#4321",
-                },
-                "Sauron": {"nation": "Sauron", "discord_handle": "Sauron#5050"},
-            },
-            "info2": {
-                "Theoden": {
-                    "nation": "Theoden Federation",
-                    "discord_handle": "Theoden#0974",
+            "p2": {
+                "pos3": {
+                    "name": "n3",
+                    "nation": "nat3",
+                    "discord_handle": "n3#3",
                 }
             },
         }
-        assert vars == expected
+        assert template_vars == expected
+
+    def test_with_non_existent_personnel_group_raises_exception(self):
+        people_info = loader.PeopleInfoStore({})
+
+        with pytest.raises(LoaderError):
+            loader.replace_personnel_names_with_info({}, ["p"], people_info)
 
 
-class TestFileVarLoader:
-    def test_integration(self, toml_files):
-        vars_1 = {
-            "personnel1": {"position1": "Frodo", "position2": ["Gandalf", "Sauron"]},
-            "personnel2": {"position1": "Theoden"},
-        }
-        vars_2 = {"foo1": "bar1", "foo2": "bar2"}
-        vars_3 = {
-            "info1": {
-                "Frodo": {"nation": "Frodonia", "discord_handle": "Frodo#1234"},
-                "Gandalf": {
-                    "nation": "Gandalf Republic",
-                    "discord_handle": "Gandalf#4321",
+def test_get_template_vars_returns_template_vars(toml_files):
+    vars1 = {
+        "foo": "bar",
+        "p": {"pos1": "n1", "pos2": ["n2"]},
+    }
+    vars2 = {
+        "i": {
+            "n1": {"nation": "nat1", "discord_handle": "n1#1"},
+            "n2": {"nation": "nat2", "discord_handle": "n2#2"},
+        },
+    }
+    var_paths = toml_files({"vars1.toml": vars1, "vars2.toml": vars2}).file_paths
+
+    config = {
+        "template_var_paths": var_paths,
+        "personnel_groups": ["p"],
+        "people_info_groups": ["i"],
+    }
+    result = loader.get_template_vars({"file_template_var_loader": config})
+
+    expected = {
+        "foo": "bar",
+        "p": {
+            "pos1": {
+                "name": "n1",
+                "nation": "nat1",
+                "discord_handle": "n1#1",
+            },
+            "pos2": [
+                {
+                    "name": "n2",
+                    "nation": "nat2",
+                    "discord_handle": "n2#2",
                 },
-                "Sauron": {"nation": "Sauron", "discord_handle": "Sauron#5050"},
-            },
-            "info2": {
-                "Theoden": {
-                    "nation": "Theoden Federation",
-                    "discord_handle": "Theoden#0974",
-                }
-            },
-        }
-        path = toml_files(
-            {"test1.toml": vars_1, "test2.toml": vars_2, "test3.toml": vars_3}
-        )
-        config = {
-            "template_var_paths": [
-                str(path / "test1.toml"),
-                str(path / "test2.toml"),
-                str(path / "test3.toml"),
             ],
-            "personnel_groups": ["personnel1", "personnel2"],
-            "personnel_info_groups": ["info1", "info2"],
-        }
-
-        r = file_template_var_loader.get_template_vars(
-            {"file_template_var_loader": config}
-        )
-
-        expected = {
-            "personnel1": {
-                "position1": {
-                    "name": "Frodo",
-                    "nation": "Frodonia",
-                    "discord_handle": "Frodo#1234",
-                },
-                "position2": [
-                    {
-                        "name": "Gandalf",
-                        "nation": "Gandalf Republic",
-                        "discord_handle": "Gandalf#4321",
-                    },
-                    {
-                        "name": "Sauron",
-                        "nation": "Sauron",
-                        "discord_handle": "Sauron#5050",
-                    },
-                ],
-            },
-            "personnel2": {
-                "position1": {
-                    "name": "Theoden",
-                    "nation": "Theoden Federation",
-                    "discord_handle": "Theoden#0974",
-                }
-            },
-            "foo1": "bar1",
-            "foo2": "bar2",
-            "info1": {
-                "Frodo": {"nation": "Frodonia", "discord_handle": "Frodo#1234"},
-                "Gandalf": {
-                    "nation": "Gandalf Republic",
-                    "discord_handle": "Gandalf#4321",
-                },
-                "Sauron": {"nation": "Sauron", "discord_handle": "Sauron#5050"},
-            },
-            "info2": {
-                "Theoden": {
-                    "nation": "Theoden Federation",
-                    "discord_handle": "Theoden#0974",
-                }
-            },
-        }
-        assert r == expected
+        },
+        "i": {
+            "n1": {"nation": "nat1", "discord_handle": "n1#1"},
+            "n2": {"nation": "nat2", "discord_handle": "n2#2"},
+        },
+    }
+    assert result == expected
