@@ -6,7 +6,7 @@ from unittest.mock import Mock
 import freezegun
 import pytest
 
-from nsdu.loader_api import DispatchOp
+from nsdu.loader_api import DispatchMetadata, DispatchOp, DispatchOpResult
 from nsdu.loaders import google_dispatch_loader as loader
 from nsdu.loaders.google_dispatch_loader import (
     CategorySetup,
@@ -917,15 +917,9 @@ class TestDispatchConfigStore:
                     )
                 },
                 {
-                    "nat": {
-                        "n": {
-                            "ns_id": "1",
-                            "action": "edit",
-                            "title": "t",
-                            "category": "meta",
-                            "subcategory": "gameplay",
-                        }
-                    }
+                    "n": DispatchMetadata(
+                        "1", DispatchOp.EDIT, "nat", "t", "meta", "gameplay"
+                    )
                 },
             ],
             [
@@ -933,7 +927,7 @@ class TestDispatchConfigStore:
                     "n": Dispatch(
                         ns_id=None,
                         owner_nation="nat",
-                        operation=DispatchOp.EDIT,
+                        operation=DispatchOp.CREATE,
                         title="t",
                         template="tp",
                         category="meta",
@@ -941,14 +935,9 @@ class TestDispatchConfigStore:
                     )
                 },
                 {
-                    "nat": {
-                        "n": {
-                            "action": "edit",
-                            "title": "t",
-                            "category": "meta",
-                            "subcategory": "gameplay",
-                        }
-                    }
+                    "n": DispatchMetadata(
+                        None, DispatchOp.CREATE, "nat", "t", "meta", "gameplay"
+                    )
                 },
             ],
             [{}, {}],
@@ -957,9 +946,9 @@ class TestDispatchConfigStore:
     def test_get_canonical_dispatch_config_returns_canonical_format(
         self, dispatch_config, expected
     ):
-        obj = loader.DispatchConfigStore(dispatch_config)
+        obj = loader.DispatchStore(dispatch_config)
 
-        result = obj.get_canonical_dispatch_config()
+        result = obj.get_dispatches_metadata()
 
         assert result == expected
 
@@ -975,12 +964,12 @@ class TestDispatchConfigStore:
                 subcategory="gameplay",
             )
         }
-        obj = loader.DispatchConfigStore(dispatch_data)
+        obj = loader.DispatchStore(dispatch_data)
 
         assert obj.get_dispatch_template("n") == "tp"
 
     def test_get_non_existent_dispatch_template_raises_exception(self):
-        obj = loader.DispatchConfigStore({})
+        obj = loader.DispatchStore({})
 
         with pytest.raises(KeyError):
             obj.get_dispatch_template("something non existent")
@@ -998,7 +987,7 @@ class TestDispatchConfigStore:
                 subcategory="gameplay",
             )
         }
-        obj = loader.DispatchConfigStore(dispatch_data)
+        obj = loader.DispatchStore(dispatch_data)
 
         obj.add_dispatch_id("n", "1")
         result = obj["n"].ns_id
@@ -1073,7 +1062,7 @@ class TestGoogleDispatchLoader:
             SheetRange("s", "A!A1:F"): range_1_rows,
             SheetRange("s", "B!A1:F"): range_2_rows,
         }
-        dispatches = loader.DispatchConfigStore(
+        dispatches = loader.DispatchStore(
             loader.parse_dispatch_cell_values_of_ranges(
                 dispatch_ranges, owner_nations, category_setups, Mock()
             )
@@ -1091,36 +1080,19 @@ class TestGoogleDispatchLoader:
             Mock(),
         )
 
-    def test_get_dispatch_config_with_many_dispatches_returns_canonical_format(
-        self, loader_obj
-    ):
-        result = loader_obj.get_dispatch_config()
+    def test_get_dispatches_metadata_returns_metadata(self, loader_obj):
+        result = loader_obj.get_dispatches_metadata()
 
         assert result == {
-            "nat1": {
-                "n1": {
-                    "action": "create",
-                    "title": "t1",
-                    "category": "meta",
-                    "subcategory": "gameplay",
-                },
-                "n2": {
-                    "action": "edit",
-                    "ns_id": "2",
-                    "title": "t2",
-                    "category": "meta",
-                    "subcategory": "gameplay",
-                },
-            },
-            "nat2": {
-                "n3": {
-                    "action": "edit",
-                    "ns_id": "3",
-                    "title": "t3",
-                    "category": "meta",
-                    "subcategory": "gameplay",
-                }
-            },
+            "n1": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat1", "t1", "meta", "gameplay"
+            ),
+            "n2": DispatchMetadata(
+                "2", DispatchOp.EDIT, "nat1", "t2", "meta", "gameplay"
+            ),
+            "n3": DispatchMetadata(
+                "3", DispatchOp.EDIT, "nat2", "t3", "meta", "gameplay"
+            ),
         }
 
     def test_get_utility_dispatch_template_returns_correct_template(self, loader_obj):
@@ -1145,7 +1117,7 @@ class TestGoogleDispatchLoader:
         dispatch_ranges = {
             SheetRange("s", "A!A1:F"): range_1_rows,
         }
-        dispatches = loader.DispatchConfigStore(
+        dispatches = loader.DispatchStore(
             loader.parse_dispatch_cell_values_of_ranges(
                 dispatch_ranges, owner_nations, category_setups, Mock()
             )
@@ -1165,7 +1137,7 @@ class TestGoogleDispatchLoader:
         obj.report_result(
             "n",
             DispatchOp.CREATE,
-            "success",
+            DispatchOpResult.SUCCESS,
             datetime(2023, 1, 1),
         )
 

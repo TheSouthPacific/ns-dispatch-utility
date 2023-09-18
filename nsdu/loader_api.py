@@ -107,7 +107,7 @@ def after_update(
     op: DispatchOp,
     result: DispatchOpResult,
     result_time: datetime,
-    result_details: str,
+    result_details: str | None,
 ) -> None:
     """Run after a dispatch operation has finished to get its result.
 
@@ -117,7 +117,7 @@ def after_update(
         op (DispatchOperation): Operation type
         result (DispatchOpResult): Result type
         result_time (datetime): Time the operation finished
-        result_details (str): Result details
+        result_details (str | None): Result details
     """
 
     raise NotImplementedError

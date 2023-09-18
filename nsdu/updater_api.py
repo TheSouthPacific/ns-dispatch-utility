@@ -122,11 +122,15 @@ class DispatchUpdater:
             str: Id of new dispatch
         """
 
+        logger.info('Creating dispatch "%s".', name)
         text = self.get_rendered_dispatch_text(name)
         category_num, subcategory_num = get_category_number(category, subcategory)
+
         new_dispatch_id = self.dispatch_api.create_dispatch(
             title=title, text=text, category=category_num, subcategory=subcategory_num
         )
+        logger.debug('Got ID "%s" of new dispatch "%s".', new_dispatch_id, name)
+        logger.debug('Created dispatch "%s"', name)
         return new_dispatch_id
 
     def edit_dispatch(
@@ -142,8 +146,11 @@ class DispatchUpdater:
             subcategory (str): Subcategory name or number
         """
 
+        logger.info('Editing dispatch "%s".', name)
+
         text = self.get_rendered_dispatch_text(name)
         category_num, subcategory_num = get_category_number(category, subcategory)
+
         self.dispatch_api.edit_dispatch(
             dispatch_id=dispatch_id,
             title=title,
@@ -151,12 +158,15 @@ class DispatchUpdater:
             category=category_num,
             subcategory=subcategory_num,
         )
+        logger.debug('Edited dispatch "%s"', name)
 
-    def remove_dispatch(self, dispatch_id: str) -> None:
+    def remove_dispatch(self, name: str, dispatch_id: str) -> None:
         """Delete a dispatch.
 
         Args:
             dispatch_id (str):  Id
         """
 
+        logger.info('Deleting dispatch "%s".', name)
         self.dispatch_api.remove_dispatch(dispatch_id)
+        logger.debug('Deleted dispatch "%s".', name)

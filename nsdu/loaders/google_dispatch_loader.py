@@ -19,7 +19,12 @@ from googleapiclient.http import HttpError
 
 from nsdu import exceptions, loader_api
 from nsdu.config import Config
-from nsdu.loader_api import DispatchOp, DispatchesMetadata
+from nsdu.loader_api import (
+    DispatchMetadata,
+    DispatchOp,
+    DispatchOpResult,
+    DispatchesMetadata,
+)
 
 GOOGLE_API_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
 
@@ -881,40 +886,27 @@ def generate_new_dispatch_cell_values_for_ranges(
     return new_spreadsheet_cell_values
 
 
-class DispatchConfigStore(UserDict[str, Dispatch]):
-    """Manage configurations of dispatches
-    (e.g. ID, title, category, template,...)."""
+class DispatchStore(UserDict[str, Dispatch]):
+    """Contains template and metadata of dispatches."""
 
-    def get_canonical_dispatch_config(self):
-        """Get dispatch config in NSDU format.
+    def get_dispatches_metadata(self) -> DispatchesMetadata:
+        """Get metadata of all dispatches.
 
         Returns:
-            dict: Canonical dispatch config
+            DispatchesMetadata: Metadata of dispatches
         """
 
-        result = {}
-        for name, dispatch in self.data.items():
-            match dispatch.operation:
-                case DispatchOp.CREATE:
-                    canonical_operation = "create"
-                case DispatchOp.EDIT:
-                    canonical_operation = "edit"
-                case DispatchOp.DELETE:
-                    canonical_operation = "remove"
-
-            canonical_config = {
-                "action": canonical_operation,
-                "title": dispatch.title,
-                "category": dispatch.category,
-                "subcategory": dispatch.subcategory,
-            }
-            if dispatch.ns_id is not None:
-                canonical_config["ns_id"] = dispatch.ns_id
-            owner_nation = dispatch.owner_nation
-            if owner_nation not in result:
-                result[owner_nation] = {}
-            result[owner_nation][name] = canonical_config
-        return result
+        return {
+            name: DispatchMetadata(
+                dispatch.ns_id,
+                dispatch.operation,
+                dispatch.owner_nation,
+                dispatch.title,
+                dispatch.category,
+                dispatch.subcategory,
+            )
+            for name, dispatch in self.data.items()
+        }
 
     def get_dispatch_template(self, name: str) -> str:
         """Get dispatch template text.
@@ -955,7 +947,7 @@ class GoogleDispatchLoader:
         self,
         api: GoogleSheetsApiAdapter,
         dispatch_rows: Mapping[SheetRange, DispatchRows],
-        dispatches: DispatchConfigStore,
+        dispatches: DispatchStore,
         utility_templates: Mapping[str, str],
         owner_nations: OwnerNationStore,
         category_setups: CategorySetupStore,
@@ -971,14 +963,14 @@ class GoogleDispatchLoader:
         self.utility_templates = utility_templates
         self.dispatches = dispatches
 
-    def get_dispatch_config(self) -> dict:
-        """Get dispatch config.
+    def get_dispatches_metadata(self) -> DispatchesMetadata:
+        """Get metadata of all dispatches.
 
         Returns:
-            dict: Dispatch config
+            DispatchesMetadata: Metadata of dispatches
         """
 
-        return self.dispatches.get_canonical_dispatch_config()
+        return self.dispatches.get_dispatches_metadata()
 
     def get_dispatch_template(self, name: str) -> str:
         """Get dispatch template text.
@@ -1007,23 +999,25 @@ class GoogleDispatchLoader:
     def report_result(
         self,
         name: str,
-        operation: DispatchOp,
-        result: str,
+        op: DispatchOp,
+        result: DispatchOpResult,
         result_time: datetime,
+        result_details: str | None = None,
     ) -> None:
         """Report operation result from NSDU.
 
         Args:
             name (str): Dispatch name
             operation (str): Dispatch operation
-            result (str): Result
+            result (DispatchOpResult): Result type
             result_time (datetime): Time update operation happened
+            result_details (str): Result details. Defaults to None
         """
 
-        if result == "success":
-            self.op_result_store.report_success(name, operation, result_time)
+        if result == DispatchOpResult.SUCCESS:
+            self.op_result_store.report_success(name, op, result_time)
         else:
-            self.op_result_store.report_failure(name, operation, result, result_time)
+            self.op_result_store.report_failure(name, op, result_details, result_time)
 
     def update_spreadsheets(self) -> None:
         """Update spreadsheets."""
@@ -1100,7 +1094,7 @@ def init_dispatch_loader(loaders_config: Config):
         sheets_api,
         flatten_spreadsheet_config(loader_config["dispatch_spreadsheets"]),
     )
-    dispatches = DispatchConfigStore(
+    dispatches = DispatchStore(
         parse_dispatch_cell_values_of_ranges(
             dispatch_rows,
             owner_nations,
@@ -1124,7 +1118,7 @@ def init_dispatch_loader(loaders_config: Config):
 
 @loader_api.dispatch_loader
 def get_dispatch_metadata(loader: GoogleDispatchLoader) -> DispatchesMetadata:
-    return loader.get_dispatch_config()
+    return loader.get_dispatches_metadata()
 
 
 @loader_api.dispatch_loader
@@ -1137,20 +1131,11 @@ def after_update(
     loader: GoogleDispatchLoader,
     name: str,
     op: DispatchOp,
-    result: str,
+    result: DispatchOpResult,
     result_time: datetime,
+    result_details: str | None,
 ) -> None:
-    match op:
-        case "create":
-            operation = DispatchOp.CREATE
-        case "edit":
-            operation = DispatchOp.EDIT
-        case "remove":
-            operation = DispatchOp.DELETE
-        case _:
-            raise ValueError("Invalid dispatch action")
-
-    loader.report_result(name, operation, result, result_time)
+    loader.report_result(name, op, result, result_time, result_details)
 
 
 @loader_api.dispatch_loader
