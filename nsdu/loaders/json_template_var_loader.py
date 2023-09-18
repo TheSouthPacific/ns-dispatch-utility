@@ -1,11 +1,11 @@
 """Load template variables from JSON files."""
 
 import json
-import pathlib
 
 from nsdu import loader_api
 from nsdu.config import Config
 from nsdu.loader_api import TemplateVars
+from nsdu.utils import expanded_path
 
 
 @loader_api.template_var_loader
@@ -17,7 +17,7 @@ def get_template_vars(loaders_config: Config) -> TemplateVars:
     template_vars = {}
     for path in var_json_paths:
         try:
-            file_content = pathlib.Path(path).expanduser().read_text()
+            file_content = expanded_path(path).read_text()
             template_vars.update(json.loads(file_content))
         except FileNotFoundError as err:
             raise loader_api.LoaderError(f'JSON var file "{path}" not found') from err
