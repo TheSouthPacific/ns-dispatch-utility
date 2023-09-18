@@ -7,7 +7,7 @@ from nsdu import config, info
 
 class TestGetConfigFromEnv:
     def test_with_env(self, toml_files):
-        config_path = toml_files({"config.toml": {"a": "b"}})
+        config_path = toml_files({"config.toml": {"a": "b"}}).file_paths[0]
 
         r = config.get_config_from_env(config_path)
 
@@ -20,7 +20,7 @@ class TestGetConfigFromEnv:
 
 class TestGetConfigFromDefault:
     def test_with_existing_config_file(self, toml_files):
-        config_path = toml_files({info.CONFIG_NAME: {"a": "b"}})
+        config_path = toml_files({info.CONFIG_NAME: {"a": "b"}}).file_paths[0]
 
         r = config.get_config_from_default(
             config_path.parent, info.DEFAULT_CONFIG_PATH, info.CONFIG_NAME

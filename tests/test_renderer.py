@@ -3,7 +3,7 @@ from unittest.mock import Mock
 
 import pytest
 
-from nsdu import config, exceptions, renderer
+from nsdu import config, loader_api, renderer
 
 
 class TestDispatchTemplateLoader:
@@ -16,10 +16,10 @@ class TestDispatchTemplateLoader:
         assert result[0] == "r"
 
     def test_with_template_not_exist_raises_exception(self):
-        template_load_func = Mock(side_effect=exceptions.DispatchTemplateNotFound)
+        template_load_func = Mock(side_effect=loader_api.DispatchTemplateNotFound)
         obj = renderer.JinjaTemplateLoader(template_load_func)
 
-        with pytest.raises(exceptions.DispatchTemplateNotFound):
+        with pytest.raises(loader_api.DispatchTemplateNotFound):
             obj.get_source(Mock(), "")
 
 
@@ -35,10 +35,10 @@ class TestTemplateRenderer:
         assert result == expected
 
     def test_render_non_existent_template_raises_exception(self):
-        template_load_func = Mock(side_effect=exceptions.DispatchTemplateNotFound)
+        template_load_func = Mock(side_effect=loader_api.DispatchTemplateNotFound)
         obj = renderer.TemplateRenderer(template_load_func)
 
-        with pytest.raises(exceptions.DispatchTemplateNotFound):
+        with pytest.raises(loader_api.DispatchTemplateNotFound):
             obj.render("t", {})
 
     def test_load_filters_then_render_uses_filters_when_rendering(self):

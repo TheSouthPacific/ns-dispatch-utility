@@ -8,7 +8,7 @@ from typing import Any
 
 import pluggy
 
-from nsdu import info
+from nsdu import exceptions, info
 from nsdu.config import Config
 
 TemplateVars = dict[str, Any]
@@ -40,6 +40,18 @@ class DispatchMetadata:
     title: str
     category: str
     subcategory: str
+
+
+class LoaderError(exceptions.NSDUError):
+    """Error from loader plugins."""
+
+
+class CredNotFound(LoaderError):
+    """Login credential not found. This exception is for credential loaders."""
+
+
+class DispatchTemplateNotFound(LoaderError):
+    """Dispatch template not found. This exception is for dispatch loaders."""
 
 
 DispatchesMetadata = dict[str, DispatchMetadata]

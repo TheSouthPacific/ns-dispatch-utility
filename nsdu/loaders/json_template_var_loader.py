@@ -3,7 +3,7 @@
 import json
 import pathlib
 
-from nsdu import exceptions, loader_api
+from nsdu import loader_api
 from nsdu.config import Config
 from nsdu.loader_api import TemplateVars
 
@@ -20,11 +20,9 @@ def get_template_vars(loaders_config: Config) -> TemplateVars:
             file_content = pathlib.Path(path).expanduser().read_text()
             template_vars.update(json.loads(file_content))
         except FileNotFoundError as err:
-            raise exceptions.LoaderConfigError(
-                f'JSON var file "{path}" not found'
-            ) from err
+            raise loader_api.LoaderError(f'JSON var file "{path}" not found') from err
         except json.JSONDecodeError as err:
-            raise exceptions.LoaderConfigError(
+            raise loader_api.LoaderError(
                 f'JSON var file "{path}" is invalid: {err}'
             ) from err
 

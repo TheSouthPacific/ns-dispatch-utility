@@ -2,33 +2,34 @@ from unittest import mock
 
 import nationstates
 import pytest
+from nationstates import exceptions as ns_exceptions
 
-from nsdu import exceptions, ns_api
+from nsdu import ns_api
 
 
 class TestRaiseNsduException:
     def test_unknown_dispatch_raises_specific_nsdu_exception(self):
-        exception = nationstates.exceptions.APIUsageError("Unknown dispatch.")
-        with pytest.raises(exceptions.UnknownDispatchError):
+        exception = ns_exceptions.APIUsageError("Unknown dispatch.")
+        with pytest.raises(ns_api.UnknownDispatchError):
             ns_api.raise_nsdu_exception(exception)
 
     def test_not_owner_dispatch_raises_specific_nsdu_exception(self):
-        exception = nationstates.exceptions.APIUsageError(
+        exception = ns_exceptions.APIUsageError(
             "You are not the author of this dispatch."
         )
-        with pytest.raises(exceptions.NotOwnerDispatchError):
+        with pytest.raises(ns_api.NotOwnerDispatchError):
             ns_api.raise_nsdu_exception(exception)
 
     def test_forbidden_raises_specific_nsdu_exception(self):
-        exception = nationstates.exceptions.Forbidden()
+        exception = ns_exceptions.Forbidden()
 
-        with pytest.raises(exceptions.NationLoginError):
+        with pytest.raises(ns_api.NationLoginError):
             ns_api.raise_nsdu_exception(exception)
 
     def test_other_exception_raises_general_api_error_nsdu_exception(self):
-        exception = nationstates.exceptions.APIUsageError()
+        exception = ns_exceptions.APIUsageError()
 
-        with pytest.raises(exceptions.DispatchApiError):
+        with pytest.raises(ns_api.DispatchApiError):
             ns_api.raise_nsdu_exception(exception)
 
 
@@ -49,12 +50,12 @@ class TestLoginApi:
     def test_get_autologin_code_from_incorrect_password_raises_exception(self):
         original_api = mock.create_autospec(nationstates.Nationstates)
         original_api.nation.return_value = mock.Mock(
-            get_shards=mock.Mock(side_effect=nationstates.exceptions.Forbidden)
+            get_shards=mock.Mock(side_effect=ns_exceptions.Forbidden)
         )
         api = ns_api.AuthApi("")
         api.original_api = original_api
 
-        with pytest.raises(exceptions.NationLoginError):
+        with pytest.raises(ns_api.NationLoginError):
             api.get_autologin_code("my_nation", "something wrong")
 
     def test_verify_correct_autologin_code_returns_true(self):
@@ -67,7 +68,7 @@ class TestLoginApi:
     def test_verify_incorrect_autologin_code_returns_false(self):
         original_api = mock.create_autospec(nationstates.Nationstates)
         original_api.nation.return_value = mock.Mock(
-            get_shards=mock.Mock(side_effect=nationstates.exceptions.Forbidden)
+            get_shards=mock.Mock(side_effect=ns_exceptions.Forbidden)
         )
         api = ns_api.AuthApi("")
         api.original_api = original_api

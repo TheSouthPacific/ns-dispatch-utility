@@ -7,28 +7,8 @@ import sys
 from importlib import util as import_util
 from pathlib import Path
 from types import ModuleType
-from typing import Mapping
 
 logger = logging.getLogger(__name__)
-
-
-def get_dispatch_info(dispatch_config: Mapping) -> dict:
-    """Return dispatch information for use as context in the template renderer.
-
-    Args:
-        dispatch_config (Mapping): Dispatch configuration.
-
-    Returns:
-        dict: Dispatch information.
-    """
-
-    dispatch_info = {}
-    for nation, dispatches in dispatch_config.items():
-        for name, config in dispatches.items():
-            config["owner_nation"] = nation
-            dispatch_info[name] = config
-
-    return dispatch_info
 
 
 def expanded_path(path: Path | str) -> Path:

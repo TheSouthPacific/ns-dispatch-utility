@@ -12,6 +12,19 @@ from nsdu.renderer import TemplateLoadFunc, TemplateVars
 logger = logging.getLogger(__name__)
 
 
+class DispatchMetadataError(exceptions.NSDUError):
+    """Dispatch config error."""
+
+
+class NonExistentCategoryError(DispatchMetadataError):
+    """Category or subcategory doesn't exist."""
+
+    def __init__(self, category_type, category_value):
+        self.category_type = category_type
+        self.category_value = category_value
+        super().__init__()
+
+
 def get_category_number(category: str, subcategory: str) -> Tuple[str, str]:
     """Get the number of a dispatch category or subcategory name.
     If the provided names are numbers, just return the numbers as is.
@@ -33,14 +46,12 @@ def get_category_number(category: str, subcategory: str) -> Tuple[str, str]:
             category_info = info.CATEGORIES[category.lower()]
             category_num = category_info["num"]
         except KeyError as err:
-            raise exceptions.NonexistentCategoryError("category", category) from err
+            raise NonExistentCategoryError("category", category) from err
 
         try:
             subcategory_num = category_info["subcategories"][subcategory.lower()]
         except KeyError as err:
-            raise exceptions.NonexistentCategoryError(
-                "subcategory", subcategory
-            ) from err
+            raise NonExistentCategoryError("subcategory", subcategory) from err
     else:
         category_num = category
         subcategory_num = subcategory

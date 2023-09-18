@@ -17,13 +17,14 @@ from google.oauth2 import service_account
 from googleapiclient import discovery
 from googleapiclient.http import HttpError
 
-from nsdu import exceptions, loader_api
+from nsdu import loader_api
 from nsdu.config import Config
 from nsdu.loader_api import (
     DispatchesMetadata,
     DispatchMetadata,
     DispatchOp,
     DispatchOpResult,
+    LoaderError,
 )
 
 GOOGLE_API_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]
@@ -76,7 +77,7 @@ class Dispatch(loader_api.DispatchMetadata):
     template: str
 
 
-class GoogleDispatchLoaderError(exceptions.LoaderError):
+class GoogleDispatchLoaderError(LoaderError):
     """Base class for exceptions from this loader."""
 
 

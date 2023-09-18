@@ -10,7 +10,7 @@ from typing import Mapping, Sequence
 
 from nsdu import config, loader_api
 from nsdu.config import Config
-from nsdu.loader_api import LoaderError, TemplateVars
+from nsdu.loader_api import TemplateVars
 
 logger = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ def load_template_vars_from_files(paths: Sequence[str]) -> TemplateVars:
             file_vars = config.get_config_from_toml(path)
             logger.debug('Loaded variable file "%s"', path)
         except FileNotFoundError:
-            raise LoaderError(f'Variable file "{path}" not found')
+            raise loader_api.LoaderError(f'Variable file "{path}" not found')
 
         if file_vars is not None:
             loaded_vars.update(file_vars)
@@ -70,7 +70,7 @@ class PeopleInfoStore(UserDict[str, PersonInfo]):
             group_names (Sequence[str]): Group names
 
         Raises:
-            LoaderError: Group not found
+            loader_api.LoaderError: Group not found
 
         Returns:
             PeopleInfoStore
@@ -81,7 +81,9 @@ class PeopleInfoStore(UserDict[str, PersonInfo]):
             try:
                 people_info.update(template_vars[group])
             except KeyError:
-                raise LoaderError(f'People info variable group "{group}" not found')
+                raise loader_api.LoaderError(
+                    f'People info variable group "{group}" not found'
+                )
 
         return cls(people_info)
 
@@ -89,7 +91,7 @@ class PeopleInfoStore(UserDict[str, PersonInfo]):
         try:
             return super().__getitem__(name)
         except KeyError:
-            raise LoaderError(f'Info for person "{name}" not found')
+            raise loader_api.LoaderError(f'Info for person "{name}" not found')
 
 
 def replace_personnel_names_with_info(
@@ -105,14 +107,16 @@ def replace_personnel_names_with_info(
         people_info (PeopleInfoStore): People info store
 
     Raises:
-        LoaderError: Personnel variable group not found
+        loader_api.LoaderError: Personnel variable group not found
     """
 
     for group in personnel_group_names:
         try:
             personnel = template_vars[group]
         except KeyError:
-            raise LoaderError(f'Personnel variable group "{group}" not found')
+            raise loader_api.LoaderError(
+                f'Personnel variable group "{group}" not found'
+            )
 
         for position, names in personnel.items():
             if isinstance(names, list):

@@ -5,19 +5,19 @@ from nsdu import updater_api
 
 class TestGetCategoryNumber:
     def test_all_alpha_inputs_returns_correct_numbers(self):
-        cat_num, subcat_num = updater_api.get_category_number("factbook", "overview")
+        cat_num, sub_cat_num = updater_api.get_category_number("factbook", "overview")
 
-        assert cat_num == "1" and subcat_num == "100"
+        assert cat_num == "1" and sub_cat_num == "100"
 
     def test_all_alpha_inputs_with_uppercase_letters_returns_correct_numbers(self):
-        cat_num, subcat_num = updater_api.get_category_number("Factbook", "Overview")
+        cat_num, sub_cat_num = updater_api.get_category_number("Factbook", "Overview")
 
-        assert cat_num == "1" and subcat_num == "100"
+        assert cat_num == "1" and sub_cat_num == "100"
 
     def test_no_alpha_inputs_returns_inputs(self):
-        cat_num, subcat_num = updater_api.get_category_number("1", "100")
+        cat_num, sub_cat_num = updater_api.get_category_number("1", "100")
 
-        assert cat_num == "1" and subcat_num == "100"
+        assert cat_num == "1" and sub_cat_num == "100"
 
 
 class TestDispatchUpdater:
@@ -90,6 +90,6 @@ class TestDispatchUpdater:
         dispatch_api = mock.Mock()
         updater.dispatch_api = dispatch_api
 
-        updater.remove_dispatch("12345")
+        updater.remove_dispatch("foo", "12345")
 
         dispatch_api.remove_dispatch.assert_called_with("12345")

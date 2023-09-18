@@ -10,7 +10,7 @@ from typing import Sequence
 import toml
 
 import nsdu
-from nsdu import exceptions, loader_api
+from nsdu import loader_api
 from nsdu.config import Config
 
 DEFAULT_ID_STORE_FILENAME = "dispatch_id.json"
@@ -41,7 +41,7 @@ class DispatchConfigManager:
                     dispatch_config_path
                 ] = nsdu.get_config_from_toml(dispatch_config_path)
             except FileNotFoundError:
-                raise exceptions.LoaderConfigError(
+                raise loader_api.LoaderError(
                     f"Dispatch config file {dispatch_config_path} not found."
                 )
 
@@ -177,12 +177,12 @@ def init_dispatch_loader(loaders_config: Config):
     try:
         loader_config = loaders_config["file_dispatch_loader"]
     except KeyError:
-        raise exceptions.LoaderConfigError("File dispatch loader does not have config.")
+        raise loader_api.LoaderError("File dispatch loader does not have config.")
 
     try:
         dispatch_config_paths = loader_config["dispatch_config_paths"]
     except KeyError:
-        raise exceptions.LoaderConfigError("There is no dispatch config path!")
+        raise loader_api.LoaderError("There is no dispatch config path!")
 
     dispatch_config_manager = DispatchConfigManager()
     dispatch_config_manager.load_from_files(dispatch_config_paths)
@@ -192,7 +192,7 @@ def init_dispatch_loader(loaders_config: Config):
             loader_config["dispatch_template_path"]
         ).expanduser()
     except KeyError:
-        raise exceptions.LoaderConfigError("There is no dispatch template path!")
+        raise loader_api.LoaderError("There is no dispatch template path!")
 
     loader = FileDispatchLoader(
         dispatch_config_manager,

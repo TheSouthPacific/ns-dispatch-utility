@@ -1,6 +1,6 @@
 import pytest
 
-from nsdu import exceptions
+from nsdu import loader_api
 from nsdu.loaders import json_template_var_loader
 
 
@@ -39,13 +39,13 @@ class TestJsonTemplateVarLoader:
             "json_template_var_loader": {"template_var_paths": [json_path]}
         }
 
-        with pytest.raises(exceptions.LoaderConfigError):
+        with pytest.raises(loader_api.LoaderError):
             json_template_var_loader.get_template_vars(loader_config)
 
     def test_load_non_existent_json_file_raises_exception(self):
         loader_config = {"json_template_var_loader": {"template_var_paths": ["abcd"]}}
 
-        with pytest.raises(exceptions.LoaderConfigError):
+        with pytest.raises(loader_api.LoaderError):
             json_template_var_loader.get_template_vars(loader_config)
 
     def test_no_template_var_path_provided_returns_empty_dict(self):

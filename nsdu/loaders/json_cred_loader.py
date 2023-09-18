@@ -5,7 +5,7 @@ import json
 import logging
 from pathlib import Path
 
-from nsdu import exceptions, info, loader_api
+from nsdu import info, loader_api
 from nsdu.config import Config
 
 CRED_FILENAME = "creds.json"
@@ -60,7 +60,7 @@ class JSONCredLoader:
         """
 
         if name not in self.creds:
-            raise exceptions.CredNotFound(
+            raise loader_api.CredNotFound(
                 'Credential of nation "{}" not found.'.format(name)
             )
         del self.creds[name]
