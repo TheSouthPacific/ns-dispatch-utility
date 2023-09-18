@@ -136,7 +136,7 @@ class DispatchLoaderManager(PersistentLoaderManager):
         op: loader_api.DispatchOp,
         result: loader_api.DispatchOpResult,
         result_time: datetime,
-        result_details: str | None,
+        result_details: str | None = None,
     ) -> None:
         self.manager.hook.after_update(
             loader=self.loader,
