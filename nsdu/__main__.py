@@ -1,5 +1,7 @@
 """NationStates Dispatch Utility."""
 
+from __future__ import annotations
+
 import abc
 import argparse
 import importlib.metadata as import_metadata
@@ -7,165 +9,211 @@ import logging
 import logging.config
 import signal
 import sys
+from argparse import Namespace
 from datetime import datetime, timezone
 from typing import Sequence
 
-from nsdu import config, exceptions, info, loader_managers, ns_api, updater_api, utils
-from nsdu.loader_managers import (
-    DispatchLoaderManager,
-    LoaderManagerBuilder,
-    TemplateVarLoaderManager,
-    CredLoaderManager,
-    SimpleBbcLoaderManager,
+from nsdu import (
+    config,
+    exceptions,
+    info,
+    loader_api,
+    loader_managers,
+    ns_api,
+    updater_api,
+    utils,
 )
 from nsdu.config import Config
+from nsdu.loader_api import DispatchesMetadata, DispatchOp, DispatchOpResult
+from nsdu.loader_managers import (
+    CredLoaderManager,
+    DispatchLoaderManager,
+    LoaderManagerBuilder,
+    SimpleBbcLoaderManager,
+    TemplateVarLoaderManager,
+)
 
 logger = logging.getLogger("NSDU")
 
 
-class OperationWrapper(abc.ABC):
-    """Interface for classes that wrap related NSDU's operations."""
+class CredOperationError(exceptions.NSDUError):
+    """Error about a login credential operation (e.g. add, remove)."""
+
+
+class Feature(abc.ABC):
+    """Base class for a facade class which handles a feature."""
 
     @abc.abstractmethod
     def cleanup(self) -> None:
-        """Perform final save and cleanup."""
+        """Perform saves and cleanup before exiting."""
 
 
-class DispatchOperations(OperationWrapper):
-    """A wrapper for dispatch operations such as update."""
+class DispatchFeature(Feature):
+    """Handles the dispatch feature."""
 
     def __init__(
         self,
         dispatch_updater: updater_api.DispatchUpdater,
         dispatch_loader_manager: DispatchLoaderManager,
         cred_loader_manager: CredLoaderManager,
-        dispatch_config: dict,
-        dispatch_info: dict,
+        dispatches_metadata: DispatchesMetadata,
     ) -> None:
-        """A wrapper for dispatch operations such as update.
+        """Handles the dispatch features.
 
         Args:
             dispatch_updater (updater_api.DispatchUpdater): Dispatch updater
-            dispatch_loader_manager (loader.DispatchLoaderManager): Dispatch loader
-            manager
-            dispatch_config (dict): Dispatch config
-            dispatch_info (dict): Dispatch info
-            creds (Mapping[str, str]): Nation login credentials
+            dispatch_loader_manager (DispatchLoaderManager): Dispatch loader manager
+            cred_loader_manager (CredLoaderManager): Credential loader manager
+            dispatch_metadata (DispatchesMetadata): Metadata of dispatches
         """
 
         self.dispatch_updater = dispatch_updater
         self.dispatch_loader_manager = dispatch_loader_manager
-        self.dispatch_config = dispatch_config
-        self.dispatch_info = dispatch_info
+        self.dispatches_metadata = dispatches_metadata
         self.cred_loader_manager = cred_loader_manager
 
-    def update_a_dispatch(self, name: str) -> None:
-        """Update a dispatch.
+    @classmethod
+    def from_nsdu_config(
+        cls, nsdu_config: Config, loader_manager_builder: LoaderManagerBuilder
+    ) -> DispatchFeature:
+        """Setup this feature with NSDU's config.
+
+        Args:
+            nsdu_config (Config): NSDU's config
+            loader_manager_builder (LoaderManagerBuilder): Loader manager builder
+
+        Returns:
+            DispatchFeature
+        """
+
+        loader_opts = nsdu_config["loaders"]
+        loaders_config = nsdu_config["loaders_config"]
+
+        dispatch_loader_manager = DispatchLoaderManager(loaders_config)
+        template_var_loader_manager = TemplateVarLoaderManager(loaders_config)
+        simple_bbc_loader_manager = SimpleBbcLoaderManager(loaders_config)
+        cred_loader_manager = CredLoaderManager(loaders_config)
+
+        loader_manager_builder.build(
+            dispatch_loader_manager, loader_opts["dispatch_loader"]
+        )
+        loader_manager_builder.build(
+            template_var_loader_manager, loader_opts["template_var_loader"]
+        )
+        loader_manager_builder.build(cred_loader_manager, loader_opts["cred_loader"])
+        loader_manager_builder.build(
+            simple_bbc_loader_manager, loader_opts["simple_bb_loader"]
+        )
+
+        cred_loader_manager.init_loader()
+
+        dispatch_loader_manager.init_loader()
+        dispatch_metadata = dispatch_loader_manager.get_dispatch_metadata()
+        logger.debug("Loaded dispatch config: %r", dispatch_metadata)
+
+        simple_bb_config = simple_bbc_loader_manager.get_simple_bbc_config()
+
+        template_vars = template_var_loader_manager.get_all_template_vars()
+        template_vars["dispatch_info"] = dispatch_metadata
+
+        rendering_config = nsdu_config.get("rendering", {})
+        dispatch_updater = updater_api.DispatchUpdater(
+            user_agent=nsdu_config["general"]["user_agent"],
+            template_filter_paths=rendering_config.get("filter_paths", None),
+            simple_fmts_config=simple_bb_config,
+            complex_fmts_source_path=rendering_config.get(
+                "complex_formatter_source_path", None
+            ),
+            template_load_func=dispatch_loader_manager.get_dispatch_template,
+            template_vars=template_vars,
+        )
+
+        return cls(
+            dispatch_updater,
+            dispatch_loader_manager,
+            cred_loader_manager,
+            dispatch_metadata,
+        )
+
+    def execute_dispatch_op(self, name: str) -> None:
+        """Execute a dispatch operation.
 
         Args:
             name (str): Dispatch name
         """
 
-        config = self.dispatch_info[name]
-        category = config["category"]
-        subcategory = config["subcategory"]
-        title = config["title"]
-        action = config["action"]
+        metadata = self.dispatches_metadata[name]
+        dispatch_id = metadata.ns_id
+        title = metadata.title
+        operation = metadata.operation
+        category = metadata.category
+        subcategory = metadata.subcategory
 
-        if action not in ("create", "edit", "remove"):
-            raise exceptions.DispatchConfigError(
-                f'Invalid action "{action}" on dispatch "{name}".'
-            )
-        dispatch_id = config.get("ns_id")
         result_time = datetime.now(tz=timezone.utc)
 
         try:
-            if action == "create":
-                logger.debug('Creating dispatch "%s" with params: %r', name, config)
+            if operation == DispatchOp.CREATE:
                 new_dispatch_id = self.dispatch_updater.create_dispatch(
                     name, title, category, subcategory
                 )
-                logger.debug('Got id "%s" of new dispatch "%s".', new_dispatch_id, name)
                 self.dispatch_loader_manager.add_dispatch_id(name, new_dispatch_id)
-                logger.info('Created dispatch "%s".', name)
-            elif action == "edit":
-                logger.debug(
-                    'Editing dispatch "%s" with id "%s" and with params: %r',
-                    name,
-                    dispatch_id,
-                    config,
-                )
+            elif operation == DispatchOp.EDIT:
+                if dispatch_id is None:
+                    raise ValueError
                 self.dispatch_updater.edit_dispatch(
                     name, dispatch_id, title, category, subcategory
                 )
-                logger.info('Edited dispatch "%s".', name)
-            elif action == "remove":
-                logger.debug('Removing dispatch "%s" with id "%s".', name, dispatch_id)
-                self.dispatch_updater.remove_dispatch(dispatch_id)
-                logger.info('Removed dispatch "%s".', name)
-            result_time = datetime.now(tz=timezone.utc)
+            elif operation == DispatchOp.DELETE:
+                if dispatch_id is None:
+                    raise ValueError
+                self.dispatch_updater.remove_dispatch(name, dispatch_id)
+
             self.dispatch_loader_manager.after_update(
-                name, action, "success", result_time
+                name, operation, DispatchOpResult.SUCCESS, result_time
             )
-        except exceptions.UnknownDispatchError:
-            logger.error(
-                'Could not find dispatch "%s" with id "%s".', name, dispatch_id
-            )
+        except ns_api.DispatchApiError as err:
+            err_message = str(err)
+            logger.error(err_message)
             self.dispatch_loader_manager.after_update(
-                name, action, "unknown-dispatch-error", result_time
-            )
-        except exceptions.NotOwnerDispatchError:
-            logger.error('Dispatch "%s" is not owned by this nation.', name)
-            self.dispatch_loader_manager.after_update(
-                name, action, "not-owner-dispatch-error", result_time
-            )
-        except exceptions.NonexistentCategoryError as err:
-            logger.error(
-                '%s "%s" of dispatch "%s" is invalid.',
-                err.category_type,
-                err.category_value,
-                name,
-            )
-            self.dispatch_loader_manager.after_update(
-                name, action, "invalid-category-options", result_time
+                name, operation, DispatchOpResult.FAILURE, result_time, err_message
             )
 
-    def update_dispatches(self, names: Sequence[str]) -> None:
-        """Update dispatches. Empty list means update all.
+    def execute_dispatch_ops(self, names: Sequence[str]) -> None:
+        """Execute operations of dispatches with provided names.
+        Empty list means all dispatches.
 
         Args:
             names (Sequence[str]): Dispatch names
         """
 
         names = list(names)
-        if names:
-            while names[-1] not in self.dispatch_info:
-                logger.error('Could not find dispatch "%s"', names[-1])
-                names.pop()
-                if not names:
-                    return
+        while names and names[-1] not in self.dispatches_metadata:
+            logger.error('Could not find dispatch "%s"', names[-1])
+            names.pop()
 
-        for owner_nation, dispatch_config in self.dispatch_config.items():
+        dispatch_groups: dict[str, DispatchesMetadata] = {}
+        for name, metadata in self.dispatches_metadata.items():
+            owner_nation = metadata.owner_nation
+            if owner_nation not in dispatch_groups:
+                dispatch_groups[owner_nation] = {}
+            dispatch_groups[owner_nation][name] = metadata
+
+        for owner_nation, dispatches_metadata in dispatch_groups.items():
             try:
                 owner_nation = utils.canonical_nation_name(owner_nation)
-                self.dispatch_updater.set_owner_nation(
-                    owner_nation, self.cred_loader_manager.get_cred(owner_nation)
-                )
+                owner_nation_cred = self.cred_loader_manager.get_cred(owner_nation)
+                self.dispatch_updater.set_owner_nation(owner_nation, owner_nation_cred)
                 logger.info('Begin to update dispatches of nation "%s".', owner_nation)
-            except exceptions.NationLoginError:
+            except ns_api.NationLoginError:
                 logger.error('Could not log in to nation "%s".', owner_nation)
                 continue
             except KeyError:
                 logger.error('Nation "%s" has no login credential.', owner_nation)
                 continue
 
-            if not names:
-                for name in dispatch_config.keys():
-                    self.update_a_dispatch(name)
-            else:
-                for name in dispatch_config.keys():
-                    if name in names:
-                        self.update_a_dispatch(name)
+            for name in dispatches_metadata.keys():
+                if not names or name in names:
+                    self.execute_dispatch_op(name)
 
     def cleanup(self) -> None:
         """Save dispatch config changes and close dispatch loader."""
@@ -186,89 +234,48 @@ def get_metadata_entry_points() -> Sequence[import_metadata.EntryPoint]:
         return []
 
 
-def setup_dispatch_operations(
-    nsdu_config: Config, loader_manager_builder: LoaderManagerBuilder
-) -> DispatchOperations:
-    """Setup and return dispatch operation wrapper.
-
-    Args:
-        nsdu_config (Config): User configuration
-        loader_manager_builder (loader_managers.LoaderManagerBuilder): Loader manager
-        builder object
-
-    Returns:
-        DispatchOperations: Dispatch operation wrapper
-    """
-
-    loader_opts = nsdu_config["loaders"]
-    loaders_config = nsdu_config["loaders_config"]
-
-    dispatch_loader_manager = DispatchLoaderManager(loaders_config)
-    template_var_loader_manager = TemplateVarLoaderManager(loaders_config)
-    simple_bbc_loader_manager = SimpleBbcLoaderManager(loaders_config)
-    cred_loader_manager = CredLoaderManager(loaders_config)
-
-    loader_manager_builder.build(
-        dispatch_loader_manager, loader_opts["dispatch_loader"]
-    )
-    loader_manager_builder.build(
-        template_var_loader_manager, loader_opts["template_var_loader"]
-    )
-    loader_manager_builder.build(cred_loader_manager, loader_opts["cred_loader"])
-    loader_manager_builder.build(
-        simple_bbc_loader_manager, loader_opts["simple_bb_loader"]
-    )
-
-    cred_loader_manager.init_loader()
-
-    dispatch_loader_manager.init_loader()
-    dispatch_config = dispatch_loader_manager.get_dispatch_metadata()
-    logger.debug("Loaded dispatch config: %r", dispatch_config)
-
-    simple_bb_config = simple_bbc_loader_manager.get_simple_bbc_config()
-
-    template_vars = template_var_loader_manager.get_all_template_vars()
-    dispatch_info = utils.get_dispatch_info(dispatch_config)
-    template_vars["dispatch_info"] = dispatch_info
-
-    rendering_config = nsdu_config.get("rendering", {})
-    dispatch_updater = updater_api.DispatchUpdater(
-        user_agent=nsdu_config["general"]["user_agent"],
-        template_filter_paths=rendering_config.get("filter_paths", None),
-        simple_fmts_config=simple_bb_config,
-        complex_fmts_source_path=rendering_config.get(
-            "complex_formatter_source_path", None
-        ),
-        template_load_func=dispatch_loader_manager.get_dispatch_template,
-        template_vars=template_vars,
-    )
-
-    return DispatchOperations(
-        dispatch_updater,
-        dispatch_loader_manager,
-        cred_loader_manager,
-        dispatch_config,
-        dispatch_info,
-    )
-
-
-class CredOperations(OperationWrapper):
-    """A wrapper for credential operations such as adding credential."""
+class CredFeature(Feature):
+    """Handles the nation login credential feature."""
 
     def __init__(
         self,
         cred_loader_manager: CredLoaderManager,
         login_api: ns_api.AuthApi,
     ) -> None:
-        """A wrapper for credential operations such as adding credential.
+        """Handles the nation login credential feature.
 
         Args:
+            cred_loader_manager (CredLoaderManager): Cred loader manager
             login_api (api_adapter.LoginApi): Login API wrapper
-            cred_loader_manager (loader.CredLoaderManager): Cred loader manager
         """
 
         self.login_api = login_api
         self.cred_loader_manager = cred_loader_manager
+
+    @classmethod
+    def from_nsdu_config(
+        cls, nsdu_config: Config, loader_manager_builder: LoaderManagerBuilder
+    ) -> CredFeature:
+        """Setup this feature with NSDU's config
+
+        Args:
+            nsdu_config (Config): NSDU's config
+            loader_manager_builder (LoaderManagerBuilder): Loader manager builder
+
+        Returns:
+            CredFeature
+        """
+
+        cred_loader_manager = loader_managers.CredLoaderManager(
+            nsdu_config["loaders_config"]
+        )
+        loader_name = nsdu_config["loaders"]["cred_loader"]
+        loader_manager_builder.build(cred_loader_manager, loader_name)
+        cred_loader_manager.init_loader()
+
+        login_api = ns_api.AuthApi(nsdu_config["general"]["user_agent"])
+
+        return cls(cred_loader_manager, login_api)
 
     def add_password_cred(self, nation_name: str, password: str) -> None:
         """Add a new credential that uses password.
@@ -281,8 +288,8 @@ class CredOperations(OperationWrapper):
         try:
             autologin_code = self.login_api.get_autologin_code(nation_name, password)
             self.cred_loader_manager.add_cred(nation_name, autologin_code)
-        except exceptions.NationLoginError:
-            raise exceptions.CredOperationError(
+        except ns_api.NationLoginError:
+            raise CredOperationError(
                 f'Could not log in to the nation "{nation_name}" with that password.'
             )
 
@@ -298,7 +305,7 @@ class CredOperations(OperationWrapper):
         if is_correct:
             self.cred_loader_manager.add_cred(nation_name, autologin_code)
         else:
-            raise exceptions.CredOperationError(
+            raise CredOperationError(
                 f'Could not log in to the nation "{nation_name}" with that '
                 f"autologin code (use --add-password if you are adding passwords)."
             )
@@ -318,40 +325,12 @@ class CredOperations(OperationWrapper):
         self.cred_loader_manager.cleanup_loader()
 
 
-def setup_cred_operations(
-    nsdu_config: Config, loader_manager_builder: LoaderManagerBuilder
-) -> CredOperations:
-    """Setup and return credential operation wrapper.
-
-    Args:
-        nsdu_config (Config): User configuration
-        single_loader_builder (loader.SingleLoaderManagerBuilder): Single loader
-        manager builder
-
-    Returns:
-        CredOperations: Cred operation wrapper
-    """
-
-    cred_loader_manager = loader_managers.CredLoaderManager(
-        nsdu_config["loaders_config"]
-    )
-    loader_name = nsdu_config["loaders"]["cred_loader"]
-    loader_manager_builder.build(cred_loader_manager, loader_name)
-    cred_loader_manager.init_loader()
-
-    login_api = ns_api.AuthApi(nsdu_config["general"]["user_agent"])
-
-    return CredOperations(cred_loader_manager, login_api)
-
-
-def run_add_password_creds(
-    operations: CredOperations, cli_args: argparse.Namespace
-) -> None:
+def run_add_password_creds(feature: CredFeature, cli_args: Namespace) -> None:
     """Run password credential add operation.
 
     Args:
-        operations (CredOperations): Credential operation wrapper
-        cli_args (argparse.Namespace): CLI argument values
+        feature (CredFeature): Credential feature
+        cli_args (Namespace): CLI argument values
     """
 
     if len(cli_args.add_password) % 2 != 0:
@@ -360,24 +339,22 @@ def run_add_password_creds(
 
     try:
         for i in range(0, len(cli_args.add_password), 2):
-            operations.add_password_cred(
+            feature.add_password_cred(
                 cli_args.add_password[i], cli_args.add_password[i + 1]
             )
-    except exceptions.CredOperationError as err:
+    except CredOperationError as err:
         print(err)
         return
 
     print("Successfully added all login credentials")
 
 
-def run_add_autologin_creds(
-    operations: CredOperations, cli_args: argparse.Namespace
-) -> None:
+def run_add_autologin_creds(feature: CredFeature, cli_args: Namespace) -> None:
     """Run autologin credential add operation.
 
     Args:
-        operations (CredOperations): Credential operation wrapper
-        cli_args (argparse.Namespace): CLI argument values
+        feature (CredFeature): Credential feature
+        cli_args (Namespace): CLI argument values
     """
 
     if len(cli_args.add) % 2 != 0:
@@ -386,37 +363,37 @@ def run_add_autologin_creds(
 
     try:
         for i in range(0, len(cli_args.add), 2):
-            operations.add_autologin_cred(cli_args.add[i], cli_args.add[i + 1])
-    except exceptions.CredOperationError as err:
+            feature.add_autologin_cred(cli_args.add[i], cli_args.add[i + 1])
+    except CredOperationError as err:
         print(err)
         return
 
     print("Successfully added all login credentials")
 
 
-def run_remove_cred(operations: CredOperations, cli_args: argparse.Namespace) -> None:
+def run_remove_cred(feature: CredFeature, cli_args: Namespace) -> None:
     """Run credential remove operation.
 
     Args:
-        operations (CredOperations): Credential operation wrapper
-        cli_args (argparse.Namespace): CLI argument values
+        feature (CredFeature): Credential feature
+        cli_args (Namespace): CLI argument values
     """
 
     for nation_name in cli_args.remove:
         try:
-            operations.remove_cred(nation_name)
+            feature.remove_cred(nation_name)
             print(f'Removed login credential of "{nation_name}"')
-        except exceptions.CredNotFound:
+        except loader_api.CredNotFound:
             print(f'Nation "{nation_name}" not found.')
             break
 
 
-def run(nsdu_config: Config, cli_args: argparse.Namespace) -> None:
+def run(nsdu_config: Config, cli_args: Namespace) -> None:
     """Run the app with user configuration and CLI argument values.
 
     Args:
         nsdu_config (Config): Configuration
-        cli_args (argparse.Namespace): CLI argument values
+        cli_args (Namespace): CLI argument values
     """
 
     custom_loader_dir_path = nsdu_config["general"].get("custom_loader_dir_path", None)
@@ -425,31 +402,31 @@ def run(nsdu_config: Config, cli_args: argparse.Namespace) -> None:
         entry_points, custom_loader_dir_path
     )
 
-    operations: OperationWrapper | None = None
+    feature: Feature | None = None
 
     def interrupt_handler(sig, frame):
         logger.info("Exiting NSDU...")
-        if operations:
-            operations.cleanup()
+        if feature:
+            feature.cleanup()
         logger.info("Exited NSDU.")
         sys.exit()
 
     signal.signal(signal.SIGINT, interrupt_handler)
 
     if cli_args.subparser_name == "cred":
-        operations = setup_cred_operations(nsdu_config, loader_manager_builder)
+        feature = CredFeature.from_nsdu_config(nsdu_config, loader_manager_builder)
         if hasattr(cli_args, "add") and cli_args.add is not None:
-            run_add_autologin_creds(operations, cli_args)
+            run_add_autologin_creds(feature, cli_args)
         elif hasattr(cli_args, "add_password") and cli_args.add_password is not None:
-            run_add_password_creds(operations, cli_args)
+            run_add_password_creds(feature, cli_args)
         elif hasattr(cli_args, "remove") and cli_args.remove is not None:
-            run_remove_cred(operations, cli_args)
+            run_remove_cred(feature, cli_args)
     elif cli_args.subparser_name == "update":
-        operations = setup_dispatch_operations(nsdu_config, loader_manager_builder)
-        operations.update_dispatches(cli_args.dispatches)
+        feature = DispatchFeature.from_nsdu_config(nsdu_config, loader_manager_builder)
+        feature.execute_dispatch_ops(cli_args.dispatches)
 
-    if operations:
-        operations.cleanup()
+    if feature:
+        feature.cleanup()
 
 
 def get_cli_args() -> argparse.Namespace:
