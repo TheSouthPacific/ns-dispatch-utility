@@ -20,10 +20,10 @@ from googleapiclient.http import HttpError
 from nsdu import exceptions, loader_api
 from nsdu.config import Config
 from nsdu.loader_api import (
+    DispatchesMetadata,
     DispatchMetadata,
     DispatchOp,
     DispatchOpResult,
-    DispatchesMetadata,
 )
 
 GOOGLE_API_SCOPES = ["https://www.googleapis.com/auth/spreadsheets"]

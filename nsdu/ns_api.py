@@ -4,6 +4,7 @@
 import re
 
 import nationstates
+from nationstates import exceptions as ns_exceptions
 
 from nsdu import exceptions
 
@@ -25,14 +26,15 @@ def convert_to_html_entities(text: str) -> bytes:
     return text.encode("ascii", "xmlcharrefreplace")
 
 
-def raise_nsdu_exception(err: Exception) -> None:
+def raise_nsdu_exception(err: ns_exceptions.APIError) -> None:
     """Reraise NSDU-specific exceptions from API wrapper's exceptions."""
 
-    if "Unknown dispatch" in str(err):
+    err_message = str(err)
+    if "Unknown dispatch" in err_message:
         raise exceptions.UnknownDispatchError from err
-    if "not the author of this dispatch" in str(err):
+    if "not the author of this dispatch" in err_message:
         raise exceptions.NotOwnerDispatchError from err
-    if err == nationstates.exceptions.Forbidden:
+    if err == ns_exceptions.Forbidden:
         raise exceptions.NationLoginError from err
 
     raise exceptions.DispatchApiError from err

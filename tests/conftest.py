@@ -1,7 +1,7 @@
 import json
 
-import toml
 import pytest
+import toml
 
 
 @pytest.fixture

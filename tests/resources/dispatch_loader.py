@@ -7,10 +7,10 @@ from datetime import datetime
 from nsdu import loader_api
 from nsdu.config import Config
 from nsdu.loader_api import (
-    DispatchOpResult,
     DispatchesMetadata,
-    DispatchOp,
     DispatchMetadata,
+    DispatchOp,
+    DispatchOpResult,
 )
 
 

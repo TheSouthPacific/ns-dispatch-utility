@@ -1,6 +1,5 @@
 from unittest import mock
 
-
 from nsdu import updater_api
 
 

@@ -1,11 +1,11 @@
-from typing import Any
 import os
 import shutil
 from pathlib import Path
+from typing import Any
 
 import toml
 
-from nsdu import info, exceptions, utils
+from nsdu import exceptions, info, utils
 
 Config = dict[str, Any]
 

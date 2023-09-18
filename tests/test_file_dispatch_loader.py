@@ -1,7 +1,7 @@
-import toml
 from unittest import mock
 
 import pytest
+import toml
 
 from nsdu import exceptions
 from nsdu.loaders import file_dispatch_loader

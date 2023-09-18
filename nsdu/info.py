@@ -5,7 +5,6 @@ from pathlib import Path
 
 import appdirs
 
-
 APP_NAME = "nsdu"
 APP_VERSION = "0.3.0"
 AUTHOR = "ns_tsp_usovietnam"

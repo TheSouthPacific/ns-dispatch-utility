@@ -7,7 +7,7 @@ from typing import Callable, Mapping, Sequence
 
 import jinja2
 
-from nsdu import bbc_parser, exceptions, config, utils
+from nsdu import bbc_parser, config, exceptions, utils
 from nsdu.bbc_parser import SimpleFormattersConfig
 from nsdu.loader_api import TemplateVars
 from nsdu.types import RenderContext

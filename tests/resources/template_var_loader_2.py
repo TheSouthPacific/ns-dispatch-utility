@@ -3,8 +3,8 @@
 
 
 from nsdu import loader_api
-from nsdu.loader_api import TemplateVars
 from nsdu.config import Config
+from nsdu.loader_api import TemplateVars
 
 
 @loader_api.template_var_loader

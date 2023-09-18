@@ -1,5 +1,5 @@
-from datetime import datetime, timezone
 import logging
+from datetime import datetime, timezone
 from unittest import mock
 from unittest.mock import Mock
 
@@ -10,15 +10,15 @@ from nsdu.loader_api import DispatchMetadata, DispatchOp, DispatchOpResult
 from nsdu.loaders import google_dispatch_loader as loader
 from nsdu.loaders.google_dispatch_loader import (
     CategorySetup,
-    DispatchRow,
     Dispatch,
+    DispatchRow,
+    FailureOpResult,
+    InvalidDispatchRowError,
     OwnerNation,
     SheetRange,
-    UtilityTemplateRow,
-    InvalidDispatchRowError,
     SkipRow,
     SuccessOpResult,
-    FailureOpResult,
+    UtilityTemplateRow,
 )
 
 

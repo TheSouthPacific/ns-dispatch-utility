@@ -3,8 +3,7 @@ from unittest import mock
 import nationstates
 import pytest
 
-from nsdu import ns_api
-from nsdu import exceptions
+from nsdu import exceptions, ns_api
 
 
 class TestRaiseNsduException:
@@ -21,12 +20,14 @@ class TestRaiseNsduException:
             ns_api.raise_nsdu_exception(exception)
 
     def test_forbidden_raises_specific_nsdu_exception(self):
-        exception = nationstates.exceptions.Forbidden
+        exception = nationstates.exceptions.Forbidden()
+
         with pytest.raises(exceptions.NationLoginError):
             ns_api.raise_nsdu_exception(exception)
 
     def test_other_exception_raises_general_api_error_nsdu_exception(self):
-        exception = nationstates.exceptions.APIUsageError
+        exception = nationstates.exceptions.APIUsageError()
+
         with pytest.raises(exceptions.DispatchApiError):
             ns_api.raise_nsdu_exception(exception)
 
@@ -76,7 +77,10 @@ class TestLoginApi:
 
 class TestDispatchApi:
     def test_create_dispatch(self):
-        resp = 'New factbook posted! <a href="/nation=test/detail=factbook/id=1234567">View Your Factbook</a>'
+        resp = (
+            "New factbook posted!"
+            '<a href="/nation=test/detail=factbook/id=1234567">View Your Factbook</a>'
+        )
         api = ns_api.DispatchApi("")
         create_dispatch = mock.Mock(return_value={"success": resp})
         api.owner_nation = mock.Mock(create_dispatch=create_dispatch)
@@ -91,7 +95,10 @@ class TestDispatchApi:
         )
 
     def test_edit_dispatch(self):
-        resp = 'New factbook edited! <a href="/nation=test/detail=factbook/id=1234567">View Your Factbook</a>'
+        resp = (
+            "New factbook posted!"
+            '<a href="/nation=test/detail=factbook/id=1234567">View Your Factbook</a>'
+        )
         api = ns_api.DispatchApi("")
         edit_dispatch = mock.Mock(return_value={"success": resp})
         api.owner_nation = mock.Mock(edit_dispatch=edit_dispatch)

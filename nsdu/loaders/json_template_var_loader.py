@@ -1,11 +1,11 @@
 """Load template variables from JSON files."""
 
-import pathlib
 import json
+import pathlib
 
 from nsdu import exceptions, loader_api
-from nsdu.loader_api import TemplateVars
 from nsdu.config import Config
+from nsdu.loader_api import TemplateVars
 
 
 @loader_api.template_var_loader

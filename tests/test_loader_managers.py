@@ -1,16 +1,15 @@
 import sys
+from importlib import util as import_util
+from importlib.metadata import EntryPoint
 from pathlib import Path
 from types import ModuleType
 from unittest import mock
 from unittest.mock import Mock
-from importlib.metadata import EntryPoint
-from importlib import util as import_util
 
 import pytest
 
 from nsdu import loader_managers
 from nsdu.loader_api import DispatchMetadata, DispatchOp, DispatchOpResult
-
 
 TEST_LOADER_DIR_PATH = Path("tests/resources")
 
