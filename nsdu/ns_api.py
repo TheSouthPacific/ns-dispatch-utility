@@ -5,28 +5,81 @@ import re
 
 import nationstates
 from nationstates import exceptions as ns_exceptions
+from nationstates.objects import Nation
 
 from nsdu import exceptions
 
 
-class DispatchApiError(exceptions.NSDUError):
+class NsApiError(exceptions.NSDUError):
+    """NationStates API error."""
+
+
+class DispatchApiError(NsApiError):
     """Dispatch API error."""
 
 
-class UnknownDispatchError(DispatchApiError):
-    """This dispatch does not exist."""
+class AuthApiError(NsApiError):
+    """Auth API error."""
 
 
-class NotOwnerDispatchError(DispatchApiError):
-    """You do not own this dispatch."""
+class OwnerNationNotSet(AuthApiError):
+    """Owner nation is not set."""
 
 
-class NationLoginError(DispatchApiError):
-    """Failed to log in to nation."""
+class AuthApi:
+    """Wrapper for authentication-related NationStates API calls."""
 
+    def __init__(self, user_agent: str) -> None:
+        """Wrapper for authentication-related NationStates API calls.
 
-class OwnerNationNotSet(DispatchApiError):
-    pass
+        Args:
+            user_agent (str): User agent for API calls
+        """
+
+        self.original_api = nationstates.Nationstates(
+            user_agent=user_agent, enable_beta=True
+        )
+
+    def get_autologin_code(self, nation_name: str, password: str) -> str:
+        """Get autologin code of a nation from its password.
+
+        Args:
+            nation_name (str): Nation name
+            password (str): Password
+
+        Raises:
+            exceptions.NationLoginError: Failed to login
+
+        Returns:
+            str: Autologin code
+        """
+
+        nation = self.original_api.nation(nation_name, password=password)
+
+        try:
+            resp = nation.get_shards("ping", full_response=True)
+            return resp["headers"]["X-Autologin"]  # type: ignore
+        except ns_exceptions.Forbidden as err:
+            raise AuthApiError(f"Failed to log in to nation {nation_name}") from err
+
+    def verify_autologin_code(self, nation_name: str, autologin_code: str) -> bool:
+        """Verify if an autologin code can log in to a nation.
+
+        Args:
+            nation_name (str): Nation name
+            autologin_code (str): Autologin code
+
+        Raises:
+            exceptions.NationLoginError: Failed to login
+        """
+
+        nation = self.original_api.nation(nation_name, autologin=autologin_code)
+
+        try:
+            nation.get_shards("ping")
+            return True
+        except ns_exceptions.Forbidden:
+            return False
 
 
 def convert_to_html_entities(text: str) -> bytes:
@@ -42,73 +95,29 @@ def convert_to_html_entities(text: str) -> bytes:
     return text.encode("ascii", "xmlcharrefreplace")
 
 
-def raise_nsdu_exception(err: ns_exceptions.APIError) -> None:
-    """Reraise NSDU-specific exceptions from API wrapper's exceptions."""
+def parse_resp_for_new_dispatch_id(resp_text: str) -> str:
+    """Get the dispatch ID of a new dispatch from API response text.
 
-    err_message = str(err)
-    if "Unknown dispatch" in err_message:
-        raise UnknownDispatchError from err
-    if "not the author of this dispatch" in err_message:
-        raise NotOwnerDispatchError from err
-    if isinstance(err, ns_exceptions.Forbidden):
-        raise NationLoginError from err
+    Args:
+        resp_text (str): API response text
 
-    raise DispatchApiError from err
+    Raises:
+        DispatchApiError: No dispatch ID found in API response
 
+    Returns:
+        str: Dispatch ID
+    """
 
-class AuthApi:
-    """Wrapper for authentication-related NationStates API calls."""
+    matches = re.search("id=(\\d+)", resp_text)
 
-    def __init__(self, user_agent: str) -> None:
-        """Wrapper for login-related NationStates API calls.
+    if matches is None:
+        raise DispatchApiError("No dispatch ID found in API response")
 
-        Args:
-            user_agent (str): API call's user agent
-        """
-        self.original_api = nationstates.Nationstates(
-            user_agent=user_agent, enable_beta=True
-        )
+    dispatch_id = matches.group(1)
+    if not isinstance(dispatch_id, str):
+        raise DispatchApiError("No dispatch ID found in API response")
 
-    def get_autologin_code(self, nation_name: str, password: str) -> str:
-        """Get autologin code of a nation from its password.
-
-        Args:
-            nation_name (str): Nation's name
-            password (str): Nation's password
-
-        Raises:
-            exceptions.NationLoginError: Failed to log in to the nation
-
-        Returns:
-            str: Autologin code
-        """
-
-        nation = self.original_api.nation(nation_name, password=password)
-
-        try:
-            resp = nation.get_shards("ping", full_response=True)
-            return resp["headers"]["X-Autologin"]  # type: ignore
-        except nationstates.exceptions.Forbidden as err:
-            raise NationLoginError from err
-
-    def verify_autologin_code(self, nation_name: str, autologin_code: str) -> bool:
-        """Verify if an autologin code can log in to the provided nation.
-
-        Args:
-            nation_name (str): Nation's name
-            autologin_code (str): Nation's autologin code
-
-        Raises:
-            exceptions.NationLoginError: Failed to log in to the nation
-        """
-
-        nation = self.original_api.nation(nation_name, autologin=autologin_code)
-
-        try:
-            nation.get_shards("ping")
-            return True
-        except nationstates.exceptions.Forbidden:
-            return False
+    return dispatch_id
 
 
 class DispatchApi:
@@ -118,22 +127,22 @@ class DispatchApi:
         """Wrapper for dispatch-related NationStates API calls.
 
         Args:
-            user_agent (str): API call's user agent
+            user_agent (str): User agent for API calls
         """
         self.original_api = nationstates.Nationstates(
             user_agent=user_agent, enable_beta=True
         )
-        self.owner_nation = None
+        self.nation: Nation | None = None
 
-    def set_owner_nation(self, nation_name: str, autologin: str) -> None:
+    def set_nation(self, nation_name: str, autologin: str) -> None:
         """Set the nation to perform dispatch API calls on.
 
         Args:
-            nation_name (str): Nation's name
-            autologin (str): Nation's autologin code
+            nation_name (str): Nation name
+            autologin (str): Autologin code
         """
 
-        self.owner_nation = self.original_api.nation(nation_name, autologin=autologin)
+        self.nation = self.original_api.nation(nation_name, autologin=autologin)
 
     def create_dispatch(
         self, title: str, text: str, category: str, subcategory: str
@@ -141,34 +150,29 @@ class DispatchApi:
         """Create a dispatch.
 
         Args:
-            title (str): Dispatch title
-            text (str): Dispatch text
-            category (str): Dispatch category number
-            subcategory (str): Dispatch subcategory number
+            title (str): Title
+            text (str): Text content
+            category (str): Category number
+            subcategory (str): Subcategory number
+
         Returns:
-            str: New dispatch ID
+            str: ID of new dispatch
         """
 
-        if self.owner_nation is None:
+        if self.nation is None:
             raise OwnerNationNotSet
 
         try:
-            resp = self.owner_nation.create_dispatch(
+            resp = self.nation.create_dispatch(
                 title=title,
                 text=convert_to_html_entities(text),
                 category=category,
                 subcategory=subcategory,
             )
-        except nationstates.exceptions.APIError as err:
-            raise_nsdu_exception(err)
+        except ns_exceptions.APIError as err:
+            raise DispatchApiError(err) from err
 
-        matches = re.search("id=(\\d+)", resp["success"])  # type: ignore
-        if matches is None:
-            raise DispatchApiError("No dispatch ID found in dispatch API response")
-        new_dispatch_id = matches.group(1)
-        if not isinstance(new_dispatch_id, str):
-            raise DispatchApiError("No dispatch ID found in dispatch API response")
-        return new_dispatch_id
+        return parse_resp_for_new_dispatch_id(resp["success"])  # type: ignore
 
     def edit_dispatch(
         self, dispatch_id: str, title: str, text: str, category: str, subcategory: str
@@ -177,37 +181,37 @@ class DispatchApi:
 
         Args:
             dispatch_id (str): Dispatch ID
-            title (str): Dispatch title
-            text (str): Dispatch text
-            category (str): Dispatch category number
-            subcategory (str): Dispatch subcategory number
+            title (str): Title
+            text (str): Text content
+            category (str): Category number
+            subcategory (str): Subcategory number
         """
 
-        if self.owner_nation is None:
+        if self.nation is None:
             raise OwnerNationNotSet
 
         try:
-            self.owner_nation.edit_dispatch(
+            self.nation.edit_dispatch(
                 dispatch_id=dispatch_id,
                 title=title,
                 text=convert_to_html_entities(text),
                 category=category,
                 subcategory=subcategory,
             )
-        except nationstates.exceptions.APIError as err:
-            raise_nsdu_exception(err)
+        except ns_exceptions.APIError as err:
+            raise DispatchApiError(err) from err
 
-    def remove_dispatch(self, dispatch_id: str) -> None:
+    def delete_dispatch(self, dispatch_id: str) -> None:
         """Delete a dispatch.
 
         Args:
             dispatch_id (str): Dispatch ID
         """
 
-        if self.owner_nation is None:
+        if self.nation is None:
             raise OwnerNationNotSet
 
         try:
-            self.owner_nation.remove_dispatch(dispatch_id=dispatch_id)
-        except nationstates.exceptions.APIError as err:
-            raise_nsdu_exception(err)
+            self.nation.remove_dispatch(dispatch_id=dispatch_id)
+        except ns_exceptions.APIError as err:
+            raise DispatchApiError(err) from err
