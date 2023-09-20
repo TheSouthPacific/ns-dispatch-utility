@@ -24,7 +24,7 @@ class DispatchRenderError(exceptions.NSDUError):
 
 
 class TemplateRenderError(DispatchRenderError):
-    """Jinja template rendering errors."""
+    """Jinja template rendering error."""
 
 
 class JinjaTemplateLoader(jinja2.BaseLoader):
