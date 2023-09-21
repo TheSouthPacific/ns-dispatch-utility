@@ -66,9 +66,7 @@ class CredFeature(Feature):
             autologin_code = self.auth_api.get_autologin_code(nation_name, password)
             self.cred_loader_manager.add_cred(nation_name, autologin_code)
         except ns_api.AuthApiError as err:
-            raise UserError(
-                f'Could not log in to the nation "{nation_name}" with that password.'
-            ) from err
+            raise UserError(err) from err
 
     def add_autologin_cred(self, nation_name: str, autologin_code: str) -> None:
         """Add a new credential that uses autologin code.
@@ -111,18 +109,12 @@ def run_add_password_creds(feature: CredFeature, cli_args: Namespace) -> None:
     """
 
     if len(cli_args.add_password) % 2 != 0:
-        print("There is no password for the last name.")
-        return
+        raise UserError("There is no password for the last nation.")
 
-    try:
-        for i in range(0, len(cli_args.add_password), 2):
-            feature.add_password_cred(
-                cli_args.add_password[i], cli_args.add_password[i + 1]
-            )
-    except UserError as err:
-        print(err)
-        return
-
+    for i in range(0, len(cli_args.add_password), 2):
+        feature.add_password_cred(
+            cli_args.add_password[i], cli_args.add_password[i + 1]
+        )
     print("Successfully added all login credentials")
 
 
@@ -135,16 +127,10 @@ def run_add_autologin_creds(feature: CredFeature, cli_args: Namespace) -> None:
     """
 
     if len(cli_args.add) % 2 != 0:
-        print("There is no password for the last name.")
-        return
+        raise UserError("There is no autologin code for the last nation.")
 
-    try:
-        for i in range(0, len(cli_args.add), 2):
-            feature.add_autologin_cred(cli_args.add[i], cli_args.add[i + 1])
-    except UserError as err:
-        print(err)
-        return
-
+    for i in range(0, len(cli_args.add), 2):
+        feature.add_autologin_cred(cli_args.add[i], cli_args.add[i + 1])
     print("Successfully added all login credentials")
 
 
@@ -161,5 +147,4 @@ def run_remove_cred(feature: CredFeature, cli_args: Namespace) -> None:
             feature.remove_cred(nation_name)
             print(f'Removed login credential of "{nation_name}"')
         except loader_api.CredNotFound:
-            print(f'Nation "{nation_name}" not found.')
-            break
+            raise UserError(f'Login credential for nation "{nation_name}" not found.')

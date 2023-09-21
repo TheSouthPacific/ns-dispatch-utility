@@ -60,7 +60,9 @@ class AuthApi:
             resp = nation.get_shards("ping", full_response=True)
             return resp["headers"]["X-Autologin"]  # type: ignore
         except ns_exceptions.Forbidden as err:
-            raise AuthApiError(f"Failed to log in to nation {nation_name}") from err
+            raise AuthApiError(f'Failed to log in to nation "{nation_name}"') from err
+        except ns_exceptions.NotFound as err:
+            raise AuthApiError(f'Nation "{nation_name}" does not exist') from err
 
     def verify_autologin_code(self, nation_name: str, autologin_code: str) -> bool:
         """Verify if an autologin code can log in to a nation.
