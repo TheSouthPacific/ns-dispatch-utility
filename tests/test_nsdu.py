@@ -1,317 +1,215 @@
+from datetime import datetime, timezone
 from unittest import mock
+from unittest.mock import Mock, call
 
+import freezegun
 import pytest
 
-from nsdu import exceptions, ns_api
-from nsdu import __main__
-
-
-def get_dispatch_info(dispatch_config):
-    """Return dispatch information for use as context in the template renderer.
-
-    Args:
-        dispatch_config (dict): Dispatch configuration.
-        id_store (IDStore): Dispatch ID store.
-
-    Returns:
-        dict: Dispatch information.
-    """
-
-    dispatch_info = {}
-    for nation, dispatches in dispatch_config.items():
-        for name, config in dispatches.items():
-            config["owner_nation"] = nation
-            dispatch_info[name] = config
-
-    return dispatch_info
+from nsdu import __main__, loader_managers, ns_api, updater_api
+from nsdu.__main__ import UserError
+from nsdu.loader_api import DispatchMetadata, DispatchOp, DispatchOpResult
 
 
 class TestNsduCred:
-    def test_add_correct_password_cred_calls_cred_loader_with_autologin_code(self):
-        mock_cred_loader = mock.Mock(add_cred=mock.Mock())
-        login_api = mock.create_autospec(ns_api.AuthApi)
-        login_api.get_autologin_code.return_value = "123456"
-        operations = __main__.CredOperations(mock_cred_loader, login_api)
+    @pytest.fixture
+    def feature(self):
+        cred_loader_manager = mock.create_autospec(loader_managers.CredLoaderManager)
+        auth_api = mock.create_autospec(ns_api.AuthApi)
+        return __main__.CredFeature(cred_loader_manager, auth_api)
 
-        operations.add_password_cred("nation1", "password")
-        operations.cleanup()
+    def test_add_correct_password_cred_calls_cred_loader_with_autologin_code(
+        self, feature
+    ):
+        feature.auth_api.get_autologin_code.return_value = "1234"
 
-        mock_cred_loader.add_cred.assert_called_with("nation1", "123456")
+        feature.add_password_cred("nat", "12345678")
+        feature.cleanup()
 
-    def test_add_incorrect_password_raises_exception(self):
-        mock_cred_loader = mock.Mock(add_cred=mock.Mock())
-        login_api = mock.create_autospec(ns_api.AuthApi)
-        login_api.get_autologin_code.side_effect = exceptions.NationLoginError
-        operations = __main__.CredOperations(mock_cred_loader, login_api)
+        feature.cred_loader_manager.add_cred.assert_called_with("nat", "1234")
 
-        with pytest.raises(exceptions.CredOperationError):
-            operations.add_password_cred("nation1", "password")
+    def test_add_wrong_password_raises_exception(self, feature):
+        feature.auth_api.get_autologin_code.side_effect = ns_api.AuthApiError
 
-        operations.cleanup()
+        with pytest.raises(UserError):
+            feature.add_password_cred("nation1", "password")
 
-    def test_add_correct_autologin_cred_calls_cred_loader_with_autologin_code(self):
-        mock_cred_loader = mock.Mock(add_cred=mock.Mock())
-        login_api = mock.create_autospec(ns_api.AuthApi)
-        login_api.verify_autologin_code.return_value = True
-        operations = __main__.CredOperations(mock_cred_loader, login_api)
+    def test_add_correct_autologin_cred_calls_cred_loader_with_autologin_code(
+        self, feature
+    ):
+        feature.auth_api.verify_autologin_code.return_value = True
 
-        operations.add_autologin_cred("nation1", "123456")
-        operations.cleanup()
+        feature.add_autologin_cred("nat", "1234")
+        feature.cleanup()
 
-        mock_cred_loader.add_cred.assert_called_with("nation1", "123456")
+        feature.cred_loader_manager.add_cred.assert_called_with("nat", "1234")
 
-    def test_add_incorrect_autologin_code_raises_exception(self):
-        mock_cred_loader = mock.Mock(add_cred=mock.Mock())
-        login_api = mock.create_autospec(ns_api.AuthApi)
-        login_api.verify_autologin_code.return_value = False
-        operations = __main__.CredOperations(mock_cred_loader, login_api)
+    def test_add_wrong_autologin_code_raises_exception(self, feature):
+        feature.auth_api.verify_autologin_code.return_value = False
 
-        with pytest.raises(exceptions.CredOperationError):
-            operations.add_autologin_cred("nation1", "123456")
+        with pytest.raises(UserError):
+            feature.add_autologin_cred("nat", "")
 
-        operations.cleanup()
+    def test_remove_nation_cred_calls_cred_loader(self, feature):
+        feature.remove_cred("nat")
+        feature.cleanup()
 
-    def test_remove_nation_cred_calls_cred_loader(self):
-        mock_cred_loader = mock.Mock(remove_cred=mock.Mock())
-        app = __main__.CredOperations(mock_cred_loader, mock.Mock())
-
-        app.remove_cred("nation1")
-        app.cleanup()
-
-        mock_cred_loader.remove_cred.assert_called_with("nation1")
+        feature.cred_loader_manager.remove_cred.assert_called_with("nat")
 
 
 class TestNsduDispatch:
-    def test_create_dispatch_calls_add_dispatch_id_on_loader(self):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock(create_dispatch=mock.Mock(return_value="12345"))
-        dispatch_info = {
-            "foo": {
-                "action": "create",
-                "title": "Test title",
-                "category": "1",
-                "subcategory": "100",
-            }
+    @pytest.fixture
+    def feature(self):
+        dispatch_loader_manager = mock.create_autospec(
+            loader_managers.DispatchLoaderManager
+        )
+        cred_loader_manager = mock.create_autospec(loader_managers.CredLoaderManager)
+        dispatch_updater = mock.create_autospec(updater_api.DispatchUpdater)
+
+        return __main__.DispatchFeature(
+            dispatch_updater,
+            dispatch_loader_manager,
+            cred_loader_manager,
+            {},
+        )
+
+    def test_create_dispatch_adds_new_dispatch_id_to_loader(self, feature):
+        feature.dispatches_metadata = {
+            "n": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t", "meta", "gameplay"
+            )
         }
-        app = __main__.DispatchOperations(
-            dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {}
-        )
+        feature.dispatch_updater.create_dispatch.return_value = "1234"
 
-        app.update_a_dispatch("foo")
+        feature.execute_dispatch_operation("n")
 
-        dispatch_loader_manager.add_dispatch_id.assert_called_with("foo", "12345")
+        feature.dispatch_loader_manager.add_dispatch_id.assert_called_with("n", "1234")
 
-    def test_edit_dispatch_calls_dispatch_updater(self):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock()
-        dispatch_info = {
-            "foo": {
-                "action": "edit",
-                "ns_id": "12345",
-                "title": "Test title",
-                "category": "1",
-                "subcategory": "100",
-            }
+    def test_edit_dispatch_calls_dispatch_updater(self, feature):
+        feature.dispatches_metadata = {
+            "n": DispatchMetadata("1", DispatchOp.EDIT, "nat", "t", "meta", "gameplay")
         }
-        app = __main__.DispatchOperations(
-            dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {}
-        )
 
-        app.update_a_dispatch("foo")
+        feature.execute_dispatch_operation("n")
 
-        dispatch_updater.edit_dispatch.assert_called_with(
-            "foo", "12345", "Test title", "1", "100"
-        )
+        feature.dispatch_updater.edit_dispatch.assert_called()
 
-    def test_remove_dispatch_calls_dispatch_updater(self):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock()
-        dispatch_info = {
-            "foo": {
-                "action": "remove",
-                "ns_id": "12345",
-                "title": "Test title",
-                "category": "1",
-                "subcategory": "100",
-            }
+    def test_remove_dispatch_calls_dispatch_updater(self, feature):
+        feature.dispatches_metadata = {
+            "n": DispatchMetadata(
+                "1", DispatchOp.DELETE, "nat", "t", "meta", "gameplay"
+            )
         }
-        app = __main__.DispatchOperations(
-            dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {}
-        )
 
-        app.update_a_dispatch("foo")
+        feature.execute_dispatch_operation("n")
 
-        dispatch_updater.remove_dispatch.assert_called_with("12345")
+        feature.dispatch_updater.delete_dispatch.assert_called()
 
-    def test_update_a_dispatch_with_invalid_action(self):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock()
-        dispatch_info = {
-            "foo": {
-                "action": "abcd",
-                "ns_id": "12345",
-                "title": "Test title",
-                "category": "1",
-                "subcategory": "100",
-            }
-        }
-        app = __main__.DispatchOperations(
-            dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {}
-        )
-
-        with pytest.raises(exceptions.DispatchConfigError):
-            app.update_a_dispatch("foo")
-
-    def test_update_a_dispatch_with_no_exception_reports_success(self, caplog):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock()
-        dispatch_info = {
-            "foo": {
-                "action": "edit",
-                "ns_id": "12345",
-                "title": "Test title",
-                "category": "1",
-                "subcategory": "100",
-            }
-        }
-        app = __main__.DispatchOperations(
-            dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {}
-        )
-
-        app.update_a_dispatch("foo")
-
-        result = dispatch_loader_manager.after_update.call_args[0][2]
-        assert result == "success"
-
-    @pytest.mark.parametrize(
-        "api_exceptions,expected_result",
-        [
-            (exceptions.UnknownDispatchError, "unknown-dispatch-error"),
-            (exceptions.NotOwnerDispatchError, "not-owner-dispatch-error"),
-            (exceptions.NonexistentCategoryError("", ""), "invalid-category-options"),
-        ],
-    )
-    def test_update_a_dispatch_with_exceptions_reports_failure(
-        self, api_exceptions, expected_result, caplog
+    @pytest.mark.parametrize("operation", [DispatchOp.EDIT, DispatchOp.DELETE])
+    def test_execute_dispatch_op_that_require_id_with_no_id_raises_exception(
+        self, feature, operation
     ):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock(
-            edit_dispatch=mock.Mock(side_effect=api_exceptions)
-        )
-        dispatch_info = {
-            "foo": {
-                "action": "edit",
-                "ns_id": "12345",
-                "title": "Test title",
-                "category": "1",
-                "subcategory": "100",
-            }
+        feature.dispatches_metadata = {
+            "n": DispatchMetadata(None, operation, "nat", "t", "meta", "gameplay")
         }
-        app = __main__.DispatchOperations(
-            dispatch_updater, dispatch_loader_manager, {}, dispatch_info, {}
-        )
 
-        app.update_a_dispatch("foo")
+        with pytest.raises(updater_api.DispatchMetadataError):
+            feature.execute_dispatch_operation("n")
 
-        result = dispatch_loader_manager.after_update.call_args[0][2]
-        assert result == expected_result
-
-    def test_update_existing_dispatches_calls_dispatch_updater(self):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock()
-        dispatch_config = {
-            "nation1": {
-                "foo": {
-                    "action": "create",
-                    "title": "Test title 1",
-                    "category": "1",
-                    "subcategory": "100",
-                }
-            }
+    @freezegun.freeze_time("2023-01-01")
+    def test_execute_dispatch_op_with_no_exception_reports_success(self, feature):
+        feature.dispatches_metadata = {
+            "n": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t", "meta", "gameplay"
+            )
         }
-        dispatch_info = get_dispatch_info(dispatch_config)
-        creds = {"nation1": "abcd1234"}
-        app = __main__.DispatchOperations(
-            dispatch_updater,
-            dispatch_loader_manager,
-            dispatch_config,
-            dispatch_info,
-            creds,
+
+        feature.execute_dispatch_operation("n")
+
+        feature.dispatch_loader_manager.after_update.assert_called_with(
+            "n",
+            DispatchOp.CREATE,
+            DispatchOpResult.SUCCESS,
+            datetime(2023, 1, 1, tzinfo=timezone.utc),
         )
 
-        app.update_dispatches([])
-
-        dispatch_updater.create_dispatch.assert_called()
-
-    def test_uppercase_owner_nation_name_canonicalized(self):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock()
-        dispatch_config = {"Nation1": {}}
-        dispatch_info = get_dispatch_info(dispatch_config)
-        creds = {"nation1": "abcd1234"}
-        app = __main__.DispatchOperations(
-            dispatch_updater,
-            dispatch_loader_manager,
-            dispatch_config,
-            dispatch_info,
-            creds,
-        )
-
-        app.update_dispatches([])
-
-        dispatch_updater.set_owner_nation.assert_called_with("nation1", "abcd1234")
-
-    def test_update_some_existing_dispatches_calls_dispatch_updater(self):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock()
-        dispatch_config = {
-            "nation1": {
-                "foo": {
-                    "action": "create",
-                    "title": "Test title 1",
-                    "category": "1",
-                    "subcategory": "100",
-                }
-            }
+    @freezegun.freeze_time("2023-01-01")
+    def test_execute_dispatch_op_with_api_exception_reports_failure(self, feature):
+        feature.dispatches_metadata = {
+            "n": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t", "meta", "gameplay"
+            )
         }
-        dispatch_info = get_dispatch_info(dispatch_config)
-        creds = {"nation1": "abcd1234"}
-        app = __main__.DispatchOperations(
-            dispatch_updater,
-            dispatch_loader_manager,
-            dispatch_config,
-            dispatch_info,
-            creds,
+        feature.dispatch_updater.create_dispatch.side_effect = ns_api.DispatchApiError(
+            "a"
         )
 
-        app.update_dispatches(["foo"])
+        feature.execute_dispatch_operation("n")
 
-        dispatch_updater.create_dispatch.assert_called()
+        feature.dispatch_loader_manager.after_update.assert_called_with(
+            "n",
+            DispatchOp.CREATE,
+            DispatchOpResult.FAILURE,
+            datetime(2023, 1, 1, tzinfo=timezone.utc),
+            "a",
+        )
 
-    def test_update_non_existent_dispatches_logs_error(self, caplog):
-        dispatch_loader_manager = mock.Mock()
-        dispatch_updater = mock.Mock()
-        dispatch_config = {
-            "nation1": {
-                "foo": {
-                    "action": "create",
-                    "ns_id": "12345",
-                    "title": "Test title 1",
-                    "category": "1",
-                    "subcategory": "100",
-                }
-            }
+    def test_execute_dispatch_ops_with_names_uses_dispatches_with_those_names(
+        self, feature
+    ):
+        feature.dispatches_metadata = {
+            "n1": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t1", "meta", "gameplay"
+            ),
+            "n2": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t2", "meta", "gameplay"
+            ),
         }
-        dispatch_info = get_dispatch_info(dispatch_config)
-        creds = {"nation1": "abcd1234"}
-        app = __main__.DispatchOperations(
-            dispatch_updater,
-            dispatch_loader_manager,
-            dispatch_config,
-            dispatch_info,
-            creds,
+        feature.cred_loader_manager.get_cred.return_value = "1234"
+        feature.execute_dispatch_operation = Mock()
+
+        feature.execute_dispatch_operations(["n1"])
+
+        feature.execute_dispatch_operation.assert_has_calls([call("n1")])
+
+    def test_execute_dispatch_ops_with_no_name_uses_all_dispatches(self, feature):
+        feature.dispatches_metadata = {
+            "n1": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t1", "meta", "gameplay"
+            ),
+            "n2": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t2", "meta", "gameplay"
+            ),
+        }
+        feature.cred_loader_manager.get_cred.return_value = "1234"
+        feature.execute_dispatch_operation = Mock()
+
+        feature.execute_dispatch_operations([])
+
+        feature.execute_dispatch_operation.assert_has_calls([call("n1"), call("n2")])
+
+    def test_execute_dispatch_ops_with_many_owner_nations_logins_to_those_nations(
+        self, feature
+    ):
+        feature.dispatches_metadata = {
+            "n1": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat1", "t1", "meta", "gameplay"
+            ),
+            "n2": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat2", "t2", "meta", "gameplay"
+            ),
+        }
+        feature.cred_loader_manager.get_cred.return_value = "1234"
+        feature.execute_dispatch_operation = Mock()
+
+        feature.execute_dispatch_operations([])
+
+        feature.dispatch_updater.set_nation.assert_has_calls(
+            [call("nat1", "1234"), call("nat2", "1234")]
         )
 
-        app.update_dispatches(["voo"])
+    def test_execute_dispatch_ops_with_non_existent_name_logs_error(
+        self, caplog, feature
+    ):
+        feature.execute_dispatch_operations(["n"])
 
         assert caplog.records[-1].levelname == "ERROR"
