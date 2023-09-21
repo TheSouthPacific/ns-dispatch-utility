@@ -800,7 +800,7 @@ def parse_dispatch_cell_values_of_ranges(
 
 def generate_new_dispatch_cell_values_of_range(
     old_rows: DispatchRows,
-    dispatch_config: Mapping[str, Dispatch],
+    dispatches: Mapping[str, Dispatch],
     op_results: Mapping[str, OpResult],
 ) -> RangeCellValues:
     """Generate new dispatch cell values for a spreadsheet range
@@ -808,7 +808,7 @@ def generate_new_dispatch_cell_values_of_range(
 
     Args:
         old_rows (DispatchRows): Old cell data of a dispatch sheet range
-        dispatch_config (Mapping[str, Dispatch]): New dispatch config
+        dispatches (Mapping[str, Dispatch]): New dispatch info
         op_results (Mapping[str, OpResult]): Dispatch operation results
 
     Returns:
@@ -816,28 +816,23 @@ def generate_new_dispatch_cell_values_of_range(
     """
 
     new_row_values: RangeCellValues = []
+
     for row in old_rows:
         dispatch_name = extract_name_from_hyperlink(row.hyperlink)
 
-        if dispatch_name not in dispatch_config:
-            new_row_values.append(row.to_cell_values())
-            continue
-
-        # This case arises when the dispatch was loaded but
-        # the program exits before it is updated
         try:
-            result = op_results[dispatch_name]
+            op_result = op_results[dispatch_name]
         except KeyError:
             new_row_values.append(row.to_cell_values())
             continue
 
-        new_status = result.result_message
-        if isinstance(result, FailureOpResult):
+        new_status = op_result.result_message
+        if isinstance(op_result, FailureOpResult):
             new_dispatch_row = dataclasses.replace(row, status=new_status)
             new_row_values.append(new_dispatch_row.to_cell_values())
             continue
 
-        dispatch = dispatch_config[dispatch_name]
+        dispatch = dispatches[dispatch_name]
 
         new_dispatch_name = row.hyperlink
         new_operation = row.operation

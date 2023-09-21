@@ -773,11 +773,6 @@ class TestGenerateNewDispatchRangeCellValues:
             ["", {}, {}],
             [
                 "n",
-                {},
-                {"n": SuccessOpResult("n", DispatchOp.CREATE, datetime(2023, 1, 1))},
-            ],
-            [
-                "n",
                 {
                     "n": Dispatch(
                         "1",
@@ -1108,7 +1103,7 @@ class TestGoogleDispatchLoader:
     def test_update_spreadsheets_after_new_dispatch_created_changes_op_to_edit(
         self,
     ):
-        owner_nations = loader.OwnerNationStore({"1": OwnerNation("nation1", ["s"])})
+        owner_nations = loader.OwnerNationStore({"1": OwnerNation("nat", ["s"])})
         category_setups = loader.CategorySetupStore(
             {"1": CategorySetup("meta", "gameplay")}
         )
@@ -1152,6 +1147,58 @@ class TestGoogleDispatchLoader:
                 "t",
                 "tp",
                 "Created successfully.\nTime: 2023/01/01 00:00:00 ",
+            ]
+        ]
+        new_spreadsheets = {loader.SheetRange("s", "A!A1:F"): new_range}
+        sheets_api.update_values_of_ranges.assert_called_with(new_spreadsheets)
+
+    def test_update_spreadsheets_after_nsdu_failure_report_updates_status_with_failure(
+        self,
+    ):
+        owner_nations = loader.OwnerNationStore({"1": OwnerNation("nat", ["s"])})
+        category_setups = loader.CategorySetupStore(
+            {"1": CategorySetup("meta", "gameplay")}
+        )
+        utility_templates = {}
+        range_1_rows = [DispatchRow("n", "create", "1", "1", "t", "tp", "")]
+        dispatch_ranges = {
+            SheetRange("s", "A!A1:F"): range_1_rows,
+        }
+        dispatches = loader.DispatchStore(
+            loader.parse_dispatch_cell_values_of_ranges(
+                dispatch_ranges, owner_nations, category_setups, Mock()
+            )
+        )
+        sheets_api = mock.create_autospec(loader.GoogleSheetsApiAdapter)
+        op_result_store = loader.OpResultStore()
+        obj = loader.GoogleDispatchLoader(
+            sheets_api,
+            dispatch_ranges,
+            dispatches,
+            utility_templates,
+            owner_nations,
+            category_setups,
+            op_result_store,
+        )
+        obj.report_result(
+            "n",
+            DispatchOp.CREATE,
+            DispatchOpResult.FAILURE,
+            datetime(2023, 1, 1),
+            "d",
+        )
+
+        obj.update_spreadsheets()
+
+        new_range = [
+            [
+                "n",
+                "create",
+                "1",
+                "1",
+                "t",
+                "tp",
+                "Failed to create.\nDetails: d\nTime: 2023/01/01 00:00:00 ",
             ]
         ]
         new_spreadsheets = {loader.SheetRange("s", "A!A1:F"): new_range}
