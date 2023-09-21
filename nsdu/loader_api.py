@@ -42,7 +42,7 @@ class DispatchMetadata:
     subcategory: str
 
 
-class LoaderError(exceptions.NSDUError):
+class LoaderError(exceptions.AppError):
     """Error from loader plugins."""
 
 

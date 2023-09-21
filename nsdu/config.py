@@ -10,7 +10,7 @@ from nsdu import exceptions, info, utils
 Config = dict[str, Any]
 
 
-class ConfigError(exceptions.NSDUError):
+class ConfigError(exceptions.AppError):
     """NSDU config error."""
 
 

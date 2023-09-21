@@ -19,7 +19,7 @@ TemplateLoadFunc = Callable[[str], str]
 FilterFunc = Callable[..., str]
 
 
-class DispatchRenderError(exceptions.NSDUError):
+class DispatchRenderError(exceptions.AppError):
     """Dispatch rendering error."""
 
 

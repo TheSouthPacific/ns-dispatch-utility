@@ -2,5 +2,5 @@
 """
 
 
-class NSDUError(Exception):
+class AppError(Exception):
     """NSDU general error."""

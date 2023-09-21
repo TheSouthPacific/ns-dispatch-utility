@@ -13,7 +13,7 @@ from nsdu.renderer import TemplateLoadFunc, TemplateVars
 logger = logging.getLogger(__name__)
 
 
-class DispatchMetadataError(exceptions.NSDUError):
+class DispatchMetadataError(exceptions.AppError):
     """Dispatch metadata error."""
 
 

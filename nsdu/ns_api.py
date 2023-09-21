@@ -10,7 +10,7 @@ from nationstates.objects import Nation
 from nsdu import exceptions
 
 
-class NsApiError(exceptions.NSDUError):
+class NsApiError(exceptions.AppError):
     """NationStates API error."""
 
 

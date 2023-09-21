@@ -16,7 +16,7 @@ from nsdu import exceptions, info, loader_api, utils
 from nsdu.config import Config
 
 
-class LoaderLoadError(exceptions.NSDUError):
+class LoaderLoadError(exceptions.AppError):
     """Loader source file not found."""
 
 
