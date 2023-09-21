@@ -9,6 +9,88 @@ from nsdu import dispatch, loader_api, loader_managers, ns_api, updater_api
 from nsdu.loader_api import DispatchMetadata, DispatchOp, DispatchOpResult
 
 
+def test_group_dispatches_by_owner_nation_returns_grouped_metadata_objs():
+    dispatches_metadata = {
+        "n1": DispatchMetadata(
+            None, DispatchOp.CREATE, "nat1", "t1", "meta", "gameplay"
+        ),
+        "n2": DispatchMetadata(
+            None, DispatchOp.CREATE, "nat1", "t2", "meta", "gameplay"
+        ),
+        "n3": DispatchMetadata(
+            None, DispatchOp.CREATE, "nat2", "t3", "meta", "gameplay"
+        ),
+    }
+
+    result = dispatch.group_dispatches_by_owner_nation(dispatches_metadata)
+
+    expected = {
+        "nat1": {"n1": dispatches_metadata["n1"], "n2": dispatches_metadata["n2"]},
+        "nat2": {"n3": dispatches_metadata["n3"]},
+    }
+    assert result == expected
+
+
+class TestGetDispatchesToExecute:
+    @pytest.mark.parametrize(
+        "names,expected",
+        [
+            [
+                ["n1"],
+                {
+                    "n1": DispatchMetadata(
+                        None, DispatchOp.CREATE, "nat", "t1", "meta", "gameplay"
+                    ),
+                },
+            ],
+            [
+                [],
+                {
+                    "n1": DispatchMetadata(
+                        None, DispatchOp.CREATE, "nat", "t1", "meta", "gameplay"
+                    ),
+                    "n2": DispatchMetadata(
+                        None, DispatchOp.CREATE, "nat", "t2", "meta", "gameplay"
+                    ),
+                },
+            ],
+        ],
+    )
+    def test_with_existing_names_returns_dispatch_metadata_objs(self, names, expected):
+        dispatches_metadata = {
+            "n1": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t1", "meta", "gameplay"
+            ),
+            "n2": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t2", "meta", "gameplay"
+            ),
+        }
+
+        result = dispatch.get_dispatches_to_execute(dispatches_metadata, names)
+
+        assert result == expected
+
+    def test_with_non_existent_name_skips_name(self):
+        dispatches_metadata = {
+            "n1": DispatchMetadata(
+                None, DispatchOp.CREATE, "nat", "t1", "meta", "gameplay"
+            ),
+        }
+        names = ["n1", "n"]
+
+        result = dispatch.get_dispatches_to_execute(dispatches_metadata, names)
+
+        assert result == {"n1": dispatches_metadata["n1"]}
+
+    def test_with_non_existent_name_logs_error(self, caplog):
+        dispatches_metadata = {}
+        names = ["n"]
+
+        dispatch.get_dispatches_to_execute(dispatches_metadata, names)
+
+        assert caplog.records[-1].levelname == "ERROR"
+
+
 class TestNsduDispatch:
     @pytest.fixture
     def feature(self):
