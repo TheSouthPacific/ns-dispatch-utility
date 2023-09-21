@@ -4,3 +4,7 @@
 
 class AppError(Exception):
     """NSDU general error."""
+
+
+class UserError(AppError):
+    """User error."""
