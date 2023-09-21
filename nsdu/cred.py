@@ -46,8 +46,8 @@ class CredFeature(Feature):
         cred_loader_manager = loader_managers.CredLoaderManager(
             nsdu_config["loaders_config"]
         )
-        loader_name = nsdu_config["loaders"]["cred_loader"]
-        loader_manager_builder.build(cred_loader_manager, loader_name)
+        cred_loader_name = nsdu_config["plugins"]["cred_loader"]
+        loader_manager_builder.build(cred_loader_manager, cred_loader_name)
         cred_loader_manager.init_loader()
 
         auth_api = ns_api.AuthApi(nsdu_config["general"]["user_agent"])

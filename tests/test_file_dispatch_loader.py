@@ -3,7 +3,7 @@ from unittest import mock
 import pytest
 import toml
 
-from nsdu import exceptions
+from nsdu import loader_api
 from nsdu.loaders import file_dispatch_loader
 
 
@@ -86,7 +86,7 @@ class TestDispatchConfigManager:
         file_path = toml_files({"dispatch_config.toml": dispatch_config})
         ins = file_dispatch_loader.DispatchConfigManager()
 
-        with pytest.raises(exceptions.LoaderConfigError):
+        with pytest.raises(loader_api.LoaderError):
             ins.load_from_files([str(file_path), "abcd.toml"])
 
     def test_get_canonical_dispatch_config(self):
@@ -495,7 +495,7 @@ class TestFileDispatchLoaderIntegration:
         loader = file_dispatch_loader.init_dispatch_loader(
             {"file_dispatch_loader": loader_config}
         )
-        r_dispatch_config = file_dispatch_loader.get_dispatch_config(loader)
+        r_dispatch_config = file_dispatch_loader.get_dispatch_metadata(loader)
         r_dispatch_text = file_dispatch_loader.get_dispatch_template(loader, "test1")
         file_dispatch_loader.cleanup_dispatch_loader(loader)
 
@@ -560,7 +560,7 @@ class TestFileDispatchLoaderIntegration:
         loader = file_dispatch_loader.init_dispatch_loader(
             {"file_dispatch_loader": loader_config}
         )
-        r_dispatch_config = file_dispatch_loader.get_dispatch_config(loader)
+        r_dispatch_config = file_dispatch_loader.get_dispatch_metadata(loader)
         r_dispatch_text = file_dispatch_loader.get_dispatch_template(loader, "test1")
         file_dispatch_loader.add_dispatch_id(loader, "test2", "54321")
         file_dispatch_loader.cleanup_dispatch_loader(loader)

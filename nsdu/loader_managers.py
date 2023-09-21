@@ -166,7 +166,7 @@ class SimpleBbcLoaderManager(LoaderManager):
                 loaders_config (Config): Config of loaders
         """
 
-        super().__init__(info.SIMPLE_BB_LOADER_PROJ, loaders_config)
+        super().__init__(info.SIMPLE_BBC_LOADER_PROJ, loaders_config)
 
     def get_simple_bbc_config(self) -> loader_api.BbcConfig:
         return self.manager.hook.get_simple_bbc_config(

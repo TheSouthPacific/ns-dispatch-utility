@@ -8,41 +8,41 @@ user_agent = 'NationStates Dispatch Utility run by <your main nation name>'
 complex_formatter_source_path = '~/ns_dispatches/design/complex_tags.toml'
 filter_paths = ['~/ns_dispatches/design/filters.toml']
 
-[loaders]
+[plugins]
 # Choose loader to load dispatch config and content.
 dispatch_loader = 'file_dispatch_loader'
 # Choose loader to load simple BBCode fornatters
-simple_bb_loader = 'file_simplebb_loader'
+simple_bbc_loader = 'file_simple_bbc_loader'
 # Choose loader to load template variables.
 template_var_loader = ['file_template_var_loader']
 # Choose loader to load nation login credentials.
 cred_loader = 'json_cred_loader'
 
-[loader_config]
-[loader_config.file_dispatch_loader]
+[loaders_config]
+[loaders_config.file_dispatch_loader]
 dispatch_config_paths = ['~/ns_dispatches/dispatches.toml']
 dispatch_template_path = '~/ns_dispatches'
 
 # Dispatch file extension
 # file_ext = '.txt'
 
-[loader_config.file_simple_bb_loader]
+[loaders_config.file_simple_bbc_loader]
 file_path = '~/ns_dispatches/simple_bb_config.toml'
 
-[loader_config.file_template_var_loader]
+[loaders_config.file_template_var_loader]
 template_var_paths = ['~/ns_dispatches/vars.toml']
 # Variable groups that contain personnel names (e.g. government official names)
 personnel_groups = ['personnel']
 # Variable groups that define information associated with a personnel name (e.g. nation name, Discord ID)
 personnel_info_groups = ['reference']
 
-[loader_config.json_template_var_loader]
+[loaders_config.json_template_var_loader]
 template_var_paths = ['~/ns_dispatches/vars.json']
 
-[loader_config.json_cred_loader]
+[loaders_config.json_cred_loader]
 # cred_path = '~/ns_dispatches/nations.json'
 
-[loader_config.google_dispatch_loader]
+[loaders_config.google_dispatch_loader]
 utility_template_spreadsheets = [
         { spreadsheet_id = '1234abcdefgh', ranges = [
                 'Layout!A3:B',
@@ -63,23 +63,23 @@ dispatch_spreadsheets = [
         ] },
 ]
 
-[loader_config.google_simple_bbc_loader]
+[loaders_config.google_simple_bbc_loader]
 google_cred_path = '~/ns_dispatches/google_creds.json'
 spreadsheet_id = '5678xyzjklmn'
 range = 'BBCode!A3:C'
 
-[loader_config.google_var_loader]
+[loaders_config.google_var_loader]
 google_cred_path = '~/ns_dispatches/google_creds.json'
 personnel_groups = ['gov_officials']
-personnel_info_groups = ['personnel_info']
+people_info_groups = ['personnel_info']
 
-[loader_config.google_var_loader.spreadsheet1]
+[loaders_config.google_var_loader.spreadsheet1]
 spreadsheet_id = '1234abcdefgh'
 vars = [
         { ranges = 'Var1!A3:B', name = 'gov_officials' },
         { ranges = 'Var2!A3:B', name = 'personnel_info' },
 ]
-[loader_config.google_var_loader.spreadsheet2]
+[loaders_config.google_var_loader.spreadsheet2]
 spreadsheet_id = '5678xyzjklmn'
 vars = [
         { ranges = 'Var1!A3:B', name = 'gov_officials' },

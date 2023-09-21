@@ -63,8 +63,8 @@ dispatch_loader = pluggy.HookimplMarker(info.DISPATCH_LOADER_PROJ)
 template_var_loader_specs = pluggy.HookspecMarker(info.TEMPLATE_VAR_LOADER_PROJ)
 template_var_loader = pluggy.HookimplMarker(info.TEMPLATE_VAR_LOADER_PROJ)
 
-simple_bbc_loader_specs = pluggy.HookspecMarker(info.SIMPLE_BB_LOADER_PROJ)
-simple_bbc_loader = pluggy.HookimplMarker(info.SIMPLE_BB_LOADER_PROJ)
+simple_bbc_loader_specs = pluggy.HookspecMarker(info.SIMPLE_BBC_LOADER_PROJ)
+simple_bbc_loader = pluggy.HookimplMarker(info.SIMPLE_BBC_LOADER_PROJ)
 
 cred_loader_specs = pluggy.HookspecMarker(info.CRED_LOADER_PROJ)
 cred_loader = pluggy.HookimplMarker(info.CRED_LOADER_PROJ)

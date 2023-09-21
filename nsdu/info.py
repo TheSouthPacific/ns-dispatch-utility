@@ -15,7 +15,7 @@ DEFAULT_TEMPLATE = "[reserved]"
 # Pluggy project name for loader plugins.
 DISPATCH_LOADER_PROJ = "NSDUDispatchLoader"
 TEMPLATE_VAR_LOADER_PROJ = "NSDUTemplateVarLoader"
-SIMPLE_BB_LOADER_PROJ = "NSDUSimpleBBLoader"
+SIMPLE_BBC_LOADER_PROJ = "NSDUSimpleBBLoader"
 CRED_LOADER_PROJ = "NSDUCredLoader"
 
 # Default directories
