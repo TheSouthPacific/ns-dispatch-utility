@@ -89,7 +89,7 @@ def convert_to_html_entities(text: str) -> bytes:
         text (str): Text
 
     Returns:
-        str: Converted text
+        bytes: Converted text as bytes
     """
 
     return text.encode("ascii", "xmlcharrefreplace")
