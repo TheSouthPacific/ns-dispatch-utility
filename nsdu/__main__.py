@@ -26,7 +26,7 @@ def get_metadata_entry_points() -> Sequence[EntryPoint]:
     """
 
     try:
-        return import_metadata.entry_points()[info.LOADER_ENTRY_POINT_NAME]
+        return import_metadata.entry_points().select(group=info.LOADER_ENTRY_POINT_NAME)
     except KeyError:
         return []
 
