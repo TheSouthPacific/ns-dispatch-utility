@@ -1,7 +1,7 @@
 import pytest
 
 from nsdu import loader_api
-from nsdu.loaders import file_simple_bbc_loader
+from nsdu.loaders import file_simple_bbc_loader as loader
 
 
 class TestFileVarLoader:
@@ -13,7 +13,7 @@ class TestFileVarLoader:
         path = toml_files({"simple_bb_config.toml": bb_config}).file_paths[0]
         loader_config = {"file_simple_bbc_loader": {"file_path": path}}
 
-        r = file_simple_bbc_loader.get_simple_bb_config(loader_config)
+        r = loader.get_simple_bbc_config(loader_config)
 
         assert r == bb_config
 
@@ -21,10 +21,10 @@ class TestFileVarLoader:
         loader_config = {"file_simple_bbc_loader": {"file_path": "a"}}
 
         with pytest.raises(loader_api.LoaderError):
-            file_simple_bbc_loader.get_simple_bb_config(loader_config)
+            loader.get_simple_bbc_config(loader_config)
 
     def test_get_simple_bb_config_with_no_path(self):
         loader_config = {"file_simple_bbc_loader": {}}
 
         with pytest.raises(loader_api.LoaderError):
-            file_simple_bbc_loader.get_simple_bb_config(loader_config)
+            loader.get_simple_bbc_config(loader_config)
