@@ -6,7 +6,7 @@ import logging
 from datetime import datetime, timezone
 from typing import Sequence
 
-from nsdu import loader_api, ns_api, updater_api, utils
+from nsdu import feature, loader_api, ns_api, updater_api, utils
 from nsdu.config import Config
 from nsdu.loader_api import DispatchesMetadata, DispatchOp, DispatchOpResult
 from nsdu.loader_managers import (
@@ -16,7 +16,6 @@ from nsdu.loader_managers import (
     SimpleBbcLoaderManager,
     TemplateVarLoaderManager,
 )
-from nsdu.types import Feature
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +73,7 @@ def get_dispatches_to_execute(
     return dispatches_to_execute
 
 
-class DispatchFeature(Feature):
+class DispatchFeature(feature.Feature):
     """Handles the dispatch feature."""
 
     def __init__(

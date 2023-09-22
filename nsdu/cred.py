@@ -3,15 +3,15 @@
 from __future__ import annotations
 
 from argparse import Namespace
+from typing import Mapping, Sequence
 
-from nsdu import loader_api, loader_managers, ns_api
+from nsdu import feature, loader_api, loader_managers, ns_api
 from nsdu.config import Config
 from nsdu.exceptions import UserError
 from nsdu.loader_managers import CredLoaderManager, LoaderManagerBuilder
-from nsdu.types import Feature
 
 
-class CredFeature(Feature):
+class CredFeature(feature.Feature):
     """Handles the nation login credential feature."""
 
     def __init__(
@@ -55,11 +55,14 @@ class CredFeature(Feature):
         return cls(cred_loader_manager, auth_api)
 
     def add_password_cred(self, nation_name: str, password: str) -> None:
-        """Add a new credential that uses password.
+        """Add a password credential.
 
         Args:
             nation_name (str): Nation name
             password (str): Password
+
+        Raises:
+            UserError: Failed to login
         """
 
         try:
@@ -68,8 +71,18 @@ class CredFeature(Feature):
         except ns_api.AuthApiError as err:
             raise UserError(err) from err
 
+    def add_password_creds(self, creds: Mapping[str, str]) -> None:
+        """Add password credentials.
+
+        Args:
+            creds (Mapping[str, str]): Passwords keyed by nation name
+        """
+
+        for nation_name, password in creds.items():
+            self.add_password_cred(nation_name, password)
+
     def add_autologin_cred(self, nation_name: str, autologin_code: str) -> None:
-        """Add a new credential that uses autologin code.
+        """Add an autologin code credential.
 
         Args:
             nation_name (str): Nation name
@@ -85,6 +98,16 @@ class CredFeature(Feature):
                 f"autologin code (use --add-password if you are adding passwords)."
             )
 
+    def add_autologin_creds(self, creds: Mapping[str, str]) -> None:
+        """Add autologin code credentials.
+
+        Args:
+            creds (Mapping[str, str]): Autologin code keyed by nation name
+        """
+
+        for nation_name, password in creds.items():
+            self.add_password_cred(nation_name, password)
+
     def remove_cred(self, nation_name: str) -> None:
         """Remove a login credential.
 
@@ -92,7 +115,14 @@ class CredFeature(Feature):
             nation_name (str): Nation name
         """
 
-        self.cred_loader_manager.remove_cred(nation_name)
+        try:
+            self.cred_loader_manager.remove_cred(nation_name)
+        except loader_api.CredNotFound:
+            raise UserError(f'Login credential for nation "{nation_name}" not found.')
+
+    def remove_creds(self, nation_names: Sequence[str]) -> None:
+        for name in nation_names:
+            self.remove_cred(name)
 
     def cleanup(self) -> None:
         """Cleanup loader (include saving credential changes)."""
@@ -100,51 +130,69 @@ class CredFeature(Feature):
         self.cred_loader_manager.cleanup_loader()
 
 
-def run_add_password_creds(feature: CredFeature, cli_args: Namespace) -> None:
-    """Run password credential add operation.
+class CredCliParser(feature.FeatureCliParser):
+    """Parse CLI arguments for CredFeature."""
 
-    Args:
-        feature (CredFeature): Credential feature
-        cli_args (Namespace): CLI argument values
-    """
+    def __init__(self, feature: CredFeature) -> None:
+        self.feature = feature
 
-    if len(cli_args.add_password) % 2 != 0:
-        raise UserError("There is no password for the last nation.")
+    def parse_add_password_creds(self, cli_args: Namespace) -> None:
+        """Parse password credential add CLI arguments.
 
-    for i in range(0, len(cli_args.add_password), 2):
-        feature.add_password_cred(
-            cli_args.add_password[i], cli_args.add_password[i + 1]
-        )
-    print("Successfully added all login credentials")
+        Args:
+            cli_args (Namespace): CLI argument values
+        """
 
+        if len(cli_args.add_password) % 2 != 0:
+            raise UserError("There is no password for the last nation.")
 
-def run_add_autologin_creds(feature: CredFeature, cli_args: Namespace) -> None:
-    """Run autologin credential add operation.
+        creds: dict[str, str] = {}
+        for i in range(0, len(cli_args.add_password), 2):
+            inputs = cli_args.add_password
+            creds[inputs[i]] = inputs[i + 1]
+        self.feature.add_password_creds(creds)
 
-    Args:
-        feature (CredFeature): Credential feature
-        cli_args (Namespace): CLI argument values
-    """
+        print("Successfully added all login credentials")
 
-    if len(cli_args.add) % 2 != 0:
-        raise UserError("There is no autologin code for the last nation.")
+    def parse_add_autologin_creds(self, cli_args: Namespace) -> None:
+        """Parse autologin credential add CLI arguments.
 
-    for i in range(0, len(cli_args.add), 2):
-        feature.add_autologin_cred(cli_args.add[i], cli_args.add[i + 1])
-    print("Successfully added all login credentials")
+        Args:
+            cli_args (Namespace): CLI argument values
+        """
 
+        if len(cli_args.add) % 2 != 0:
+            raise UserError("There is no autologin code for the last nation.")
 
-def run_remove_cred(feature: CredFeature, cli_args: Namespace) -> None:
-    """Run credential remove operation.
+        creds: dict[str, str] = {}
+        for i in range(0, len(cli_args.add), 2):
+            inputs = cli_args.add
+            creds[inputs[i]] = inputs[i + 1]
+        self.feature.add_autologin_creds(creds)
 
-    Args:
-        feature (CredFeature): Credential feature
-        cli_args (Namespace): CLI argument values
-    """
+        print("Successfully added all login credentials")
 
-    for nation_name in cli_args.remove:
-        try:
-            feature.remove_cred(nation_name)
-            print(f'Removed login credential of "{nation_name}"')
-        except loader_api.CredNotFound:
-            raise UserError(f'Login credential for nation "{nation_name}" not found.')
+    def parse_remove_creds(self, cli_args: Namespace) -> None:
+        """Parse credential remove CLI arguments.
+
+        Args:
+            cli_args (Namespace): CLI argument values
+        """
+
+        self.feature.remove_creds(cli_args.remove)
+        nation_names_str = ", ".join(cli_args.remove)
+        print(f'Removed login credentials of "{nation_names_str}"')
+
+    def parse(self, cli_args: Namespace) -> None:
+        """Parse CLI arguments.
+
+        Args:
+            cli_args (Namespace): CLI arguments
+        """
+
+        if hasattr(cli_args, "add"):
+            self.parse_add_autologin_creds(cli_args)
+        elif hasattr(cli_args, "add_password"):
+            self.parse_add_password_creds(cli_args)
+        elif hasattr(cli_args, "remove"):
+            self.parse_remove_creds(cli_args)

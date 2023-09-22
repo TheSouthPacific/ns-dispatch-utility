@@ -13,7 +13,7 @@ from typing import Sequence
 
 from nsdu import config, cred, dispatch, exceptions, info, loader_managers
 from nsdu.config import Config
-from nsdu.types import Feature
+from nsdu.feature import Feature
 
 logger = logging.getLogger("NSDU")
 
@@ -58,12 +58,8 @@ def run(nsdu_config: Config, cli_args: Namespace) -> None:
 
     if cli_args.subparser_name == "cred":
         feature = cred.CredFeature.from_nsdu_config(nsdu_config, loader_manager_builder)
-        if hasattr(cli_args, "add") and cli_args.add is not None:
-            cred.run_add_autologin_creds(feature, cli_args)
-        elif hasattr(cli_args, "add_password") and cli_args.add_password is not None:
-            cred.run_add_password_creds(feature, cli_args)
-        elif hasattr(cli_args, "remove") and cli_args.remove is not None:
-            cred.run_remove_cred(feature, cli_args)
+        feature_cli_parser = cred.CredCliParser(feature)
+        feature_cli_parser.parse(cli_args)
     elif cli_args.subparser_name == "update":
         feature = dispatch.DispatchFeature.from_nsdu_config(
             nsdu_config, loader_manager_builder
