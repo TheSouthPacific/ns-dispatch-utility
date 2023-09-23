@@ -11,9 +11,8 @@ from argparse import Namespace
 from importlib.metadata import EntryPoint
 from typing import Sequence
 
-from nsdu import config, cred, dispatch, exceptions, info, loader_managers
+from nsdu import config, cred, dispatch, exceptions, feature, info, loader_managers
 from nsdu.config import Config
-from nsdu.feature import Feature
 
 logger = logging.getLogger("NSDU")
 
@@ -45,29 +44,32 @@ def run(nsdu_config: Config, cli_args: Namespace) -> None:
         entry_points, custom_loader_dir_path
     )
 
-    feature: Feature | None = None
+    feature_obj: feature.Feature | None = None
+    feature_cli_parser: feature.FeatureCliParser | None = None
 
     def interrupt_handler(sig, frame):
         logger.info("Exiting NSDU...")
-        if feature:
-            feature.cleanup()
+        if feature_obj:
+            feature_obj.cleanup()
         logger.info("Exited NSDU.")
         sys.exit()
 
     signal.signal(signal.SIGINT, interrupt_handler)
 
     if cli_args.subparser_name == "cred":
-        feature = cred.CredFeature.from_nsdu_config(nsdu_config, loader_manager_builder)
-        feature_cli_parser = cred.CredCliParser(feature)
-        feature_cli_parser.parse(cli_args)
-    elif cli_args.subparser_name == "update":
-        feature = dispatch.DispatchFeature.from_nsdu_config(
+        feature_obj = cred.CredFeature.from_nsdu_config(
             nsdu_config, loader_manager_builder
         )
-        feature.execute_dispatch_operations(cli_args.dispatches)
+        feature_cli_parser = cred.CredCliParser(feature_obj)
+    elif cli_args.subparser_name == "update":
+        feature_obj = dispatch.DispatchFeature.from_nsdu_config(
+            nsdu_config, loader_manager_builder
+        )
+        feature_cli_parser = dispatch.DispatchCliParser(feature_obj)
 
-    if feature:
-        feature.cleanup()
+    if feature_obj and feature_cli_parser:
+        feature_cli_parser.parse(cli_args)
+        feature_obj.cleanup()
 
 
 def get_cli_args() -> Namespace:

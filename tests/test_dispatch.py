@@ -273,3 +273,15 @@ class TestNsduDispatch:
         feature.execute_dispatch_operations(["n"])
 
         assert caplog.records[-1].levelname == "ERROR"
+
+
+@pytest.mark.parametrize("args", [["n1", "n2"], []])
+def test_dispatch_cli_parser_parse_update_dispatches_args_uses_args(args):
+    feature = mock.create_autospec(dispatch.DispatchFeature)
+    feature.execute_dispatch_operations = Mock()
+    parser = dispatch.DispatchCliParser(feature)
+
+    cli_args = Mock(dispatches=args)
+    parser.parse(cli_args)
+
+    feature.execute_dispatch_operations.assert_called_with(args)

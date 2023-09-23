@@ -69,8 +69,8 @@ class TestCredCliParser:
         self, parser, args, expected
     ):
         parser.feature.add_password_creds = Mock()
-        cli_args = Mock(add_password=args)
 
+        cli_args = Mock(add_password=args)
         parser.parse_add_password_creds(cli_args)
 
         parser.feature.add_password_creds.assert_called_with(expected)
@@ -92,8 +92,8 @@ class TestCredCliParser:
         self, parser, args, expected
     ):
         parser.feature.add_autologin_creds = Mock()
-        cli_args = Mock(add=args)
 
+        cli_args = Mock(add=args)
         parser.parse_add_autologin_creds(cli_args)
 
         parser.feature.add_autologin_creds.assert_called_with(expected)
@@ -110,8 +110,8 @@ class TestCredCliParser:
     )
     def test_parse_remove_creds_uses_input(self, parser, args):
         parser.feature.remove_creds = Mock()
-        cli_args = Mock(remove=args)
 
+        cli_args = Mock(remove=args)
         parser.parse_remove_creds(cli_args)
 
         parser.feature.remove_creds.assert_called_with(args)

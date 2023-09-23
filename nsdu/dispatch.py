@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from argparse import Namespace
 from datetime import datetime, timezone
 from typing import Sequence
 
@@ -245,3 +246,11 @@ class DispatchFeature(feature.Feature):
         """Cleanup loaders (include saving dispatch metadata changes)."""
 
         self.dispatch_loader_manager.cleanup_loader()
+
+
+class DispatchCliParser(feature.FeatureCliParser):
+    def __init__(self, feature: DispatchFeature) -> None:
+        self.feature = feature
+
+    def parse(self, cli_args: Namespace) -> None:
+        self.feature.execute_dispatch_operations(cli_args.dispatches)
