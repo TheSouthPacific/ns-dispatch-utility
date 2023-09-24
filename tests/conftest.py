@@ -17,7 +17,7 @@ def toml_files(tmp_path):
 
     def gen_toml_files(files: Mapping[str, dict] | None = None) -> Paths:
         if files is None:
-            files = {"test.toml": {"sec": {"key": "val"}}}
+            files = {"test.toml": {"s": {"k": "v"}}}
 
         file_paths = []
 
@@ -34,17 +34,20 @@ def toml_files(tmp_path):
 
 @pytest.fixture
 def text_files(tmp_path):
-    """Create text files for testing."""
+    """Create plain text files for testing."""
 
-    def gen_text_files(files={"test.txt": "Foo Bar"}):
-        f_path = None
+    def gen_text_files(files: Mapping[str, str] | None = None):
+        if files is None:
+            files = {"test.txt": "Hello World"}
+
+        file_paths = []
+
         for name, text in files.items():
-            f_path = tmp_path / name
-            f_path.write_text(text)
+            file_path = tmp_path / name
+            file_path.write_text(text)
+            file_paths.append(file_path)
 
-        if len(files) == 1:
-            return f_path
-        return tmp_path
+        return Paths(tmp_path, file_paths)
 
     return gen_text_files
 

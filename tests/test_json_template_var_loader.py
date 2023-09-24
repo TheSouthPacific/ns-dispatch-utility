@@ -5,45 +5,32 @@ from nsdu.loaders import json_template_var_loader
 
 
 class TestJsonTemplateVarLoader:
-    def test_load_valid_json_file_returns_dict_of_json_content(self, json_files):
-        json_path = json_files({"foobar.json": {"key1": "value1"}})
-        loader_config = {
-            "json_template_var_loader": {"template_var_paths": [json_path]}
-        }
-
-        result = json_template_var_loader.get_template_vars(loader_config)
-
-        assert result == {"key1": "value1"}
-
-    def test_load_two_json_files_with_same_root_keys_returns_last_matching_key(
-        self, json_files
+    @pytest.mark.parametrize(
+        "vars,expected",
+        [
+            [{"t.json": {"k": "v"}}, {"k": "v"}],
+            [{"t1.json": {"k": "v1"}, "t2.json": {"k": "v2"}}, {"k": "v2"}],
+        ],
+    )
+    def test_get_template_vars_returns_json_content_dict(
+        self, json_files, vars, expected
     ):
-        json_dir = json_files(
-            {"foobar1.json": {"key1": "value1"}, "foobar2.json": {"key1": "value2"}}
-        )
-        json_path_1 = str(json_dir / "foobar1.json")
-        json_path_2 = str(json_dir / "foobar2.json")
-        loader_config = {
-            "json_template_var_loader": {
-                "template_var_paths": [json_path_1, json_path_2]
-            }
-        }
+        paths = json_files(vars).file_paths
+        config = {"json_template_var_loader": {"template_var_paths": paths}}
 
-        result = json_template_var_loader.get_template_vars(loader_config)
+        result = json_template_var_loader.get_template_vars(config)
 
-        assert result == {"key1": "value2"}
+        assert result == expected
 
-    def test_load_invalid_json_file_raises_exception(self, text_files):
-        json_path = text_files({"foobar.json": "{something wrong}"})
-        loader_config = {
-            "json_template_var_loader": {"template_var_paths": [json_path]}
-        }
+    def test_get_template_vars_from_invalid_json_raises_exception(self, text_files):
+        path = text_files({"t.json": "{"}).file_paths[0]
+        config = {"json_template_var_loader": {"template_var_paths": [path]}}
 
         with pytest.raises(loader_api.LoaderError):
-            json_template_var_loader.get_template_vars(loader_config)
+            json_template_var_loader.get_template_vars(config)
 
-    def test_load_non_existent_json_file_raises_exception(self):
-        loader_config = {"json_template_var_loader": {"template_var_paths": ["abcd"]}}
+    def test_get_template_vars_from_non_existent_file_raises_exception(self):
+        loader_config = {"json_template_var_loader": {"template_var_paths": ["a"]}}
 
         with pytest.raises(loader_api.LoaderError):
             json_template_var_loader.get_template_vars(loader_config)
