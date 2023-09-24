@@ -15,62 +15,74 @@ logger = logging.getLogger(__name__)
 
 
 class JSONCredLoader:
-    """JSON Credential Loader.
+    """Store nation login credentials in a JSON file."""
 
-    Args:
-        config (dict): Configuration
-        json_path (Path): Path to JSON file
-    """
+    def __init__(self, cred_file_path: Path) -> None:
+        """Store nation login credentials in a JSON file.
 
-    def __init__(self, json_path: Path):
-        super().__init__()
-        self.creds = {}
-        self.json_path = json_path
-        self.saved = True
-
-    def load_creds(self) -> None:
-        """Get all login credentials
-
-        Returns:
-            dict: Nation name and autologin code
+        Args:
+            cred_file_path (Path): Path to credential store file
         """
 
+        self.creds: dict[str, str] = {}
+        self.cred_file_path = cred_file_path
+        self.changed = False
+
+    def load_creds(self) -> None:
+        """Load credentials from JSON file."""
+
         try:
-            with open(self.json_path) as f:
+            with open(self.cred_file_path) as f:
                 self.creds = json.load(f)
         except FileNotFoundError:
             pass
 
-    def add_cred(self, name: str, x_autologin: str) -> None:
-        """Add a new credential into file.
+    def get_cred(self, name: str) -> str:
+        """Get credential (a.k.a autologin code) of a nation.
 
         Args:
             name (str): Nation name
-            x_autologin (str): X-Autologin code
+
+        Raises:
+            loader_api.LoaderError: Credential not found
+
+        Returns:
+            str: Autologin code
         """
 
-        self.creds[name] = x_autologin
-        self.saved = False
+        try:
+            return self.creds[name]
+        except KeyError as err:
+            raise loader_api.CredNotFound from err
+
+    def add_cred(self, name: str, autologin_code: str) -> None:
+        """Add a credential.
+
+        Args:
+            name (str): Nation name
+            autologin_code (str): Autologin code
+        """
+
+        self.creds[name] = autologin_code
+        self.changed = True
 
     def remove_cred(self, name: str) -> None:
-        """Remove a credential from file.
+        """Remove a credential.
 
         Args:
             name (str): Nation name
         """
 
         if name not in self.creds:
-            raise loader_api.CredNotFound(
-                'Credential of nation "{}" not found.'.format(name)
-            )
+            raise loader_api.CredNotFound
         del self.creds[name]
-        self.saved = False
+        self.changed = True
 
     def save(self) -> None:
         """Save creds to JSON file."""
 
-        if not self.saved:
-            with open(self.json_path, "w") as f:
+        if self.changed:
+            with open(self.cred_file_path, "w") as f:
                 json.dump(self.creds, f)
 
 
@@ -90,7 +102,7 @@ def init_cred_loader(loaders_config: Config) -> JSONCredLoader:
 
 @loader_api.cred_loader
 def get_cred(loader: JSONCredLoader, name: str) -> str:
-    return loader.creds[name]
+    return loader.get_cred(name)
 
 
 @loader_api.cred_loader
