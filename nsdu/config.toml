@@ -20,8 +20,8 @@ cred_loader = 'json_cred_loader'
 
 [loaders_config]
 [loaders_config.file_dispatch_loader]
-dispatch_config_paths = ['~/ns_dispatches/dispatches.toml']
-dispatch_template_path = '~/ns_dispatches'
+metadata_paths = ['~/ns_dispatches/dispatches.toml']
+template_path = '~/ns_dispatches'
 
 # Dispatch file extension
 # file_ext = '.txt'
