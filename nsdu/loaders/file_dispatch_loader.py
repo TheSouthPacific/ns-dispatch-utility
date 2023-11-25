@@ -2,174 +2,245 @@
 dispatch configuration from TOML files.
 """
 
-import copy
 import logging
 from pathlib import Path
-from typing import Sequence
+from typing import Mapping, Sequence
 
 import toml
 
 import nsdu
 from nsdu import loader_api
 from nsdu.config import Config
+from nsdu.loader_api import DispatchesMetadata, DispatchMetadata, DispatchOp
 
-DEFAULT_ID_STORE_FILENAME = "dispatch_id.json"
 DEFAULT_EXT = ".txt"
 
 logger = logging.getLogger(__name__)
 
 
-class DispatchConfigManager:
-    """Load and save dispatch configuration in TOML files."""
+def parse_dispatch_metadata_dict(raw: dict, owner_nation: str) -> DispatchMetadata:
+    """Parse a dispatch metadata dict and return the metadata
+    as a DispatchMetadata instance.
 
-    def __init__(self):
-        # Dispatch config of all loaded files
-        self.all_dispatch_config = {}
-        self.new_dispatch_id = {}
-        self.saved = True
+    Args:
+        raw (dict): Raw dict
+        owner_nation (str): Owner nation name
 
-    def load_from_files(self, dispatch_config_paths: Sequence[str]) -> None:
-        """Load dispatch configuration files from provided paths.
+    Raises:
+        ValueError: Failed to parse
 
-        Args:
-            dispatch_config_paths (Sequence[str]): Dispatch config file paths
-        """
+    Returns:
+        DispatchMetadata: Dispatch metadata
+    """
 
-        for dispatch_config_path in dispatch_config_paths:
-            try:
-                self.all_dispatch_config[
-                    dispatch_config_path
-                ] = nsdu.get_config_from_toml(dispatch_config_path)
-            except FileNotFoundError:
-                raise loader_api.LoaderError(
-                    f"Dispatch config file {dispatch_config_path} not found."
-                )
+    try:
+        title = raw["title"]
+        category = raw["category"]
+        subcategory = raw["subcategory"]
+    except KeyError as err:
+        raise ValueError(f"{err.args[0]} is missing")
 
-        logger.debug('Loaded all dispatch config files: "%r"', self.all_dispatch_config)
+    ns_id = raw.get("ns_id")
+    operation = raw.get("op")
 
-    def get_canonical_dispatch_config(self) -> dict[str, dict]:
-        """Get dispatch configuration in NSDU's standard format.
+    match operation:
+        case "create":
+            operation = DispatchOp.CREATE
+        case "edit":
+            operation = DispatchOp.EDIT
+        case "delete":
+            operation = DispatchOp.DELETE
+        case _:
+            raise ValueError(f'Invalid operation "{operation}"')
 
-        Returns:
-            dict[str, dict]: Canonical dispatch configuration
-        """
+    if operation in [DispatchOp.EDIT, DispatchOp.DELETE] and ns_id is None:
+        raise ValueError("Needs ID for edit or deletion")
 
-        canonical_dispatch_config = {}
+    return DispatchMetadata(
+        ns_id, operation, owner_nation, title, category, subcategory
+    )
 
-        for dispatch_config in self.all_dispatch_config.values():
-            for owner_nation, owner_dispatches in dispatch_config.items():
-                if owner_nation not in canonical_dispatch_config:
-                    canonical_dispatch_config[owner_nation] = {}
-                for name, conf in owner_dispatches.items():
-                    canonical_config = copy.deepcopy(conf)
-                    if "ns_id" not in conf and "action" not in conf:
-                        canonical_config["action"] = "create"
-                    elif "action" not in conf:
-                        canonical_config["action"] = "edit"
-                    elif canonical_config["action"] == "remove":
-                        canonical_config["action"] = "remove"
-                    else:
-                        canonical_config["action"] = "skip"
-                    canonical_dispatch_config[owner_nation][name] = canonical_config
 
-        return canonical_dispatch_config
+def parse_dispatch_metadata_file(content: dict) -> DispatchesMetadata:
+    """Parse content of a dispatch metadata file and return
+    the dispatches' metadata as a DispatchesMetadata instance.
 
-    def add_new_dispatch_id(self, name: str, dispatch_id: str) -> None:
-        """Add NationStates-provided ID of a new dispatch.
+    Args:
+        content (dict): File content
 
-        Args:
-            name (str): Dispatch name
-            dispatch_id (str): NationStates-provided ID
-        """
+    Returns:
+        DispatchesMetadata: Metadata of dispatches
+    """
 
-        self.new_dispatch_id[name] = dispatch_id
-        self.saved = False
+    dispatches_metadata: DispatchesMetadata = {}
+    for owner_nation, metadata_dicts in content.items():
+        for name, metadata_dict in metadata_dicts.items():
+            dispatches_metadata[name] = parse_dispatch_metadata_dict(
+                metadata_dict, owner_nation
+            )
+    return dispatches_metadata
 
-    def save(self) -> None:
-        """Save new dispatch IDs into the dispatch configuration file(s)."""
 
-        if not self.new_dispatch_id:
-            return
+def parse_dispatch_metadata_files(
+    files_content: Sequence[dict],
+) -> DispatchesMetadata:
+    """Parse content of many dispatch metadata files and return
+    the dispatches' metadata as a DispatchesMetadata instance.
 
-        for dispatch_config_path, dispatch_config in self.all_dispatch_config.items():
-            for owner_nation, owner_dispatches in dispatch_config.items():
-                for name, conf in owner_dispatches.items():
-                    if "ns_id" not in conf and name in self.new_dispatch_id:
-                        self.all_dispatch_config[dispatch_config_path][owner_nation][
-                            name
-                        ]["ns_id"] = self.new_dispatch_id.pop(name)
+    Args:
+        files_content (Sequence[dict]): Files' content
 
-        for dispatch_config_path, dispatch_config in self.all_dispatch_config.items():
-            with open(Path(dispatch_config_path).expanduser(), "w") as f:
-                toml.dump(dispatch_config, f)
+    Returns:
+        DispatchesMetadata: Metadata of dispatches
+    """
 
-        self.saved = True
-        logger.debug("Saved modified dispatch config: %r", self.all_dispatch_config)
+    files_dispatches_metadata: DispatchesMetadata = {}
+    for file_content in files_content:
+        dispatches_metadata = parse_dispatch_metadata_file(file_content)
+        files_dispatches_metadata.update(dispatches_metadata)
+    return files_dispatches_metadata
+
+
+def load_files_content(file_paths: Sequence[str]) -> dict[Path, dict]:
+    """Load TOML files as dicts.
+
+    Args:
+        file_paths (Sequence[str]): File paths
+
+    Raises:
+        loader_api.LoaderError: File not found
+
+    Returns:
+        dict[Path, dict]: Files' content
+    """
+
+    files_content: dict[Path, dict] = {}
+    for path in file_paths:
+        try:
+            content = nsdu.get_config_from_toml(path)
+        except FileNotFoundError as err:
+            raise loader_api.LoaderError(
+                f'Dispatch metadata file "{path}"" not found.'
+            ) from err
+
+        file_path = Path(path)
+        files_content[file_path] = content
+    return files_content
+
+
+def get_new_metadata_dict(old_dict: dict, new_dispatch_id: str | None) -> dict:
+    """Get a dispatch metadata dict with new data from an old one.
+
+    Args:
+        old_dict (dict): Old metadata dict
+        new_dispatch_id (str | None): ID of new dispatch
+
+    Returns:
+        dict: Metadata dict with new data
+    """
+
+    if new_dispatch_id is None:
+        return old_dict
+
+    new_dict = old_dict.copy()
+    new_dict["ns_id"] = new_dispatch_id
+    new_dict["op"] = "edit"
+    return new_dict
+
+
+def update_dispatch_metadata_files(
+    files_content: Mapping[Path, dict], new_dispatch_ids: Mapping[str, str]
+) -> None:
+    """Save new metadata of dispatches into TOML files.
+
+    Args:
+        files_content (Mapping[Path, dict]): Files' content
+    """
+
+    for path, content in files_content.items():
+        new_content = {
+            owner: {
+                name: get_new_metadata_dict(metadata, new_dispatch_ids.get(name))
+                for name, metadata in dispatches_metadata
+            }
+            for owner, dispatches_metadata in content
+        }
+        with open(path, "w") as f:
+            toml.dump(new_content, f)
 
 
 class FileDispatchLoader:
-    """Wrapper to persist state and expose standard operations."""
+    """Wrapper for operations of this loader."""
 
     def __init__(
         self,
-        dispatch_config_manager: DispatchConfigManager,
+        metadata_files: dict[Path, dict],
         template_path: Path,
         file_ext: str,
     ) -> None:
-        """Wrapper to persist state and expose standard operations.
+        """Wrapper for operations of this loader.
 
         Args:
-            dispatch_config_manager (DispatchConfigManager): Dispatch config manager
-            template_path (Path): Dispatch template folder path
-            file_ext (str): Dispatch file extension
+            metadata_files (dict[Path, dict]): Paths and content of
+            dispatch metadata files
+            template_path (Path): Dispatch template directory path
+            file_ext (str): Dispatch template extension
         """
 
-        self.dispatch_config_manager = dispatch_config_manager
         self.template_path = template_path
         self.file_ext = file_ext
 
-    def get_dispatch_config(self) -> dict[str, dict]:
-        """Get dispatch configuration in NSDU's standard format.
+        self.metadata_files = metadata_files
+        self.new_dispatch_ids: dict[str, str] = {}
+        self.changed = False
+
+    def get_canonical_dispatch_metadata(self) -> DispatchesMetadata:
+        """Get dispatch metadata as a DispatchesMetadata instance.
 
         Returns:
-            dict: Dispatch configuration
+            DispatchesMetadata: Metadata of dispatches
         """
 
-        return self.dispatch_config_manager.get_canonical_dispatch_config()
+        files_content = list(self.metadata_files.values())
+        return parse_dispatch_metadata_files(files_content)
 
     def get_dispatch_template(self, name: str) -> str:
-        """Get the template text of a dispatch.
+        """Get a dispatch template from a text file with the same name.
 
         Args:
             name (str): Dispatch name
 
         Raises:
-            exceptions.LoaderError: Could not find dispatch file
+            exceptions.LoaderError: Dispatch file not found
 
         Returns:
-            str | None: Template text
+            str: Template text
         """
 
         file_path = Path(self.template_path, name).with_suffix(self.file_ext)
         try:
             return file_path.read_text()
         except FileNotFoundError:
-            raise ValueError("Dispatch template not found")
+            raise loader_api.DispatchTemplateNotFound
 
-    def add_new_dispatch_id(self, name, dispatch_id) -> None:
-        """Add NationStates-provided ID of a new dispatch.
+    def add_new_dispatch_id(self, name: str, dispatch_id: str) -> None:
+        """Add ID of a new dispatch.
 
         Args:
             name (str): Dispatch name
-            dispatch_id (str): NationStates-provided ID
+            dispatch_id (str): Dispatch ID
         """
 
-        self.dispatch_config_manager.add_new_dispatch_id(name, dispatch_id)
+        self.new_dispatch_ids[name] = dispatch_id
 
-    def save_dispatch_config(self) -> None:
+    def save_updated_dispatch_metadata(self) -> None:
         """Save new dispatch IDs into dispatch configuration file(s)."""
 
-        self.dispatch_config_manager.save()
+        if not self.changed:
+            return
+        update_dispatch_metadata_files(self.metadata_files, self.new_dispatch_ids)
+        self.changed = False
+        logger.debug("Saved modified dispatch config: %r", self.metadata_files)
 
 
 @loader_api.dispatch_loader
@@ -177,35 +248,41 @@ def init_dispatch_loader(loaders_config: Config):
     try:
         loader_config = loaders_config["file_dispatch_loader"]
     except KeyError:
-        raise loader_api.LoaderError("File dispatch loader does not have config.")
+        raise loader_api.LoaderError(
+            "file_dispatch_loader is not configured. "
+            "Please set file_dispatch_loader in loaders_config."
+        )
 
     try:
-        dispatch_config_paths = loader_config["dispatch_config_paths"]
+        dispatch_metadata_paths = loader_config["metadata_paths"]
     except KeyError:
-        raise loader_api.LoaderError("There is no dispatch config path!")
-
-    dispatch_config_manager = DispatchConfigManager()
-    dispatch_config_manager.load_from_files(dispatch_config_paths)
+        raise loader_api.LoaderError(
+            "No dispatch metadata path configured. "
+            "Please set metadata_paths in this loader's config."
+        )
+    metadata_files_content = load_files_content(dispatch_metadata_paths)
 
     try:
-        dispatch_template_path = Path(
-            loader_config["dispatch_template_path"]
-        ).expanduser()
+        dispatch_template_path = Path(loader_config["template_path"]).expanduser()
     except KeyError:
-        raise loader_api.LoaderError("There is no dispatch template path!")
+        raise loader_api.LoaderError(
+            "No dispatch template path configured. "
+            "Please set template_path in this loader's config."
+        )
+
+    template_file_extension = loader_config.get("file_ext", DEFAULT_EXT)
 
     loader = FileDispatchLoader(
-        dispatch_config_manager,
+        metadata_files_content,
         dispatch_template_path,
-        loader_config.get("file_ext", DEFAULT_EXT),
+        template_file_extension,
     )
-
     return loader
 
 
 @loader_api.dispatch_loader
 def get_dispatch_metadata(loader: FileDispatchLoader):
-    return loader.get_dispatch_config()
+    return loader.get_canonical_dispatch_metadata()
 
 
 @loader_api.dispatch_loader
@@ -220,4 +297,4 @@ def add_dispatch_id(loader: FileDispatchLoader, name: str, dispatch_id: str) -> 
 
 @loader_api.dispatch_loader
 def cleanup_dispatch_loader(loader: FileDispatchLoader) -> None:
-    loader.save_dispatch_config()
+    loader.save_updated_dispatch_metadata()
