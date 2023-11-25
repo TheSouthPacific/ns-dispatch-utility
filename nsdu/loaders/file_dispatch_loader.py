@@ -18,12 +18,14 @@ DEFAULT_EXT = ".txt"
 logger = logging.getLogger(__name__)
 
 
-def parse_dispatch_metadata_dict(raw: dict, owner_nation: str) -> DispatchMetadata:
+def parse_dispatch_metadata_dict(
+    metadata_dict: dict, owner_nation: str
+) -> DispatchMetadata | None:
     """Parse a dispatch metadata dict and return the metadata
     as a DispatchMetadata instance.
 
     Args:
-        raw (dict): Raw dict
+        metadata_dict (dict): Metadata dict
         owner_nation (str): Owner nation name
 
     Raises:
@@ -34,14 +36,12 @@ def parse_dispatch_metadata_dict(raw: dict, owner_nation: str) -> DispatchMetada
     """
 
     try:
-        title = raw["title"]
-        category = raw["category"]
-        subcategory = raw["subcategory"]
+        operation = metadata_dict["op"]
+        title = metadata_dict["title"]
+        category = metadata_dict["category"]
+        subcategory = metadata_dict["subcategory"]
     except KeyError as err:
         raise ValueError(f"{err.args[0]} is missing")
-
-    ns_id = raw.get("ns_id")
-    operation = raw.get("op")
 
     match operation:
         case "create":
@@ -53,32 +53,16 @@ def parse_dispatch_metadata_dict(raw: dict, owner_nation: str) -> DispatchMetada
         case _:
             raise ValueError(f'Invalid operation "{operation}"')
 
+    ns_id: str | None = None
+    if operation != DispatchOp.CREATE:
+        ns_id = metadata_dict.get("ns_id")
+
     if operation in [DispatchOp.EDIT, DispatchOp.DELETE] and ns_id is None:
         raise ValueError("Needs ID for edit or deletion")
 
     return DispatchMetadata(
         ns_id, operation, owner_nation, title, category, subcategory
     )
-
-
-def parse_dispatch_metadata_file(content: dict) -> DispatchesMetadata:
-    """Parse content of a dispatch metadata file and return
-    the dispatches' metadata as a DispatchesMetadata instance.
-
-    Args:
-        content (dict): File content
-
-    Returns:
-        DispatchesMetadata: Metadata of dispatches
-    """
-
-    dispatches_metadata: DispatchesMetadata = {}
-    for owner_nation, metadata_dicts in content.items():
-        for name, metadata_dict in metadata_dicts.items():
-            dispatches_metadata[name] = parse_dispatch_metadata_dict(
-                metadata_dict, owner_nation
-            )
-    return dispatches_metadata
 
 
 def parse_dispatch_metadata_files(
@@ -96,7 +80,12 @@ def parse_dispatch_metadata_files(
 
     files_dispatches_metadata: DispatchesMetadata = {}
     for file_content in files_content:
-        dispatches_metadata = parse_dispatch_metadata_file(file_content)
+        dispatches_metadata = {
+            name: parse_dispatch_metadata_dict(metadata, owner)
+            for owner, dispatches_metadata in file_content.items()
+            for name, metadata in dispatches_metadata.items()
+            if "op" in metadata
+        }
         files_dispatches_metadata.update(dispatches_metadata)
     return files_dispatches_metadata
 
