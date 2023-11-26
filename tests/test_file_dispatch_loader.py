@@ -160,6 +160,59 @@ def test_parse_invalid_dispatch_metadata_dict(metadata_dict):
                 "n1": DispatchMetadata(None, DispatchOp.CREATE, "nat1", "t", "c", "sc"),
             },
         ],
+        [
+            [
+                {
+                    "nat1": {
+                        "n1": {
+                            "op": "create",
+                            "title": "t",
+                            "category": "c",
+                            "subcategory": "sc",
+                        },
+                    }
+                },
+                {
+                    "nat2": {
+                        "n1": {
+                            "op": "create",
+                            "title": "t",
+                            "category": "c",
+                            "subcategory": "sc",
+                        },
+                    }
+                },
+            ],
+            {
+                "n1": DispatchMetadata(None, DispatchOp.CREATE, "nat2", "t", "c", "sc"),
+            },
+        ],
+        [
+            [
+                {
+                    "nat1": {
+                        "n1": {
+                            "op": "create",
+                            "title": "t",
+                            "category": "c",
+                            "subcategory": "sc",
+                        },
+                    },
+                    "nat2": {
+                        "n1": {
+                            "op": "create",
+                            "title": "t",
+                            "category": "c",
+                            "subcategory": "sc",
+                        }
+                    },
+                },
+            ],
+            {
+                "n1": DispatchMetadata(None, DispatchOp.CREATE, "nat2", "t", "c", "sc"),
+            },
+        ],
+        [[{}], {}],
     ],
 )
 def test_parse_dispatch_metadata_files(files_content, expected):
