@@ -190,9 +190,9 @@ class CredCliParser(feature.FeatureCliParser):
             cli_args (Namespace): CLI arguments
         """
 
-        if hasattr(cli_args, "add"):
+        if cli_args.add is not None:
             self.parse_add_autologin_creds(cli_args)
-        elif hasattr(cli_args, "add_password"):
+        elif cli_args.add_password is not None:
             self.parse_add_password_creds(cli_args)
-        elif hasattr(cli_args, "remove"):
+        elif cli_args.remove is not None:
             self.parse_remove_creds(cli_args)

@@ -229,7 +229,7 @@ class FileDispatchLoader:
             return
         update_dispatch_metadata_files(self.metadata_files, self.new_dispatch_ids)
         self.changed = False
-        logger.debug("Saved modified dispatch config: %r", self.metadata_files)
+        logger.debug("Saved modified dispatch metadata: %r", self.metadata_files)
 
 
 @loader_api.dispatch_loader
