@@ -7,20 +7,19 @@ readme = "README.md"
 version = "0.3.0"
 
 [tool.poetry.dependencies]
-Jinja2 = "^3.1.2"
+Jinja2 = "^3.1.4"
 appdirs = "^1.4.4"
 bbcode = "^1.1.0"
-certifi = "^2023.07.22"
 google-api-python-client = "^2.15.0"
 google-auth-httplib2 = "^0.1.0"
 google-auth-oauthlib = "^0.4.5"
-nationstates = "^3.0.2"
+nationstates = "^3.1.4"
 pluggy = "^1.0.0"
 python = "^3.11"
 toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
-black = "^22.10.0"
+black = "^24.3.0"
 coverage = "^6.5.0"
 freezegun = "^1.2.2"
 pytest = "^7.2.0"
