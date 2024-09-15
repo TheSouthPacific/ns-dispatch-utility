@@ -1,0 +1,15 @@
+{
+  "python.testing.pytestArgs": ["tests"],
+  "python.testing.unittestEnabled": false,
+  "python.testing.pytestEnabled": true,
+  "cSpell.words": [
+    "autologin",
+    "Factbook",
+    "Gameplay",
+    "googleapiclient",
+    "nsdu",
+    "Testopia",
+    "usovietnam"
+  ],
+  "python.analysis.typeCheckingMode": "basic"
+}
