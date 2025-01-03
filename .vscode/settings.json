@@ -3,10 +3,12 @@
   "python.testing.unittestEnabled": false,
   "python.testing.pytestEnabled": true,
   "cSpell.words": [
+    "appdirs",
     "autologin",
     "Factbook",
     "Gameplay",
     "googleapiclient",
+    "httplib",
     "nsdu",
     "Testopia",
     "usovietnam"

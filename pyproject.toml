@@ -12,22 +12,20 @@ appdirs = "^1.4.4"
 bbcode = "^1.1.0"
 google-api-python-client = "^2.15.0"
 google-auth-httplib2 = "^0.1.0"
-google-auth-oauthlib = "^0.4.5"
+google-auth-oauthlib = "^1.2.1"
 nationstates = "^3.1.4"
 pluggy = "^1.0.0"
 python = "^3.11"
 toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
-coverage = "^6.5.0"
 freezegun = "^1.2.2"
-pytest = "^7.2.0"
-pytest-cov = "^4.0.0"
-ruff = "^0.0.285"
-pre-commit = "^3.3.3"
+pytest = "^8.3.4"
+ruff = "^0.8.5"
+pre-commit = "^4.0.1"
 
-[tool.ruff]
-select = ["E", "F", "I"]
+[tool.ruff.lint]
+extend-select = ["I"]
 
 [tool.poetry.scripts]
 nsdu = "nsdu.__main__:main"
