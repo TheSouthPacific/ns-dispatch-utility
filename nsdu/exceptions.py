@@ -2,74 +2,9 @@
 """
 
 
-class NSDUError(Exception):
+class AppError(Exception):
     """NSDU general error."""
 
 
-class ConfigError(NSDUError):
-    """NSDU general config error."""
-
-
-class LoaderNotFound(NSDUError):
-    """Loader source file not found."""
-
-
-class LoaderError(NSDUError):
-    """Error of loader plugins."""
-
-
-class LoaderConfigError(LoaderError):
-    """Loader's config error."""
-
-
-class CredNotFound(LoaderError):
-    """Login credential not found. For cred loader."""
-
-
-class DispatchTemplateNotFound(LoaderError):
-    """Dispatch template not found."""
-
-
-class DispatchApiError(NSDUError):
-    """Dispatch API error."""
-
-
-class CredOperationError(NSDUError):
-    """Error about a login credential operation (e.g. add, remove)."""
-
-
-class UnknownDispatchError(DispatchApiError):
-    """This dispatch does not exist."""
-
-
-class NotOwnerDispatchError(DispatchApiError):
-    """You do not own this dispatch."""
-
-
-class NationLoginError(DispatchApiError):
-    """Failed to log in to nation."""
-
-
-class DispatchConfigError(NSDUError):
-    """Dispatch config error."""
-
-
-class NonexistentCategoryError(DispatchConfigError):
-    """Category or subcategory doesn't exist."""
-
-    def __init__(self, category_type, category_value):
-        self.category_type = category_type
-        self.category_value = category_value
-        super().__init__()
-
-
-class DispatchRenderingError(NSDUError):
-    """Dispatch rendering error."""
-
-
-class BBParsingError(DispatchRenderingError):
-    """BBCode parsing errors."""
-
-
-class TemplateRenderingError(DispatchRenderingError):
-    """Jinja template rendering errors."""
+class UserError(AppError):
+    """User error."""

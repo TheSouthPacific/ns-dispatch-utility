@@ -1,108 +1,168 @@
-import os
-import shutil
-import logging
-from unittest import mock
+from pathlib import Path
+from unittest.mock import Mock
 
 import pytest
-import toml
 
-from nsdu import info
-from nsdu import exceptions
-from nsdu import renderer
+from nsdu import config, loader_api, renderer
 
 
 class TestDispatchTemplateLoader:
-    def test_exising_template_returns_template_text(self):
-        template_load_func = mock.Mock(return_value="Test text")
+    def test_with_template_exists_returns_template_text(self):
+        template_load_func = Mock(return_value="r")
         obj = renderer.JinjaTemplateLoader(template_load_func)
 
-        r = obj.get_source(mock.Mock(), "Test")
-        assert r[0] == "Test text"
+        result = obj.get_source(Mock(), "t")
 
-    def test_non_existent_template_raises_exception(self):
-        template_load_func = mock.Mock(side_effect=exceptions.DispatchTemplateNotFound)
+        assert result[0] == "r"
+
+    def test_with_template_not_exist_raises_exception(self):
+        template_load_func = Mock(side_effect=loader_api.DispatchTemplateNotFound)
         obj = renderer.JinjaTemplateLoader(template_load_func)
 
-        with pytest.raises(exceptions.DispatchTemplateNotFound):
-            obj.get_source(mock.Mock(), "Test")
+        with pytest.raises(loader_api.DispatchTemplateNotFound):
+            obj.get_source(Mock(), "")
 
 
 class TestTemplateRenderer:
-    def test_render_non_existent_template_raises_exception(self):
-        template_load_func = mock.Mock(side_effect=exceptions.DispatchTemplateNotFound)
-        obj = renderer.TemplateRenderer(template_load_func)
-
-        with pytest.raises(exceptions.DispatchTemplateNotFound):
-            obj.render("foo", {})
-
-    def test_render_existent_template_returns_rendered_text(self):
+    @pytest.mark.parametrize("context,expected", [[{"i": "1"}, "1"], [{}, ""]])
+    def test_render_existing_template_returns_rendered_text(self, context, expected):
         template = "{{ i }}"
-        template_load_func = mock.Mock(return_value=template)
+        template_load_func = Mock(return_value=template)
         obj = renderer.TemplateRenderer(template_load_func)
 
-        r = obj.render("foo", {"i": "1"})
+        result = obj.render("t", context)
 
-        assert r == "1"
+        assert result == expected
 
-    def test_load_filters_filters_are_loaded(self):
-        template = "{{ i|foo_filter }}"
-        template_load_func = mock.Mock(return_value=template)
+    def test_render_non_existent_template_raises_exception(self):
+        template_load_func = Mock(side_effect=loader_api.DispatchTemplateNotFound)
         obj = renderer.TemplateRenderer(template_load_func)
 
-        def foo_filter(a):
-            return "[{}]".format(a)
+        with pytest.raises(loader_api.DispatchTemplateNotFound):
+            obj.render("t", {})
 
-        obj.load_filters({"foo_filter": foo_filter})
-        r = obj.render("foo", {"i": "1"})
+    def test_load_filters_then_render_uses_filters_when_rendering(self):
+        template = "{{ i|foo }}"
+        template_load_func = Mock(return_value=template)
+        obj = renderer.TemplateRenderer(template_load_func)
 
-        assert r == "[1]"
+        def foo(a):
+            return "f-{}".format(a)
+
+        obj.load_filters({"foo": foo})
+        result = obj.render("t", {"i": "1"})
+
+        assert result == "f-1"
+
+    def test_render_with_non_existent_filters_raises_exception(self):
+        template = "{{ i|foo }}"
+        template_load_func = Mock(return_value=template)
+        obj = renderer.TemplateRenderer(template_load_func)
+
+        with pytest.raises(renderer.TemplateRenderError):
+            obj.render("t", {"i": "1"})
 
 
 class TestLoadFiltersFromSource:
-    def test_files_exist_filters_are_loaded(self):
-        template = "{{ i|filter1 }}"
-        template_load_func = mock.Mock(return_value=template)
+    @pytest.mark.parametrize(
+        "paths,template,expected",
+        [
+            [
+                ["tests/resources/filters-1.py", "tests/resources/filters-2.py"],
+                "{{ i|filterA }} {{ i|filterC }}",
+                "fA-1 fC-1",
+            ],
+            [
+                [],
+                "{{ i }}",
+                "1",
+            ],
+        ],
+    )
+    def test_with_files_exist_loads_filters(self, paths, template, expected):
+        template_load_func = Mock(return_value=template)
         obj = renderer.TemplateRenderer(template_load_func)
 
-        renderer.load_filters_from_source(obj, ["tests/resources/filters-1.py"])
-        r = obj.render("foo", {"i": 1})
+        renderer.load_filters_from_source(obj, paths)
+        result = obj.render("t", {"i": 1})
 
-        assert r == "[1]"
+        assert result == expected
 
-    def test_files_not_exist_raises_exception(self):
-        obj = renderer.TemplateRenderer(mock.Mock())
+    def test_with_non_existent_files_raises_exception(self):
+        obj = renderer.TemplateRenderer(Mock())
 
-        with pytest.raises(exceptions.ConfigError):
-            renderer.load_filters_from_source(obj, ["non-existent.py"])
+        with pytest.raises(config.ConfigError):
+            renderer.load_filters_from_source(obj, [""])
 
 
-class TestIntegrationDispatchRenderer:
-    def test_render(self):
-        template = (
-            "{% for i in j %}[complex]{{ i|filter1 }}[/complex]"
-            "[complexctx][complex]{{ i|filter2(0)}}[/complex][/complexctx]"
-            "[complexopt opt=1]{{ i|filter3 }}[/complexopt]{% endfor %}"
-        )
-        template_load_func = mock.Mock(return_value=template)
-        simple_bb_config = {
-            "simple1": {"format_string": "[simple1r]%(value)s[/simple1r]"}
-        }
-        complex_formatter_source_path = "tests/resources/bb_complex_formatters.py"
-        template_filter_paths = [
-            "tests/resources/filters-1.py",
-            "tests/resources/filters-2.py",
-        ]
-        template_vars = {"j": [1, 2], "example": {"foo": "cool"}}
-        ins = renderer.DispatchRenderer(
+class TestDispatchRenderer:
+    @pytest.mark.parametrize(
+        "template,simple_fmts_config,complex_fmts_path,filter_paths,expected",
+        [
+            [
+                "[s]{{ i|filterA }}[/s][c1]{{ i|filterC }}[/c1]",
+                {"s": {"format_string": "[sr]%(value)s[/sr]"}},
+                Path("tests/resources/bbc_complex_formatters.py"),
+                ["tests/resources/filters-1.py", "tests/resources/filters-2.py"],
+                "[sr]fA-1[/sr][cr1]fC-1[/cr1]",
+            ],
+            [
+                "[s]{{ i }}[/s][c1]{{ i }}[/c1]",
+                {"s": {"format_string": "[sr]%(value)s[/sr]"}},
+                Path("tests/resources/bbc_complex_formatters.py"),
+                None,
+                "[sr]1[/sr][cr1]1[/cr1]",
+            ],
+            [
+                "{{ i|filterA }}{{ i|filterC }}",
+                None,
+                None,
+                ["tests/resources/filters-1.py", "tests/resources/filters-2.py"],
+                "fA-1fC-1",
+            ],
+            [
+                "{{ i }}",
+                None,
+                None,
+                None,
+                "1",
+            ],
+        ],
+    )
+    def test_render_returns_rendered_text(
+        self, template, simple_fmts_config, complex_fmts_path, filter_paths, expected
+    ):
+        template_load_func = Mock(return_value=template)
+        template_vars = {"i": 1}
+        obj = renderer.DispatchRenderer(
             template_load_func,
-            simple_bb_config,
+            simple_fmts_config,
+            complex_fmts_path,
+            filter_paths,
+            template_vars,
+        )
+
+        result = obj.render("t")
+
+        assert result == expected
+
+    def test_render_with_bbc_uses_template_vars_as_bbc_format_context(self):
+        template = "[c2]{{ i|filterA }}[/c2]"
+        template_load_func = Mock(return_value=template)
+        simple_formatter_config = None
+        complex_formatter_source_path = Path(
+            "tests/resources/bbc_complex_formatters.py"
+        )
+        template_filter_paths = ["tests/resources/filters-1.py"]
+        template_vars = {"i": 1, "foo": "bar"}
+        obj = renderer.DispatchRenderer(
+            template_load_func,
+            simple_formatter_config,
             complex_formatter_source_path,
             template_filter_paths,
             template_vars,
         )
 
-        expected = (
-            "[simple1r][1][/simple1r][complexctxr=cool][complex]1and0[/complex][/complexctxr][complexoptr=1]<1>[/complexoptr]"
-            "[simple1r][2][/simple1r][complexctxr=cool][complex]2and0[/complex][/complexctxr][complexoptr=1]<2>[/complexoptr]"
-        )
-        assert ins.render("test1") == expected
+        result = obj.render("t")
+
+        assert result == "[cr2]ctx=bar fA-1[/cr2]"

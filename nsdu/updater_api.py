@@ -1,110 +1,114 @@
-"""Updates dispatches based on dispatch config from dispatch loader.
+"""A simple API to render dispatches from templates
+and upload them to NationStates.
 """
 
 import logging
-from typing import Any, Callable, Mapping, Sequence, Tuple
+from pathlib import Path
+from typing import Sequence
 
-from nsdu import ns_api
-from nsdu import renderer
-from nsdu import info
-from nsdu import exceptions
-
+from nsdu import exceptions, info, ns_api, renderer
+from nsdu.bbc_parser import SimpleFormattersConfig
+from nsdu.renderer import TemplateLoadFunc, TemplateVars
 
 logger = logging.getLogger(__name__)
 
 
-def get_category_number(category: str, subcategory: str) -> Tuple[str, str]:
-    """Get the number of a dispatch category or subcategory name.
-    If the provided names are numbers, just return the numbers as is.
+class DispatchMetadataError(exceptions.AppError):
+    """Dispatch metadata error."""
+
+
+def get_category_numbers(category: str, subcategory: str) -> tuple[str, str]:
+    """Get category and subcategory number from their names.
+    If the provided names are numbers, return the numbers as is.
 
     Args:
-        category (str): Category name or number
-        subcategory (str): Subcategory name or number
+        category (str): Category name
+        subcategory (str): Subcategory name
 
     Raises:
-        exceptions.DispatchUpdatingError: Could not find (sub)category number from provided name
+        DispatchMetadataError: Invalid name
 
     Returns:
-        Tuple[str, str]: Category and subcategory number
+        tuple[str, str]: Category, subcategory number
     """
 
-    if category.isalpha() and subcategory.isalpha():
-        try:
-            category_info = info.CATEGORIES[category.lower()]
-            category_num = category_info["num"]
-        except KeyError as err:
-            raise exceptions.NonexistentCategoryError("category", category) from err
+    if category.isnumeric() and subcategory.isnumeric():
+        return category, subcategory
 
-        try:
-            subcategory_num = category_info["subcategories"][subcategory.lower()]
-        except KeyError as err:
-            raise exceptions.NonexistentCategoryError(
-                "subcategory", subcategory
-            ) from err
-    else:
-        category_num = category
-        subcategory_num = subcategory
+    try:
+        category_info = info.CATEGORIES[category.lower()]
+        category_num = category_info["num"]
+    except KeyError as err:
+        raise DispatchMetadataError(f"Category {category} is invalid") from err
+
+    try:
+        subcategory_num = category_info["subcategories"][subcategory.lower()]
+    except KeyError as err:
+        raise DispatchMetadataError(f"Subcategory {subcategory} is invalid") from err
 
     return category_num, subcategory_num
 
 
 class DispatchUpdater:
-    """Render dispatches from templates and uploads them to NationStates."""
+    """Render dispatches from templates and upload them to NationStates."""
 
     def __init__(
         self,
         user_agent: str,
         template_filter_paths: Sequence[str],
-        simple_formatter_config: Mapping[str, Mapping[str, str]],
-        complex_formatter_source_path: str,
-        template_load_func: Callable[[str], str],
-        template_vars: Mapping[str, Any],
+        simple_fmts_config: SimpleFormattersConfig | None,
+        complex_fmts_source_path: Path | None,
+        template_load_func: TemplateLoadFunc,
+        template_vars: TemplateVars,
     ) -> None:
-        """Renders dispatches from templates and uploads them to NationStates.
+        """Renders and uploads dispatches to NationStates.
 
         Args:
-            user_agent (str): User agent for NationStates API calls
-            template_filter_paths (Sequence[str]): List of paths to template filter source files
-            simple_formatter_config (Mapping[str, Mapping[str, str]]): Simple BBCode formatter config
-            complex_formatter_source_path (str): Path to complex BBCode formatter source file
-            template_load_func (Callable[[str], str]): A callable that receives a dispatch name and returns its template
-            template_vars (Mapping[str, Any]): Template variables
+            user_agent (str): User agent for NationStates API
+            template_filter_paths (Sequence[str]): Paths to template filter source files
+            simple_formatter_config (SimpleFormattersConfig | None): Config for
+            simple BBCode formatters
+            complex_formatter_source_path (Path | None): Path to source file of
+            complex BBCode formatters
+            template_load_func (TemplateLoadFunc): A callback which receives
+            dispatch name and returns template text
+            template_vars (TemplateVars): Template variables
         """
 
         self.dispatch_api = ns_api.DispatchApi(user_agent=user_agent)
         self.renderer = renderer.DispatchRenderer(
             template_load_func,
-            simple_formatter_config,
-            complex_formatter_source_path,
+            simple_fmts_config,
+            complex_fmts_source_path,
             template_filter_paths,
             template_vars,
         )
 
-    def set_owner_nation(self, nation_name: str, autologin: str) -> None:
+    def set_nation(self, nation_name: str, autologin: str) -> None:
         """Set the nation to do dispatch operations on.
 
         Args:
             nation_name (str): Nation name
-            autologin (str): Nation's autologin code
+            autologin (str): Autologin code
         """
 
-        self.dispatch_api.set_owner_nation(nation_name, autologin)
+        self.dispatch_api.set_nation(nation_name, autologin)
 
-    def get_rendered_dispatch_text(self, name: str) -> str:
-        """Get rendered text of a dispatch.
+    def render_dispatch(self, name: str) -> str:
+        """Render a dispatch.
 
         Args:
             name (str): Dispatch name
 
         Returns:
-            str: Rendered text
+            str: Text of rendered dispatch
         """
 
         return self.renderer.render(name)
 
     def create_dispatch(
         self, name: str, title: str, category: str, subcategory: str
-    ) -> None:
+    ) -> str:
         """Create a dispatch.
 
         Args:
@@ -114,14 +118,16 @@ class DispatchUpdater:
             subcategory (str): Subcategory name or number
 
         Returns:
-            str: Id of new dispatch
+            str: ID of new dispatch
         """
 
-        text = self.get_rendered_dispatch_text(name)
-        category_num, subcategory_num = get_category_number(category, subcategory)
+        text = self.render_dispatch(name)
+        category_num, subcategory_num = get_category_numbers(category, subcategory)
+
         new_dispatch_id = self.dispatch_api.create_dispatch(
             title=title, text=text, category=category_num, subcategory=subcategory_num
         )
+
         return new_dispatch_id
 
     def edit_dispatch(
@@ -131,14 +137,15 @@ class DispatchUpdater:
 
         Args:
             name (str): Name
-            dispatch_id (str): Id
+            dispatch_id (str): ID
             title (str): Title
             category (str): Category name or number
             subcategory (str): Subcategory name or number
         """
 
-        text = self.get_rendered_dispatch_text(name)
-        category_num, subcategory_num = get_category_number(category, subcategory)
+        text = self.render_dispatch(name)
+        category_num, subcategory_num = get_category_numbers(category, subcategory)
+
         self.dispatch_api.edit_dispatch(
             dispatch_id=dispatch_id,
             title=title,
@@ -147,11 +154,11 @@ class DispatchUpdater:
             subcategory=subcategory_num,
         )
 
-    def remove_dispatch(self, dispatch_id: str) -> None:
+    def delete_dispatch(self, dispatch_id: str) -> None:
         """Delete a dispatch.
 
         Args:
-            dispatch_id (str):  Id
+            dispatch_id (str): ID
         """
 
-        self.dispatch_api.remove_dispatch(dispatch_id)
+        self.dispatch_api.delete_dispatch(dispatch_id)

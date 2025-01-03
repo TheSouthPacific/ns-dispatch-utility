@@ -5,18 +5,17 @@ from pathlib import Path
 
 import appdirs
 
-
 APP_NAME = "nsdu"
 APP_VERSION = "0.3.0"
-AUTHOR = "ns_tsp_usovietnam"
-DESCRIPTION = "Automatically update and format dispatches."
+AUTHOR = "USoVietnam"
+DESCRIPTION = "Utility to update and format dispatches."
 
 DEFAULT_TEMPLATE = "[reserved]"
 
 # Pluggy project name for loader plugins.
 DISPATCH_LOADER_PROJ = "NSDUDispatchLoader"
 TEMPLATE_VAR_LOADER_PROJ = "NSDUTemplateVarLoader"
-SIMPLE_BB_LOADER_PROJ = "NSDUSimpleBBLoader"
+SIMPLE_BBC_LOADER_PROJ = "NSDUSimpleBBLoader"
 CRED_LOADER_PROJ = "NSDUCredLoader"
 
 # Default directories
