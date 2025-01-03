@@ -19,14 +19,12 @@ python = "^3.11"
 toml = "^0.10.2"
 
 [tool.poetry.group.dev.dependencies]
-black = "^24.3.0"
 coverage = "^6.5.0"
 freezegun = "^1.2.2"
 pytest = "^7.2.0"
 pytest-cov = "^4.0.0"
 ruff = "^0.0.285"
 pre-commit = "^3.3.3"
-isort = "^5.12.0"
 
 [tool.ruff]
 select = ["E", "F", "I"]
