@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        python-version: ["3.11", "3.12"]
+        python-version: ["3.10", "3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
       - name: Set up Python ${{ matrix.python-version }}
@@ -20,12 +20,12 @@ jobs:
           python-version: ${{ matrix.python-version }}
       - name: Install Poetry
         uses: abatilo/actions-poetry@v4
-      - name: Setup virtual environment
+      - name: Setup virtual environment using Poetry
         run: |
           poetry config virtualenvs.create true --local
           poetry config virtualenvs.in-project true --local
       - uses: actions/cache@v4
-        name: Define cache for the virtual environment based on dependency lock file
+        name: Cache virtual environment based on dependency lock file
         with:
           path: ./.venv
           key: venv-${{ hashFiles('poetry.lock') }}
