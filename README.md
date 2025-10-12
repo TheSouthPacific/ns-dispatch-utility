@@ -70,12 +70,10 @@ Create a Google spreadsheet with the same column setup as [the spreadsheet TSP i
 - **Status:** The result of the `nsdu update` command after it acts on your dispatch. This column is auto-set by `nsdu` so don't touch it.
 
 Create another Google spreadsheet with the same setup as [the spreadsheet TSP is using](https://docs.google.com/spreadsheets/d/1tdG_2Vp0VabvL9TGAaM5fX3vUrF-YLX8b851M1JgeJM/edit?usp=sharing). To be quick, you should just duplicate the spreadsheet. This one contains the layouts and macros (We'll call this the master config)
-_TODO: Explaining about the columns of this_
+_TODO: Explaining about the columns of this spreadsheet_
 
 Download [this](https://github.com/watarichanno/tsp_dispatches). These are TOML files which contain the placeholder values and custom BBCode tags. Change them to your preferences or don't touch them if you are updating TSP's dispatches.
 
-Set the `nsdu` config file like [this example](). Change the `/path/to/folder/` part of all file `path` values to the folder containing the `tsp_dispatches` folder above.
+Set the `nsdu` config file like [this example](https://github.com/TheSouthPacific/ns-dispatch-utility/blob/v0.3.1/docs/sample_nsdu_config.toml). Just copy it then change the `/path/to/folder/` part of all `path` values to the folder containing the `tsp_dispatches` folder above. Also change the `spreadsheet_id` values to the spreadsheet ID of the spreadsheets you made. The ID is the part between `/d/` and `/edit` of the spreadsheet's URL (in your browser URL bar when you view a spreadsheet): `https://docs.google.com/spreadsheets/d/1c7rApk0yQp5b1S-kIPTj7n-ulbz2Yy5PKJjj6VzJnIE/edit`
 
-Change the `spreadsheet_id` values to the spreadsheet ID of the Google spreadsheets you made. The ID is the bolded part of the spreadsheet's URL (in your browser URL bar when you view a spreadsheet): https://docs.google.com/spreadsheets/d/**1c7rApk0yQp5b1S-kIPTj7n-ulbz2Yy5PKJjj6VzJnIE**/edit
-
-Get the `nsdu_google_creds.json` file which allows `nsdu` to edit the spreadsheets. _TODO: How to do this_
+Get the `nsdu_google_creds.json` file which allows `nsdu` to edit the spreadsheets (_TODO: How to do this_). Put this file in whatever folder containing the `tsp_dispatches` folder.

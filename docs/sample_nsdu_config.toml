@@ -30,10 +30,12 @@ cred_loader = 'json_cred_loader'
 file_path = '/path/to/folder/tsp_dispatches/design/simple_bbc_formatters.toml'
 
 [loaders_config.file_template_var_loader]
-template_var_paths = ['/path/to/folder/tsp_dispatches/personnel.toml',
-                      '/path/to/folder/tsp_dispatches/urls.toml',
-                      '/path/to/folder/tsp_dispatches/img_urls.toml',
-                      '/path/to/folder/tsp_dispatches/misc.toml']
+template_var_paths = [
+    '/path/to/folder/tsp_dispatches/personnel.toml',
+    '/path/to/folder/tsp_dispatches/urls.toml',
+    '/path/to/folder/tsp_dispatches/img_urls.toml',
+    '/path/to/folder/tsp_dispatches/misc.toml',
+]
 # Variable groups that contain personnel names (e.g. government official names)
 personnel_groups = ['gov_officials']
 # Variable groups that define information associated with a personnel name (e.g. nation name, Discord ID)
@@ -43,12 +45,22 @@ people_info_groups = ['people_info']
 # cred_path = '/path/to/folder/nation-creds.json'
 
 [loaders_config.google_dispatch_loader]
+utility_template_spreadsheets = [
+    { spreadsheet_id = '1tdG_2Vp0VabvL9TGAaM5fX3vUrF-YLX8b851M1JgeJM', ranges = [
+        'Layouts!A3:B',
+        'Macros!A3:B',
+    ] },
+]
+dispatch_spreadsheets = [
+    { spreadsheet_id = '1c7rApk0yQp5b1S-kIPTj7n-ulbz2Yy5PKJjj6VzJnIE', ranges = [
+        'Welcome!A3:G',
+        'Government!A3:G',
+        'Scratchpad!A3:G',
+    ] },
+    { spreadsheet_id = '1tdG_2Vp0VabvL9TGAaM5fX3vUrF-YLX8b851M1JgeJM', ranges = [
+        'Design Guides!A3:G',
+    ] },
+]
 google_cred_path = '/path/to/folder/nsdu_google_creds.json'
-owner_nation_sheet = {spreadsheet_id = '1tdG_2Vp0VabvL9TGAaM5fX3vUrF-YLX8b851M1JgeJM', range='Owner nations!A3:C'}
-category_setup_sheet = {spreadsheet_id = '1tdG_2Vp0VabvL9TGAaM5fX3vUrF-YLX8b851M1JgeJM', range='Categories!A3:C'}
-utility_template_spreadsheets = [{spreadsheet_id = '1tdG_2Vp0VabvL9TGAaM5fX3vUrF-YLX8b851M1JgeJM',
-                                  ranges=['Layouts!A3:B', 'Macros!A3:B']}]
-dispatch_spreadsheets = [{spreadsheet_id = '1c7rApk0yQp5b1S-kIPTj7n-ulbz2Yy5PKJjj6VzJnIE',
-                          ranges = ['Welcome!A3:G', 'Government!A3:G', 'Scratchpad!A3:G']},
-                         {spreadsheet_id = '1tdG_2Vp0VabvL9TGAaM5fX3vUrF-YLX8b851M1JgeJM',
-                          ranges = ['Design Guides!A3:G']}]
+owner_nation_sheet = { spreadsheet_id = '1tdG_2Vp0VabvL9TGAaM5fX3vUrF-YLX8b851M1JgeJM', range = 'Owner nations!A3:C' }
+category_setup_sheet = { spreadsheet_id = '1tdG_2Vp0VabvL9TGAaM5fX3vUrF-YLX8b851M1JgeJM', range = 'Categories!A3:C' }
