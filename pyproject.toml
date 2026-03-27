@@ -7,7 +7,7 @@ requires-python = ">=3.13"
 dependencies = [
     "appdirs>=1.4.4",
     "bbcode>=1.1.0",
-    "google-api-python-client>=2.190.0",
+    "google-api-python-client>=2.193.0",
     "jinja2>=3.1.6",
     "nationstates>=3.1.4",
     "pluggy>=1.6.0",
@@ -15,7 +15,7 @@ dependencies = [
 ]
 
 [dependency-groups]
-dev = ["freezegun>=1.5.5", "pre-commit>=4.5.1", "pytest>=9.0.2", "ruff>=0.15.0"]
+dev = ["freezegun>=1.5.5", "pre-commit>=4.5.1", "pytest>=9.0.2", "ruff>=0.15.8"]
 
 [project.scripts]
 nsdu = "nsdu.__main__:main"
